@@ -92,8 +92,8 @@ for k in range (0,Niter):
 #resolve solutions
 v = v[:,1:Niter+1]
 m = np.exp((u-v)/(sigma**2))
-msoln = np.empty((I,J))
-usoln = np.empty((I,J))
+msoln = np.empty([(I+1)*(J+1)])
+usoln = np.empty([(I+1)*(J+1)])
 for i in range (0,I):
 	for j in range (0,J):
 		msoln[i,j] = m[index(i,j),Niter-1]
