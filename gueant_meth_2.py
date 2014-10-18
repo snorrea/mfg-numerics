@@ -9,8 +9,8 @@ import numpy as np
 import scipy.weave as weave
 
 #INPUTS
-dx = 1/10 #these taken from Gueant's paper
-dt = 1/20 
+dx = 1/50 #these taken from Gueant's paper
+dt = 1/2000 
 xmin = 0
 xmax = 1
 T = 1
@@ -23,7 +23,7 @@ I = int(Nt)
 J = int(Nx)
 x = np.arange(xmin,xmax+dx,dx)
 def index(i,j): #this is a jolly source of errors
-	return int(j+I*(i-1))
+	return int(j+J*(i))
 
 #input functions and constants
 def f(xh,xi):
