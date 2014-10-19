@@ -35,11 +35,14 @@ def index(i,j): #this is a jolly source of errors, no more, probably still
 
 #input functions and constants
 def f(xh,xi):
-	return -min(1.4,max(xi,0.7))
+	#return -min(1.4,max(xi,0.7)) #gueant's original
+	return xh*(1-xh)*xi #my thing which will explode
 sigma2 = 0.8**2
-m0 = 1-0.2*np.cos(np.pi*x)
+m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
+#m0 = abs(np.sin(np.pi*x)*np.cos(np.pi*x) + 0.1)*(np.pi/(1+0.1*np.pi))
 fmax = 2 #this has to be chosen empirically
-uT = np.square(x*(1-x))
+#uT = np.square(x*(1-x)) #gueant's original
+uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
 
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
 u = np.empty((I*J))
@@ -62,10 +65,9 @@ for k in range (0,Niter):
 	u[J*I-J-2:J*I-1] = uT #this is wrong wrong wrong what the fuck is wrong
 	#j+(J-1)*i
 	#solve u
-	for i in range (I-1,0,-1):
+	for i in range (I-2,-1,-1):
 		for j in range (0,J):
 			if j==0:
-				print i,j
 				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j+1)] - 2*u[index(i+1,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j+1)])/dx)**2 ) )
 			elif j==J-1:
 				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j-1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j-1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
@@ -73,7 +75,8 @@ for k in range (0,Niter):
 				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
 
 	#known initial conditions on v
-	v[0:(J)] = np.copy(u[0:(J)]) - sigma2 * np.log(m0)
+	#print m0.shape
+	v[0:J+1] = np.copy(u[0:(J+1)]) - sigma2 * np.log(m0)
 	
 	#solve for v
 	for i in range (0,I-1):
@@ -101,23 +104,26 @@ print "Crunching over. Total elapsed time (in seconds):", time.time()-t
 
 #resolve solutions into a mesh
 m = np.exp((u-v)/(sigma2))
-print max(abs(m-u))
-msoln = np.empty((I+1,J+1))
-usoln = msoln
-for i in range (0,I+1):
-	for j in range (0,J+1):
+msoln = np.empty((I,J))
+usoln = np.empty((I,J))
+for i in range (0,I):
+	for j in range (0,J):
 		msoln[i,j] = m[index(i,j)]
 		usoln[i,j] = u[index(i,j)]
 #shit attempt at plotting
-xi = np.linspace(xmin,xmax,Nx+1)
-ti = np.linspace(0,T,Nt+1)
+xi = np.linspace(xmin,xmax,Nx)
+ti = np.linspace(0,T,Nt)
 Xplot, Tplot = np.meshgrid(xi,ti)
-print Xplot.shape, Tplot.shape, msoln.shape
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-#print Xplot, Tplot, msoln
-ax.plot_wireframe(Xplot,Tplot,usoln,rstride=15,cstride=5)
+fig1 = plt.figure()
+ax1 = fig1.add_subplot(111, projection='3d')
+ax1.plot_wireframe(Xplot,Tplot,msoln,rstride=15,cstride=5)
+ax1.set_xlabel('x')
+ax1.set_ylabel('t')
+ax1.set_zlabel('m(x,t)')
 plt.show()
-
+#fig2 = plt.figure()
+#ax2 = fig1.add_subplot(111, projection='3d')
+#ax2.plot_wireframe(Xplot,Tplot,usoln,rstride=15,cstride=5)
+#plt.show()
 
 
