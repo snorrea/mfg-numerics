@@ -81,7 +81,7 @@ for k in range (0,Niter):
 	
 	#solve for v
 	for i in range (1,I):
-		for j in range (0,J):
+		for j in range (0,J): #these should be vectorised 
 			if j==0: #j
 				v[index(i,j),k+1] = v[index(i+1,j),k+1] + dt * ( sigma**2/2 * ( v[index(i+1,j+1),k+1] + v[index(i+1,j+1),k+1] - 2*v[index(i+1,j),k+1] )/(dx**2) - f(x[j],np.exp( ( u[index(i+1,j),k] - v[index(i+1,j),k] )/(sigma**2) )) + 0.5*( max(0,(v[index(i+1,j+1),k+1]-v[index(i+1,j),k+1])/dx)**2 + min(0,(v[index(i+1,j),k+1]-v[index(i+1,j+1),k+1])/dx)**2 ) );
 			elif j==J-1:
@@ -89,8 +89,8 @@ for k in range (0,Niter):
 			else: #source of error could be the inputs of the f function in terms of u
 				v[index(i,j),k+1] = v[index(i+1,j),k+1] + dt * ( sigma**2/2 * ( v[index(i+1,j+1),k+1] + v[index(i+1,j-1),k+1] - 2*v[index(i+1,j),k+1] )/(dx**2) - f(x[j],np.exp( ( u[index(i+1,j),k] - v[index(i+1,j),k] )/(sigma**2) )) + 0.5*( max(0,(v[index(i+1,j+1),k+1]-v[index(i+1,j),k+1])/dx)**2 + min(0,(v[index(i+1,j),k+1]-v[index(i+1,j-1),k+1])/dx)**2 ) );
 
-#resolve solutions
-v = v[:,1:Niter+1]
+#resolve solutions into a mesh
+v = v[:,1:Niter+1] #remove initial condition
 m = np.exp((u-v)/(sigma**2))
 msoln = np.empty((I,J))
 usoln = np.empty((I,J))
@@ -100,6 +100,6 @@ for i in range (0,I):
 		usoln[i,j] = u[index(i,j),Niter-1]
 
 #shit attempt at plotting
-print Xplot.shape,Tplot.shape,m.shape
+print Xplot.shape,Tplot.shape,msoln.shape
 ax.plot_surface(Xplot,Tplot,m)
 plt.show()
