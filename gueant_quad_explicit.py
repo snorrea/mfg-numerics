@@ -36,13 +36,13 @@ def index(i,j): #this is a jolly source of errors, no more, probably still
 #input functions and constants
 def f(xh,xi):
 	#return -min(1.4,max(xi,0.7)) #gueant's original
-	return xh*(1-xh)*xi #my thing which will explode
+	#return xh*(1-xh)*xi #my thing which will explode but didn't
+	return -100*np.log(xi)
 sigma2 = 0.8**2
 m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
-#m0 = abs(np.sin(np.pi*x)*np.cos(np.pi*x) + 0.1)*(np.pi/(1+0.1*np.pi))
-fmax = 2 #this has to be chosen empirically
-#uT = np.square(x*(1-x)) #gueant's original
-uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
+fmax = 10 #this has to be chosen empirically
+uT = np.square(x*(1-x)) #gueant's original
+#uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
 
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
 u = np.empty((I*J))
