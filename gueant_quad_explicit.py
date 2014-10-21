@@ -19,7 +19,7 @@ dt = 1/2000
 xmin = 0
 xmax = 1
 T = 1
-Niter = 50 #maximum number of iterations
+Niter = 500 #maximum number of iterations
 tolerance = 1e-6
 
 #CRUNCH
@@ -37,11 +37,16 @@ def index(i,j): #this is a jolly source of errors, no more, probably still
 def f(xh,xi):
 	#return -min(1.4,max(xi,0.7)) #gueant's original
 	#return xh*(1-xh)*xi #my thing which will explode but didn't
-	return -100*np.log(xi)
+	#return -(xi)
+	#return -100*np.log(xi)
+	#return -0.1 + (xh*(1-xh))**2/(1+4*xi)**(1.5)
+	#return -xi - abs(xh-0.3)**2
+	#return -xi - 2*abs(xh-0.3)**2/(xi+1)
+	return -2*(xi**2)*abs(xh-0.5)**2
 sigma2 = 0.8**2
 m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
 fmax = 10 #this has to be chosen empirically
-uT = np.square(x*(1-x)) #gueant's original
+uT = np.square(x*(1-x))*0 #gueant's original
 #uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
 
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
@@ -116,7 +121,7 @@ ti = np.linspace(0,T,Nt)
 Xplot, Tplot = np.meshgrid(xi,ti)
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(111, projection='3d')
-ax1.plot_wireframe(Xplot,Tplot,msoln,rstride=15,cstride=5)
+ax1.plot_wireframe(Xplot,Tplot,msoln,rstride=15,cstride=15)
 ax1.set_xlabel('x')
 ax1.set_ylabel('t')
 ax1.set_zlabel('m(x,t)')
