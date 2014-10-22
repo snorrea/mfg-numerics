@@ -8,6 +8,7 @@ from __future__ import division
 import numpy as np
 import scipy.weave as weave
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import time as time
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -42,11 +43,12 @@ def f(xh,xi):
 	#return -0.1 + (xh*(1-xh))**2/(1+4*xi)**(1.5)
 	#return -xi - abs(xh-0.3)**2
 	#return -xi - 2*abs(xh-0.3)**2/(xi+1)
-	return -2*(xi**2)*abs(xh-0.5)**2
-sigma2 = 0.8**2
+	return -2*(xi)*abs(xh-0.5)**2
+sigma2 = 0.6**2
 m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
-fmax = 10 #this has to be chosen empirically
-uT = np.square(x*(1-x))*0 #gueant's original
+fmax = 2 #this has to be chosen empirically
+#uT = np.square(x*(1-x)) #gueant's original
+uT = x*0 
 #uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
 
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
@@ -87,11 +89,11 @@ for k in range (0,Niter):
 	for i in range (0,I-1):
 		for j in range (0,J):
 			if j==0: #j
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j+1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j+1)])/dx)**2 ) )
+				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j+1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j+1)])/dx)**2 ) )
 			elif j==J-1:
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j-1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j-1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
+				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j-1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j-1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
 			else: #source of error could be the inputs of the f function in terms of u
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
+				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
 	
 	#change in stuff check; this indicates that something is very very wrong, but WHAT THE FUCK
 	deltaeverything = max(abs( np.exp(( u-v )/(sigma2)) - np.exp(( u_old-v_old )/(sigma2))) )
@@ -121,7 +123,7 @@ ti = np.linspace(0,T,Nt)
 Xplot, Tplot = np.meshgrid(xi,ti)
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(111, projection='3d')
-ax1.plot_wireframe(Xplot,Tplot,msoln,rstride=15,cstride=15)
+ax1.plot_surface(Xplot,Tplot,msoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax1.set_xlabel('x')
 ax1.set_ylabel('t')
 ax1.set_zlabel('m(x,t)')
@@ -129,6 +131,17 @@ plt.show()
 #fig2 = plt.figure()
 #ax2 = fig1.add_subplot(111, projection='3d')
 #ax2.plot_wireframe(Xplot,Tplot,usoln,rstride=15,cstride=5)
+#plt.show()
+
+#surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm,
+#        linewidth=0, antialiased=False)
+#ax.set_zlim(-1.01, 1.01)
+
+#ax.zaxis.set_major_locator(LinearLocator(10))
+#ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+
+#fig.colorbar(surf, shrink=0.5, aspect=5)
+
 #plt.show()
 
 
