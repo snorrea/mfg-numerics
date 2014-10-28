@@ -21,7 +21,7 @@ xmin = 0
 xmax = 1
 T = 1
 Niter = 500 #maximum number of iterations
-tolerance = 1e-6
+tolerance = 1e-15
 
 #CRUNCH
 dx2 = dx**2
@@ -64,6 +64,13 @@ for i in range (0,I):
 	for j in range (0,J):
 		v_old[index(i,j)] = max(abs(uT)) + sigma2 * max(abs(np.log(m0))) + 2*T*fmax
 
+#initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
+ul1 = -1*np.ones((Niter,1))
+ul2 = -1*np.ones((Niter,1))
+ulinfty = -1*np.ones((Niter,1))
+ml1 = -1*np.ones((Niter,1))
+ml2 = -1*np.ones((Niter,1))
+mlinfty = -1*np.ones((Niter,1))
 
 #crunch
 for k in range (0,Niter):
@@ -95,16 +102,24 @@ for k in range (0,Niter):
 			else: #source of error could be the inputs of the f function in terms of u
 				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
 	
-	#change in stuff check; this indicates that something is very very wrong, but WHAT THE FUCK
-	deltaeverything = max(abs( np.exp(( u-v )/(sigma2)) - np.exp(( u_old-v_old )/(sigma2))) )
-	if deltaeverything < tolerance:
-		print "Method converged with final change" , deltaeverything
+	#compute norms of stuff
+	mchange = np.exp(( u-v )/(sigma2)) - np.exp(( u_old-v_old )/(sigma2))
+	uchange = u-u_old
+	ml1[k] = np.sum(abs(mchange))
+	ml2[k] = np.sqrt(np.sum(abs(mchange)**2))
+	mlinfty[k] = max(abs( mchange) ) 
+	ul1[k] = np.sum(abs(uchange))
+	ul2[k] = np.sqrt(np.sum(abs(uchange)**2))
+	ulinfty[k] = max(abs( uchange) ) 
+	if mlinfty[k] < tolerance:
+		print "Method converged with final change" , mlinfty[k]
+		kMax = k
 		break
 
 	#MIX IT UP NIGGA
 	u_old = np.copy(u)
 	v_old = np.copy(v)
-	print "Iteration number", k+1, "completed, used time", time.time()-titer, "with change", deltaeverything
+	print "Iteration number", k+1, "completed, used time", time.time()-titer, "with change", mlinfty[k]
 
 
 print "Crunching over. Total elapsed time (in seconds):", time.time()-t
@@ -117,17 +132,58 @@ for i in range (0,I):
 	for j in range (0,J):
 		msoln[i,j] = m[index(i,j)]
 		usoln[i,j] = u[index(i,j)]
-#shit attempt at plotting
+		
+#cut the change vectors with kMax
+ml1 = ml1[:kMax]
+ml2 = ml2[:kMax]
+mlinfty = mlinfty[:kMax]
+ul1 = ul1[:kMax]
+ul2 = ul2[:kMax]
+ulinfty = ulinfty[:kMax]
+
+#init plotstuff
 xi = np.linspace(xmin,xmax,Nx)
 ti = np.linspace(0,T,Nt)
 Xplot, Tplot = np.meshgrid(xi,ti)
-fig1 = plt.figure()
+
+#plot solution of m(x,t)
+fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')
 ax1.plot_surface(Xplot,Tplot,msoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax1.set_xlabel('x')
 ax1.set_ylabel('t')
 ax1.set_zlabel('m(x,t)')
+fig1.suptitle('Solution of density m(x,t)', fontsize=14)
+#plot solution of u(x,t)
+fig2 = plt.figure(2)
+ax2 = fig2.add_subplot(111, projection='3d')
+ax2.plot_surface(Xplot,Tplot,usoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax2.set_xlabel('x')
+ax2.set_ylabel('t')
+ax2.set_zlabel('u(x,t)')
+fig2.suptitle('Solution of potential u(x,t)', fontsize=14)
+#plot the norms of change on u
+fig3 = plt.figure(3)
+plt.plot(np.arange(1,kMax+1), np.log10(ml1), label="L1-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(ml2), label="L2-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(mlinfty), label="Linf-norm")
+legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
+ax3 = fig3.add_subplot(111)
+ax3.set_xlabel('Iteration number')
+ax3.set_ylabel('Log10 of change')
+fig3.suptitle('Convergence of u(x,t)', fontsize=14)
+#plot the norms of change on m
+fig4 = plt.figure(4)
+plt.plot(np.arange(1,kMax+1), np.log10(ul1), label="L1-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(ul2), label="L2-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(ulinfty), label="Linf-norm")
+legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
+ax4 = fig4.add_subplot(111)
+ax4.set_xlabel('Iteration number')
+ax4.set_ylabel('Log10 of change')
+fig4.suptitle('Convergence of m(x,t)', fontsize=14)
 plt.show()
+
 #fig2 = plt.figure()
 #ax2 = fig1.add_subplot(111, projection='3d')
 #ax2.plot_wireframe(Xplot,Tplot,usoln,rstride=15,cstride=5)
