@@ -30,12 +30,12 @@ def index(i,k): #this is a jolly source of errors, no more, probably still
 	return int(i+(I)*k)
 def convolution(eps,x): #this is the convolution function used in the paper, use like np.convolve(u,v)
 	return 1/eps * 1/np.sqrt(2*np.pi) * exp(-(x/eps)**2/2)
-def beta(x,i):
-	return max(0,1-abs(x-x(i))/dx)
+def beta(x,i,x_array):
+	return max(0,1-abs(x-x_array[i])/dx)
 def tau(alpha,i,k,v_array,x_array): #the function to be minimised
 	tmp = 0.5*dt*alpha**2
 	for j in range (0,I):
-		tmp = tmp + v_array[index(j,k+1)]*beta(x_array[i]-dt*alpha,j)
+		tmp = tmp + v_array[j]*beta(x_array[i]-dt*alpha,j,x_array)
 	return tmp
 
 
@@ -51,25 +51,49 @@ m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
 v = np.empty((I*K)) #potential
 m = np.empty((I*K)) #distribution
 v_old = np.empty((I*K))
-m_old = np.empty((I*K)) #I guess, but this is a fucking nasty thing
-
-#print m0
-#print m0.shape
-#set initial value on m; something is broken
+m_old = np.empty((I*K))
+v_grad = np.empty((I*K))
+#initial guess on the distribution
 for k in range (0,K):
-	m_old[(I*k):(I*k+I)] = np.copy(m0) #last 9 values are junk...?
+	m_old[(I*k):(I*k+I)] = np.copy(m0)
 
-print m_old
+#HOW TO MINIMIZE
 #minimize(fun, x0, args=(), method=None, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None)
 #minimize(tau,0,args=(i,k,v_array,x_array))
-#minimize(tau,0,args=(i,k,m0,x))
-minimize(tau,0,args=(1,2,m0,x))
+#minimize(tau,0,args=(i,k,m_old,x))
+#tmp = minimize(tau,0,args=(1,2,m_old,x))
+#print tmp.fun #this returns the minimum value of the function 
 
-#for n in range (0,Niter):
-#	titer = time.time()
-#	v[(I*K-I-1):(I*K)] = G(x,m_old) #think this works
-#	for k in range (K-1,-1,-1):
-#		for i in range (0,I):
-#		v(index(i,k)) = 
+
+for n in range (0,Niter):
+	titer = time.time()
+	v[(I*K-I):(I*K)] = G(x,m_old) #think this works
+	for k in range (K-2,-1,-1):
+		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
+		#print v_tmp
+		for i in range (0,I):
+			#print i,k
+			tmp = minimize(tau,0,args=(i,k,v_tmp,x)) #the previous timestep
+			v[index(i,k)] = dt*F(x[i],m_old) + tmp.fun
+	#compute the control based on the convoluted potential v
+	#convolute the potential in space
+		#let's skip that for now
+
+	#find the gradient in space, which happens to be the fucking control/state/whatever
+	for k in range (0,K-1):
+		#print I*k+I
+		#v_grad[(I*k):(I*k+I)] = np.gradient(v[(I+k):(I*k+I)],dx)
+		v_grad[(I*k)] = (v[I*k]-v[I*k+1])/dx
+		v_grad[(I*k)+I] = (v[I*k+I-1]-v[I*k+I])/(dx)
+		v_grad[(I*k+1):(I*k+I-1)] = (v[(I*k):(I*k+I-2)]-v[(I*k+2):(I*k+I)])/(2*dx)
+#do it manually because someone is a fucking moron
+
+	
+	#initial condition on m is already set, compute the rest of them
+	for k in range(0,K-1):
+		for i in range (0,I):
+			m[index(i,k+1)] = 0
+			for j in range (0,I):
+				m[index(i,k+1)] += beta(x[j]-dt*v_grad[index(j,k)],i,x)*m[index(i,k)]
 
 
