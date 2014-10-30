@@ -11,7 +11,7 @@ from matplotlib import cm
 
 #INPUTS
 dx = 1/10 #these taken from Gueant's paper
-dt = 1/160
+dt = 1/50
 xmin = 0
 xmax = 1
 T = 1
@@ -73,6 +73,8 @@ ml1 = -1*np.ones((Niter,1))
 ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
 
+print "Initialisation done, crunching..."
+
 for n in range (0,Niter):
 	#copy old solutions to use for error comparison thing
 	m_old = np.copy(m)
@@ -80,6 +82,8 @@ for n in range (0,Niter):
 	titer = time.time()
 
 	#compute next iteration of v given m_old
+	print "Computing iteration", n, "of v..."
+	temptime = time.time()
 	v[(I*K-I):(I*K)] = G(x,m_old) #think this works
 	#v[(I*K-I):(I*K)] = G(x,m)
 	for k in range (K-2,-1,-1):
@@ -88,33 +92,40 @@ for n in range (0,Niter):
 			#print i,k
 			tmp = minimize(tau,0,args=(i,k,v_tmp,x))
 			v[index(i,k)] = dt*F(x[i],m_old) + tmp.fun
-
+	print "Spent time", time.time()-temptime
 	##compute the control based on the convoluted potential v
 	#convolute the potential in space
 		#let's skip that for now
 
+	
+	print "Computing iteration", n, "of gradient of v..."
 	#find the gradient in space, which happens to be the fucking control/state/whatever
 	#do it manually because someone is a fucking moron
-	for k in range (0,K-1):
+	temptime = time.time()
+	for k in range (0,K-1): #gradient in last timestep and last spacestep is fucked
 		#print I*k+I
 		#v_grad[(I*k):(I*k+I)] = np.gradient(v[(I+k):(I*k+I)],dx)
-		v_grad[(I*k)] = (v[I*k]-v[I*k+1])/dx
-		v_grad[(I*k)+I] = (v[I*k+I-1]-v[I*k+I])/(dx)
-		v_grad[(I*k+1):(I*k+I-1)] = (v[(I*k):(I*k+I-2)]-v[(I*k+2):(I*k+I)])/(2*dx)
+		v_grad[(I*k)] = -(v[I*k]-v[I*k+1])/dx #backward difference
+		v_grad[(I*k)+I+1] = -(v[I*k+I]-v[I*k+I+1])/(dx)
+		v_grad[(I*k+1):(I*k+I)] = -(v[(I*k):(I*k+I-1)]-v[(I*k+2):(I*k+I+1)])/(2*dx)
+	print "Spent time", time.time()-temptime
 	#print v_grad
 
 	#initial condition on m is already set, compute the rest of them
 	#this is where it fucks up
 	#set initial conditions again I guess?
 #	m[0:I] = np.copy(m0)
+
+	print "Computing iteration", n, "of m..."
+	temptime = time.time()
 	for k in range(0,K-1):
 		for i in range (0,I):
 			m[index(i,k+1)] = 0
-			if m[index(i,k)] > 2: #stuff accumulates in i=10 like a bitch
-				print i,k,m[index(i,k)]
+			#if m[index(i,k)] > 2: #stuff will fuck up here if the gradient is weird
+			#	print i,k,m[index(i,k)]
 			for j in range (0,I):
 				m[index(i,k+1)] += beta(x[j]-dt*v_grad[index(j,k)],i,x)*m[index(j,k)]
-
+	print "Spent time", time.time()-temptime
 	#compute norms of stuff
 	mchange = m-m_old
 	vchange = v-v_old
@@ -129,18 +140,22 @@ for n in range (0,Niter):
 		kMax = n
 		break
 
-	#MIX IT UP NIGGA
+	#Evaluateiteration
 	print "Iteration number", n+1, "completed, used time", time.time()-titer, "with change", mlinfty[n], "and", vlinfty[n]
+
 
 kMax = n
 msoln = np.empty((I,K))
 vsoln = np.empty((I,K))
+gradsoln = np.empty((I,K))
 for i in range (0,I):
 	for k in range (0,K):
 		msoln[i,k] = m[index(i,k)]
 		vsoln[i,k] = v[index(i,k)]
+		gradsoln[i,k] = v_grad[index(i,k)]
 msoln = np.transpose(msoln)
 vsoln = np.transpose(vsoln)
+gradsoln = np.transpose(gradsoln)
 #cut the change vectors with kMax
 ml1 = ml1[:kMax]
 ml2 = ml2[:kMax]
@@ -193,7 +208,15 @@ ax4 = fig4.add_subplot(111)
 ax4.set_xlabel('Iteration number')
 ax4.set_ylabel('Log10 of change')
 fig4.suptitle('Convergence of v(x,t)', fontsize=14)
-#plt.show()
+#plot gradient
+fig5 = plt.figure(5)
+ax5 = fig5.add_subplot(111, projection='3d')
+ax5.plot_surface(Xplot,Tplot,gradsoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax5.set_xlabel('x')
+ax5.set_ylabel('t')
+ax5.set_zlabel('grad v(x,t)')
+fig5.suptitle('Solution of gradient of v(x,t)', fontsize=14)
+plt.show()
 
 
 
