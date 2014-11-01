@@ -12,13 +12,13 @@ from scipy.special import erf as erf
 
 #INPUTS
 dx = 1/20 #these taken from Gueant's paper
-dt = 1/40
+dt = 1/20
 xmin = -0.25
 xmax = 1.25
 T = 1
-Niter = 20 #maximum number of iterations
+Niter = 3 #maximum number of iterations
 tolerance = 1e-6
-epsilon = 0.003 #for use in convolution thing
+epsilon = 0.03 #for use in convolution thing
 
 #CRUNCH
 dx2 = dx**2
@@ -39,15 +39,15 @@ def tau(alpha,i,k,v_array,x_array): #the function to be minimised
 	for j in range (0,I):
 		tmp = tmp + v_array[j]*beta(x_array[i]-dt*alpha,j,x_array)
 	return tmp
-def mollifyweight(epsilon,x_array,index):
+def mollifyweight(epsilon,x_array,index): #need to be absolutely sure this is right...
 	return 0.5 * ( erf((x_array[abs(index)]+0.5*dx)/(np.sqrt(2)*epsilon)) - erf((x_array[abs(index)]-0.5*dx)/(np.sqrt(2)*epsilon)) )
-def mollify(array,epsilon,x_array):
+def mollify(array,epsilon,x_array): #mollifyweight spits out zero all the time, staaaahhp
 	output = np.empty((array.size))
 	for j in range (0,array.size):
 		output[j] = 0
+		w = mollifyweight(epsilon,x_array,j)
 		for i in range(-j,array.size-j):
-			#print mollifyweight(epsilon,x_array,j)
-			output[j] += mollifyweight(epsilon,x_array,j)*array[j+i]
+			output[j] += w*array[j+i]
 	return output
 
 
@@ -55,8 +55,8 @@ def mollify(array,epsilon,x_array):
 def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
 	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
 
-def F(x_array,m_array,index): #this is the running cost
-	return 0.3*abs(x_array[index]-0.5)+0.3*m_array[index]
+def F(x_array,m_array,space_index,time_index): #this is the running cost
+	return 2*abs(x_array[space_index])#+0.5*m_array[index(space_index,time_index)]
 
 m0 = np.empty(I)
 for i in range (0,x.size):
@@ -66,10 +66,10 @@ for i in range (0,x.size):
 		m0[i] = 0
 
 v = np.zeros((I*K)) #potential
-m = np.zeros((I*K)) #distribution
-v_old = np.zeros((I*K))
-m_old = np.zeros((I*K))
-v_grad = np.zeros((I*K))
+m = np.empty((I*K)) #distribution
+v_old = np.empty((I*K))
+m_old = np.empty((I*K))
+v_grad = np.empty((I))
 #initial guess on the distribution
 for k in range (0,K):
 	m[(I*k):(I*k+I)] = np.copy(m0)
@@ -88,41 +88,45 @@ vlinfty = -1*np.ones((Niter,1))
 ml1 = -1*np.ones((Niter,1))
 ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
+
+
+#set final value on v and copy the bitches
+#tmp = G(x,m)
+#print tmp.size,I
+v[(I*K-I):(I*K)] = np.copy(G(x,m))
 m_old = np.copy(m)
 v_old = np.copy(v)
-
 print "Initialisation done, crunching..."
+
+#THINGS THAT ARE WRONG:
+	#convolution method with its weights
+	#F seems to give same value for m and m_old...?
 
 for n in range (0,Niter):
 	#copy old solutions to use for error comparison thing
 	
 	titer = time.time()
 	#compute next iteration of v given m_old
-	print "Computing iteration", n, "of v..."
+	print "Computing iteration", n+1, "of v..."
 	temptime = time.time()
-	v[(I*K-I):(I*K)] = G(x,m) #this works as it should
 	for k in range (K-2,-1,-1):
-		v_tmp = np.copy(v_old[((k+1)*I):((k+1)*I+I)]) #this seems to be a source of errors... somehow, but whyyyy? radically different behaviours between using v_old and v as inputs
+		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		for i in range (0,I):
 			tmp = minimize(tau,0,args=(i,k,v_tmp,x)) #this dominates time consumption! and works
-			v[index(i,k)] = dt*F(x,m_old,i) + tmp.fun
+			v[index(i,k)] = dt*F(x,m,i,k) + tmp.fun
 	print "Spent time", time.time()-temptime
-	##compute the control based on the convoluted potential v
-	#convolute the potential in space
-		#let's skip that for now
-	
+
 	#initial condition on m is already set, compute the rest of them
-	print "Computing iteration", n, "of m..."
+	print "Computing iteration", n+1, "of m..."
 	temptime = time.time()
 	for k in range(0,K-1):
 		#smoothify the thing; this is fucked
-		v_grad = np.gradient(v[(I*k):(I*k+I)],dx)
-		#v_grad = mollify(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x)
-		#print max(v_grad-v_grad2)
-		for i in range (0,I):
+		#v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is
+		v_grad = mollify(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x) #mollifier apparently sets everything to zero
+		for i in range (0,I): 
 			m[index(i,k+1)] = 0
-			for j in range (0,I):
-				m[index(i,k+1)] += beta(x[j]-dt*v_grad[j],i,x)*m[index(j,k)] #for later: THIS HAS TO USE THE SAME TIME VALUE OF THE DISTRIBUTION
+			for j in range (0,I): 
+				m[index(i,k+1)] += beta(x[j]-dt*v_grad[j],i,x)*m[index(j,k)]
 	print "Spent time", time.time()-temptime
 	#compute norms of stuff
 	mchange = np.copy(m-m_old)
@@ -133,16 +137,18 @@ for n in range (0,Niter):
 	vl1[n] = np.sum(abs(vchange))
 	vl2[n] = np.sqrt(np.sum(abs(vchange)**2))
 	vlinfty[n] = max(abs( vchange) )
-	#print ml1[n],ml2[n],mlinfty[n],vl1[n],vl2[n],vlinfty[n],
 	if (mlinfty[n] < tolerance) and (vlinfty[n] < tolerance):
 		print "Method converged with final change" , mlinfty[n], "and", vlinfty[n]
 		kMax = n
 		break
 
+	
+
 	#Evaluateiteration
-	print "Iteration number", n+1, "completed, used time", time.time()-titer, "with change in m", mlinfty[n], "and change in v", vlinfty[n]
 	m_old = np.copy(m)
 	v_old = np.copy(v)
+	print "Iteration number", n+1, "completed, used time", time.time()-titer, "with change in m", mlinfty[n], "and change in v", vlinfty[n]
+	
 
 kMax = n
 msoln = np.empty((I,K))
