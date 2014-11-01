@@ -56,7 +56,7 @@ def G(xi,m_array): #this is the final cost, and is a function of the entire dist
 	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
 
 def F(x_array,m_array,space_index,time_index): #this is the running cost
-	return 2*abs(x_array[space_index])#+0.5*m_array[index(space_index,time_index)]
+	return 2*abs(x_array[space_index]-0.5)#+m_array[index(space_index,time_index)]
 
 m0 = np.empty(I)
 for i in range (0,x.size):
@@ -121,7 +121,8 @@ for n in range (0,Niter):
 	temptime = time.time()
 	for k in range(0,K-1):
 		#smoothify the thing; this is fucked
-		v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is
+		v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is, but I suspect there is something wrong just because
+		print v_grad.size
 		#v_grad = mollify(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x) #mollifier apparently sets everything to zero
 		for i in range (0,I): 
 			m[index(i,k+1)] = 0
