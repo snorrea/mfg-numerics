@@ -13,8 +13,8 @@ from scipy.special import erf as erf
 #INPUTS
 dx = 1/20 #these taken from Gueant's paper
 dt = 1/20
-xmin = -0.5
-xmax = 1.5
+xmin = -0.25
+xmax = 1.25
 T = 1
 Niter = 3 #maximum number of iterations
 tolerance = 1e-6
@@ -109,6 +109,8 @@ for n in range (0,Niter):
 	#compute next iteration of v given m_old
 	print "Computing iteration", n+1, "of v..."
 	temptime = time.time()
+	#need to set the last value... oh my gawd you're so stupid
+	v[(I*K-I):(I*K)] = np.copy(G(x,m))
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		for i in range (0,I):

@@ -109,6 +109,7 @@ for n in range (0,Niter):
 	#compute next iteration of v given m_old
 	print "Computing iteration", n+1, "of v..."
 	temptime = time.time()
+	v[(I*K-I):(I*K)] = np.copy(G(x,m)) 	#need to set the last value... oh my gawd you're so stupid
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		for i in range (0,I):
