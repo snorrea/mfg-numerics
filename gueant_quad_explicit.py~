@@ -44,7 +44,7 @@ def f(xh,xi):
 	#return -xi - abs(xh-0.3)**2
 	#return -xi - 2*abs(xh-0.3)**2/(xi+1)
 	return -2*(xi)*abs(xh-0.5)**2
-sigma2 = 0.3**2
+sigma2 = 0.6**2
 m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
 fmax = 2 #this has to be chosen empirically
 

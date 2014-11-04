@@ -11,14 +11,15 @@ from scipy.special import erf as erf
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 1/20 #these taken from Gueant's paper
-dt = 1/20
+dx = 3.75e-3 #these taken from Gueant's paper
+dt = 7.5e-3
 xmin = -0.25
 xmax = 1.25
 T = 1
 Niter = 3 #maximum number of iterations
 tolerance = 1e-6
-epsilon = 0.03 #for use in convolution thing
+epsilon = 0.025 #for use in convolution thing
+molly = 1
 
 #CRUNCH
 dx2 = dx**2
@@ -97,7 +98,6 @@ v[(I*K-I):(I*K)] = np.copy(G(x,m))
 m_old = np.copy(m)
 v_old = np.copy(v)
 print "Initialisation done, crunching..."
-
 #THINGS THAT ARE WRONG:
 	#convolution method with its weights
 	#F seems to give same value for m and m_old...?
@@ -122,9 +122,10 @@ for n in range (0,Niter):
 	temptime = time.time()
 	for k in range(0,K-1):
 		#smoothify the thing; this is fucked
-		v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is, but I suspect there is something wrong just because
-		print v_grad.size
-		#v_grad = mollify(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x) #mollifier apparently sets everything to zero
+		if molly==1:
+			v_grad = mollify(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x) #this isn't completely fine
+		else:
+			v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is, but I suspect there is something wrong just because
 		for i in range (0,I): 
 			m[index(i,k+1)] = 0
 			for j in range (0,I): 
@@ -143,8 +144,6 @@ for n in range (0,Niter):
 		print "Method converged with final change" , mlinfty[n], "and", vlinfty[n]
 		kMax = n
 		break
-
-	
 
 	#Evaluateiteration
 	m_old = np.copy(m)
