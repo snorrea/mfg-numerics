@@ -11,15 +11,15 @@ from scipy.special import erf as erf
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 3.75e-3 #these taken from Gueant's paper
-dt = 7.5e-3
+dx = 0.025 #these taken from Gueant's paper
+dt = 0.025
 xmin = -0.25
 xmax = 1.25
 T = 1
 Niter = 3 #maximum number of iterations
 tolerance = 1e-6
 epsilon = 0.025 #for use in convolution thing
-molly = 1
+molly = 0
 
 #CRUNCH
 dx2 = dx**2
@@ -34,8 +34,8 @@ def index(i,k): #this is a jolly source of errors, no more, probably still
 def convolution(eps,x): #this is the convolution function used in the paper, use like np.convolve(u,v)
 	return 1/eps * 1/np.sqrt(2*np.pi) * np.exp(-(x/eps)**2/2)
 def beta(x,i,x_array):
-	return max(0,1-abs(x-x_array[i])/dx)
-def tau(alpha,i,k,v_array,x_array): #the function to be minimised
+	return np.maximum(0,1-abs(x-x_array[i])/dx)
+def tau(alpha,i,v_array,x_array): #the function to be minimised
 	tmp = 0.5*dt*alpha**2
 	for j in range (0,I):
 		tmp = tmp + v_array[j]*beta(x_array[i]-dt*alpha,j,x_array)
@@ -57,7 +57,8 @@ def G(xi,m_array): #this is the final cost, and is a function of the entire dist
 	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
 
 def F(x_array,m_array,space_index,time_index): #this is the running cost
-	return 2*abs(x_array[space_index]-0.5)#+m_array[index(space_index,time_index)]
+	#return 2*abs(x_array[space_index]-0.7)+0.8*m_array[index(space_index,time_index)]
+	return 0
 
 m0 = np.empty(I)
 for i in range (0,x.size):
@@ -113,7 +114,7 @@ for n in range (0,Niter):
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		for i in range (0,I):
-			tmp = minimize(tau,0,args=(i,k,v_tmp,x)) #this dominates time consumption! and works
+			tmp = minimize(tau,0,args=(i,v_tmp,x)) #this dominates time consumption! and works
 			v[index(i,k)] = dt*F(x,m,i,k) + tmp.fun
 	print "Spent time", time.time()-temptime
 
