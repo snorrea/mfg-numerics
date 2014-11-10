@@ -160,6 +160,12 @@ val1 = min_approx1(tau,(Iarg,v_tmp,x)) #first and second arg are indices
 t2 = time.time()
 val2 = minimize(tau,0,args=(Iarg,v_tmp,x))
 print val1-val2.x[0], tau(val1,Iarg,v_tmp,x)-tau(val2.x[0],Iarg,v_tmp,x)
+if tau(val1,Iarg,v_tmp,x)-tau(val2.x[0],Iarg,v_tmp,x) > 0:
+	print "Our method is flawed."
+elif tau(val1,Iarg,v_tmp,x)-tau(val2.x[0],Iarg,v_tmp,x) == 0:
+	print "Methods are exactly equal."
+else:
+	print "Their method sucks."
 print "Comparison: mine used", t2-t1, ", their used", time.time()-t2
 #show()
 
