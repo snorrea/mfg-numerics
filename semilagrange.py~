@@ -6,22 +6,25 @@ import time as time
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import minimize as minimize
 from matplotlib import cm
-from scipy.special import erf as erf
+import quadrature_nodes as qn
 
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.025 #these taken from Gueant's paper
-dt = 0.025
+dx = 0.05 #these taken from Gueant's paper
+dt = 0.25*dx
 xmin = -0.25
 xmax = 1.25
 T = 1
 Niter = 3 #maximum number of iterations
 tolerance = 1e-6
-epsilon = 0.025 #for use in convolution thing
-molly = 0
+epsilon = 0.25*dt #for use in convolution thing
+molly = 1
+quad_order = 15
 
 #CRUNCH
+gll_x = qn.GLL_points(quad_order) #quadrature nodes
+gll_w = qn.GLL_weights(quad_order,gll_x) #quadrature weights
 dx2 = dx**2
 Nx = int(abs(xmax-xmin)/dx)
 Nt = int(T/dt) 
@@ -33,31 +36,64 @@ def index(i,k): #this is a jolly source of errors, no more, probably still
 	return int(i+(I)*k)
 def convolution(eps,x): #this is the convolution function used in the paper, use like np.convolve(u,v)
 	return 1/eps * 1/np.sqrt(2*np.pi) * np.exp(-(x/eps)**2/2)
-def beta(x,i,x_array):
-	return max(0,1-abs(x-x_array[i])/dx)
-def tau(alpha,i,k,v_array,x_array): #the function to be minimised
+def beta(x_val,i,x_array):
+	return np.maximum(0,1-abs(x_val-x_array[i])/dx)
+def tau(alpha,i,v_array,x_array): #the function to be minimised
 	tmp = 0.5*dt*alpha**2
 	for j in range (0,I):
 		tmp = tmp + v_array[j]*beta(x_array[i]-dt*alpha,j,x_array)
 	return tmp
-def mollifyweight(epsilon,x_array,index): #need to be absolutely sure this is right...
-	return 0.5 * ( erf((x_array[abs(index)]+0.5*dx)/(np.sqrt(2)*epsilon)) - erf((x_array[abs(index)]-0.5*dx)/(np.sqrt(2)*epsilon)) )
-def mollify(array,epsilon,x_array): #mollifyweight spits out zero all the time, staaaahhp
-	output = np.empty((array.size))
-	for j in range (0,array.size):
-		output[j] = 0
-		w = mollifyweight(epsilon,x_array,j)
-		for i in range(-j,array.size-j):
-			output[j] += w*array[j+i]
+def mollifier(x_val): #Evans' mollifier
+	if abs(x_val) < 1:
+		return 0.443994*np.exp(1/(x_val**2 - 1))
+	else:
+		return 0
+def mollify_array(array,epsilon,x_array,gll_x,gll_w): 
+	output = np.zeros((array.size))
+	for k in range (0,array.size):
+		for j in range (0,gll_x.size):
+			tmp = 0
+			for i in range (0,array.size):
+				tmp += array[i]*beta(x_array[k]-epsilon*(gll_x[j]),i,x_array)
+			output[k] += tmp*gll_w[j]*mollifier(gll_x[j])
+		#output[k] = tmp1*mollifier(-z2)*w2 + tmp3*mollifier(z2)*w2 + tmp2*mollifier(z3)*w3
 	return output
-
+def min_approx1(function, (args)):
+	left = -10
+	right = 10
+	linesearch_decrement = 0.5
+	linesearch_tolerance = 1/10
+	dx = 1
+	Nx = 5 #number of points
+	###########################################################################################
+	#now the sector has been found; dish out points and do some kind of simplex method
+	#xpts = np.linspace(left,right,abs(right-left)/dx) #our points
+	xpts = np.linspace(left,right,Nx)
+	fpts = np.empty((xpts.size,1))
+	fpts = function(xpts,*args)
+	x0 = xpts[np.argmin(fpts)]
+	#t1 = time.time()
+	h = dx/2
+	while True:
+		if function(x0+h,*args) < function(x0-h,*args): #go right
+			x0 += h
+			h = h*linesearch_decrement
+		elif function(x0-h,*args) < function(x0+h,*args): #go left
+			x0 += -h
+			h = h*linesearch_decrement
+		elif h > linesearch_tolerance:
+			h = h*linesearch_decrement
+		else:
+			break
+	#print "Time to minimise:",time.time()-t1
+	return function(x0,*args)
 
 #FUNCTIONS
 def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
 	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
 
 def F(x_array,m_array,space_index,time_index): #this is the running cost
-	#return 2*abs(x_array[space_index]-0.7)+0.8*m_array[index(space_index,time_index)]
+#	return 2*abs(x_array[space_index]-0.7)+0.8*m_array[index(space_index,time_index)]
 	return 0
 
 m0 = np.empty(I)
@@ -114,8 +150,11 @@ for n in range (0,Niter):
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		for i in range (0,I):
-			tmp = minimize(tau,0,args=(i,k,v_tmp,x)) #this dominates time consumption! and works
+			#t1 = time.time()
+			tmp = minimize(tau,0,args=(i,v_tmp,x)) #this dominates time consumption! and works
+			#tmp = min_approx1(tau,(i,v_tmp,x)) #this dominates time consumption! and works
 			v[index(i,k)] = dt*F(x,m,i,k) + tmp.fun
+			#v[index(i,k)] = dt*F(x,m,i,k) + tmp
 	print "Spent time", time.time()-temptime
 
 	#initial condition on m is already set, compute the rest of them
@@ -124,7 +163,8 @@ for n in range (0,Niter):
 	for k in range(0,K-1):
 		#smoothify the thing; this is fucked
 		if molly==1:
-			v_grad = mollify(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x) #this isn't completely fine
+			v_grad = mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w) #this isn't completely fine
+			#print max(v_grad-np.gradient(v[(I*k):(I*k+I)],dx))
 		else:
 			v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is, but I suspect there is something wrong just because
 		for i in range (0,I): 
@@ -145,7 +185,6 @@ for n in range (0,Niter):
 		print "Method converged with final change" , mlinfty[n], "and", vlinfty[n]
 		kMax = n
 		break
-
 	#Evaluateiteration
 	m_old = np.copy(m)
 	v_old = np.copy(v)
