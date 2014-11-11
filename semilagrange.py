@@ -12,13 +12,13 @@ import quadrature_nodes as qn
 
 #INPUTS
 dx = 0.05 #these taken from Gueant's paper
-dt = 0.25*dx
+dt = 0.5*dx
 xmin = -0.25
 xmax = 1.25
 T = 1
 Niter = 3 #maximum number of iterations
 tolerance = 1e-6
-epsilon = 0.25*dt #for use in convolution thing
+epsilon = 0.5*dt #for use in convolution thing
 molly = 1
 quad_order = 15
 

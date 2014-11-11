@@ -185,7 +185,7 @@ for n in range (0,Niter):
 		print "Method converged with final change" , mlinfty[n], "and", vlinfty[n]
 		kMax = n
 		break
-	#Evaluateiteration
+	#Evaluate iteration
 	m_old = np.copy(m)
 	v_old = np.copy(v)
 	print "Iteration number", n+1, "completed, used time", time.time()-titer, "with change in m", mlinfty[n], "and change in v", vlinfty[n]
