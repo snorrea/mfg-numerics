@@ -11,14 +11,14 @@ import quadrature_nodes as qn
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.05 #these taken from Gueant's paper
-dt = 0.25*dx
-xmin = -0.25
-xmax = 1.25
+dx = 0.05#1/300 #these taken from Gueant's paper
+dt = dx
+xmin = 0
+xmax = 1
 T = 1
 Niter = 3 #maximum number of iterations
 tolerance = 1e-6
-epsilon = 0.25*dt #for use in convolution thing
+epsilon = 2*dt #for use in convolution thing
 molly = 1
 quad_order = 15
 
@@ -56,7 +56,6 @@ def mollify_array(array,epsilon,x_array,gll_x,gll_w):
 			for i in range (0,array.size):
 				tmp += array[i]*beta(x_array[k]-epsilon*(gll_x[j]),i,x_array)
 			output[k] += tmp*gll_w[j]*mollifier(gll_x[j])
-		#output[k] = tmp1*mollifier(-z2)*w2 + tmp3*mollifier(z2)*w2 + tmp2*mollifier(z3)*w3
 	return output
 def min_approx1(function, (args)):
 	left = -10
@@ -90,16 +89,20 @@ def min_approx1(function, (args)):
 
 #FUNCTIONS
 def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
-	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
+	#return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
+	#return -(xi+0.5)**2 * (1.5-xi)**2 
+	return 0 #Carlini's no-game
 
 def F(x_array,m_array,space_index,time_index): #this is the running cost
-#	return 2*abs(x_array[space_index]-0.7)+0.8*m_array[index(space_index,time_index)]
-	return 0
+#	return 2*abs(x_array[space_index]-0.7)#+0.8*m_array[index(space_index,time_index)]
+	return 10*(x_array[space_index]-0.2)**2 #Carlini's no-game
+#	return 0
 
 m0 = np.empty(I)
 for i in range (0,x.size):
 	if x[i] >=0 and x[i]<=1:
-		m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original
+		#m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original
+		m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
 	else:
 		m0[i] = 0
 
@@ -156,6 +159,14 @@ for n in range (0,Niter):
 			v[index(i,k)] = dt*F(x,m,i,k) + tmp.fun
 			#v[index(i,k)] = dt*F(x,m,i,k) + tmp
 	print "Spent time", time.time()-temptime
+	vchange = np.copy(v-v_old)
+	vl1[n] = np.sum(abs(vchange))
+	vl2[n] = np.sqrt(np.sum(abs(vchange)**2))
+	vlinfty[n] = max(abs( vchange) )
+	if (vlinfty[n] < tolerance):
+		print "Method converged with final change" , vlinfty[n]
+		kMax = n
+		break
 
 	#initial condition on m is already set, compute the rest of them
 	print "Computing iteration", n+1, "of m..."
@@ -164,7 +175,7 @@ for n in range (0,Niter):
 		#smoothify the thing; this is fucked
 		if molly==1:
 			v_grad = mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w) #this isn't completely fine
-			#print max(v_grad-np.gradient(v[(I*k):(I*k+I)],dx))
+			#m[(I*(k)):(I*(k)+I)] = mollify_array(m[(I*(k)):(I*(k)+I)],epsilon,x,gll_x,gll_w)
 		else:
 			v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is, but I suspect there is something wrong just because
 		for i in range (0,I): 
@@ -174,17 +185,9 @@ for n in range (0,Niter):
 	print "Spent time", time.time()-temptime
 	#compute norms of stuff
 	mchange = np.copy(m-m_old)
-	vchange = np.copy(v-v_old)
 	ml1[n] = np.sum(abs(mchange))
 	ml2[n] = np.sqrt(np.sum(abs(mchange)**2))
 	mlinfty[n] = max(abs( mchange) ) 
-	vl1[n] = np.sum(abs(vchange))
-	vl2[n] = np.sqrt(np.sum(abs(vchange)**2))
-	vlinfty[n] = max(abs( vchange) )
-	if (mlinfty[n] < tolerance) and (vlinfty[n] < tolerance):
-		print "Method converged with final change" , mlinfty[n], "and", vlinfty[n]
-		kMax = n
-		break
 	#Evaluate iteration
 	m_old = np.copy(m)
 	v_old = np.copy(v)
@@ -192,6 +195,7 @@ for n in range (0,Niter):
 	
 
 kMax = n
+
 msoln = np.empty((I,K))
 vsoln = np.empty((I,K))
 gradsoln1 = np.empty((I*K))
