@@ -43,13 +43,16 @@ def f(xh,xi):
 	#return -0.1 + (xh*(1-xh))**2/(1+4*xi)**(1.5)
 	#return -xi - abs(xh-0.3)**2
 	#return -xi - 2*abs(xh-0.3)**2/(xi+1)
-	return -2*(xi)*abs(xh-0.5)**2
+	return 2*(xi)*abs(xh-0.5)**2
 sigma2 = 0.3**2
 m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
 fmax = 2 #this has to be chosen empirically
 
+def g(x_array,m_array):
+	return -0.5*(x_array+0.5)**2 * (1.5-x_array)**2
+
 #uT = np.square(x*(1-x)) #gueant's original
-uT = -0.5*(x+0.5)**2 * (1.5-x)**2
+uT = g(x,m0)
 #uT = x*0 
 #uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
 
@@ -78,17 +81,16 @@ mlinfty = -1*np.ones((Niter,1))
 for k in range (0,Niter):
 	#known terminal conditions
 	titer = time.time()
-	u[J*I-J-1:J*I] = uT #this is wrong wrong wrong what the fuck is wrong
-	#j+(J-1)*i
+	u[J*I-J-1:J*I] = uT 
 	#solve u
 	for i in range (I-2,-1,-1):
 		for j in range (0,J):
 			if j==0:
-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j+1)] - 2*u[index(i+1,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j+1)])/dx)**2 ) )
+				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j+1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j+1)])/dx)**2 ) )
 			elif j==J-1:
-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j-1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j-1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
+				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j-1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j-1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
 			else:
-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
+				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
 
 	#known initial conditions on v
 	#print m0.shape
@@ -98,11 +100,11 @@ for k in range (0,Niter):
 	for i in range (0,I-1):
 		for j in range (0,J):
 			if j==0: #j
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j+1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j+1)])/dx)**2 ) )
+				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j+1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j+1)])/dx)**2 ) )
 			elif j==J-1:
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j-1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j-1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
+				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j-1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j-1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
 			else: #source of error could be the inputs of the f function in terms of u
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
+				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
 	
 	#compute norms of stuff
 	mchange = np.exp(( u-v )/(sigma2)) - np.exp(( u_old-v_old )/(sigma2))

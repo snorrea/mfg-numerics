@@ -7,18 +7,19 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import minimize as minimize
 from matplotlib import cm
 import quadrature_nodes as qn
+import sys
 
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.05#1/300 #these taken from Gueant's paper
+dx = 0.025#1/300 #these taken from Gueant's paper
 dt = dx
 xmin = 0
 xmax = 1
 T = 1
-Niter = 3 #maximum number of iterations
-tolerance = 1e-6
-epsilon = 2*dt #for use in convolution thing
+Niter = 5 #maximum number of iterations
+tolerance = 1e-3
+epsilon = 4*dt #for use in convolution thing
 molly = 1
 quad_order = 15
 
@@ -28,6 +29,9 @@ gll_w = qn.GLL_weights(quad_order,gll_x) #quadrature weights
 dx2 = dx**2
 Nx = int(abs(xmax-xmin)/dx)
 Nt = int(T/dt) 
+#if (Nx-abs(xmax-xmin)/dx is not 0) or (Nt-T/dt is not 0):
+#	print Nx-abs(xmax-xmin)/dx, N-T/dt
+#	sys.exit("Grid size not possible.")
 I = int(Nx)+1 #space
 K = int(Nt)+1 #time
 x = np.arange(xmin,xmax+dx,dx)
@@ -45,7 +49,8 @@ def tau(alpha,i,v_array,x_array): #the function to be minimised
 	return tmp
 def mollifier(x_val): #Evans' mollifier
 	if abs(x_val) < 1:
-		return 0.443994*np.exp(1/(x_val**2 - 1))
+		#return 0.443994*np.exp(1/(x_val**2 - 1))
+		return np.exp(1/(x_val**2 - 1))/0.443994
 	else:
 		return 0
 def mollify_array(array,epsilon,x_array,gll_x,gll_w): 
@@ -57,11 +62,11 @@ def mollify_array(array,epsilon,x_array,gll_x,gll_w):
 				tmp += array[i]*beta(x_array[k]-epsilon*(gll_x[j]),i,x_array)
 			output[k] += tmp*gll_w[j]*mollifier(gll_x[j])
 	return output
-def min_approx1(function, (args)):
+def min_approx1(function, (args)): #for some reason this is twice as slow as the built-in one :(
 	left = -10
 	right = 10
 	linesearch_decrement = 0.5
-	linesearch_tolerance = 1/10
+	linesearch_tolerance = 1/50
 	dx = 1
 	Nx = 5 #number of points
 	###########################################################################################
@@ -70,8 +75,7 @@ def min_approx1(function, (args)):
 	xpts = np.linspace(left,right,Nx)
 	fpts = np.empty((xpts.size,1))
 	fpts = function(xpts,*args)
-	x0 = xpts[np.argmin(fpts)]
-	#t1 = time.time()
+	x0 = xpts[np.argmin(fpts)] #choose smallest
 	h = dx/2
 	while True:
 		if function(x0+h,*args) < function(x0-h,*args): #go right
@@ -89,14 +93,13 @@ def min_approx1(function, (args)):
 
 #FUNCTIONS
 def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
-	#return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
-	#return -(xi+0.5)**2 * (1.5-xi)**2 
+#	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
 	return 0 #Carlini's no-game
 
 def F(x_array,m_array,space_index,time_index): #this is the running cost
-#	return 2*abs(x_array[space_index]-0.7)#+0.8*m_array[index(space_index,time_index)]
-	return 10*(x_array[space_index]-0.2)**2 #Carlini's no-game
-#	return 0
+#	return abs(x_array[space_index]-0.7)**2+0.4*m_array[index(space_index,time_index)]**2
+	return (x_array[space_index]-0.2)**2 #Carlini's no-game
+#	return (x_array[space_index]-0.2)**2 + 0.2*m_array[index(space_index,time_index)]
 
 m0 = np.empty(I)
 for i in range (0,x.size):
@@ -115,13 +118,6 @@ v_grad = np.empty((I))
 for k in range (0,K):
 	m[(I*k):(I*k+I)] = np.copy(m0)
 
-#HOW TO MINIMIZE
-#minimize(fun, x0, args=(), method=None, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None)
-#minimize(tau,0,args=(i,k,v_array,x_array))
-#minimize(tau,0,args=(i,k,m_old,x))
-#tmp = minimize(tau,0,args=(1,2,m_old,x))
-#print tmp.fun #this returns the minimum value of the function 
-
 #initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
 vl1 = -1*np.ones((Niter,1))
 vl2 = -1*np.ones((Niter,1))
@@ -130,7 +126,6 @@ ml1 = -1*np.ones((Niter,1))
 ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
 
-
 #set final value on v and copy the bitches
 #tmp = G(x,m)
 #print tmp.size,I
@@ -138,9 +133,6 @@ v[(I*K-I):(I*K)] = np.copy(G(x,m))
 m_old = np.copy(m)
 v_old = np.copy(v)
 print "Initialisation done, crunching..."
-#THINGS THAT ARE WRONG:
-	#convolution method with its weights
-	#F seems to give same value for m and m_old...?
 
 for n in range (0,Niter):
 	#copy old solutions to use for error comparison thing
@@ -151,12 +143,12 @@ for n in range (0,Niter):
 	temptime = time.time()
 	v[(I*K-I):(I*K)] = np.copy(G(x,m)) 	#need to set the last value... oh my gawd you're so stupid
 	for k in range (K-2,-1,-1):
-		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
+		v_tmp = np.copy(v[((k+1)*I+1):((k+1)*I+I+1)]) #this could still be wrong
 		for i in range (0,I):
 			#t1 = time.time()
-			tmp = minimize(tau,0,args=(i,v_tmp,x)) #this dominates time consumption! and works
-			#tmp = min_approx1(tau,(i,v_tmp,x)) #this dominates time consumption! and works
+			tmp = minimize(tau,0,args=(i,v_tmp,x))
 			v[index(i,k)] = dt*F(x,m,i,k) + tmp.fun
+			#tmp = min_approx1(tau,(i,v_tmp,x)) 
 			#v[index(i,k)] = dt*F(x,m,i,k) + tmp
 	print "Spent time", time.time()-temptime
 	vchange = np.copy(v-v_old)
@@ -174,8 +166,7 @@ for n in range (0,Niter):
 	for k in range(0,K-1):
 		#smoothify the thing; this is fucked
 		if molly==1:
-			v_grad = mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w) #this isn't completely fine
-			#m[(I*(k)):(I*(k)+I)] = mollify_array(m[(I*(k)):(I*(k)+I)],epsilon,x,gll_x,gll_w)
+			v_grad = mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w) #this is completely fine
 		else:
 			v_grad = np.gradient(v[(I*k):(I*k+I)],dx)  #this is okay as is, but I suspect there is something wrong just because
 		for i in range (0,I): 
@@ -200,13 +191,17 @@ msoln = np.empty((I,K))
 vsoln = np.empty((I,K))
 gradsoln1 = np.empty((I*K))
 gradsoln = np.empty((I,K))
+mollgrad1 = np.empty((I*K))
+mollgrad = np.empty((I,K))
 for k in range (0,K):
 	gradsoln1[(I*k):(I*k+I)] = np.gradient(v[(I*k):(I*k+I)],dx)
+	mollgrad1[(I*k):(I*k+I)] = mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w)
 for i in range (0,I):
 	for k in range (0,K):
 		msoln[i,k] = m[index(i,k)]
 		vsoln[i,k] = v[index(i,k)]
 		gradsoln[i,k] = gradsoln1[index(i,k)]
+		mollgrad[i,k] = mollgrad1[index(i,k)]
 msoln = np.transpose(msoln)
 vsoln = np.transpose(vsoln)
 gradsoln = np.transpose(gradsoln)
@@ -266,6 +261,14 @@ ax5.plot_surface(Xplot,Tplot,gradsoln,rstride=5,cstride=5,cmap=cm.coolwarm,linew
 ax5.set_xlabel('x')
 ax5.set_ylabel('t')
 ax5.set_zlabel('grad v(x,t)')
+fig5.suptitle('Solution of gradient of v(x,t)', fontsize=14)
+#sss
+fig6 = plt.figure(6)
+ax6 = fig6.add_subplot(111, projection='3d')
+ax6.plot_surface(Xplot,Tplot,mollgrad,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax6.set_xlabel('x')
+ax6.set_ylabel('t')
+ax6.set_zlabel('mollified grad v(x,t)')
 fig5.suptitle('Solution of gradient of v(x,t)', fontsize=14)
 plt.show()
 

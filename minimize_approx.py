@@ -94,12 +94,12 @@ def min_approx(function, (args)):
 	#return xpts[minindex]
 
 def min_approx1(function, (args)):
-	left = -20
-	right = 20
-	linesearch_decrement = 0.5
+	left = -10
+	right = 10
+	linesearch_decrement = 0.75
 	linesearch_tolerance = 1/10
-	dx = 1
-	Nx = 5 #number of points
+	dx = .2
+	#Nx = 5 #number of points
 	###########################################################################################
 	#now the sector has been found; dish out points and do some kind of simplex method
 	xpts = np.linspace(left,right,abs(right-left)/dx) #our points
@@ -140,25 +140,27 @@ def tau(alpha,i,v_array,x_array): #the function to be minimised
 def beta(x,i,x_array):
 	return np.maximum(0,1-abs(x-x_array[i])/dx)	
 def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
-	return 5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
+	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
 
-dx = 0.2 #these taken from Gueant's paper
-dt = 0.2
+dx = 0.05 #these taken from Gueant's paper
+dt = 0.02
 xmin = -1
 xmax = 1
-Iarg = 10
+Iarg = 1
 x = np.arange(xmin,xmax+dx,dx)
 v_tmp = G(x,x)
-#alpha = np.arange(-50,50+dx,0.1*dx)
-#taus = np.empty((alpha.size,1))
-#for i in range (0,alpha.size):
-#	taus[i] = tau(alpha[i],10,v_tmp,x)
+alpha = np.arange(-10,10+dx,dx*0.1)
+taus = np.empty((alpha.size,1))
+for i in range (0,alpha.size):
+	taus[i] = tau(alpha[i],10,v_tmp,x)
 
-#plot(alpha,taus)
+plot(alpha,taus)
 t1 = time.time()
 val1 = min_approx1(tau,(Iarg,v_tmp,x)) #first and second arg are indices
 t2 = time.time()
 val2 = minimize(tau,0,args=(Iarg,v_tmp,x))
+t3 = time.time()
+print val1
 print val1-val2.x[0], tau(val1,Iarg,v_tmp,x)-tau(val2.x[0],Iarg,v_tmp,x)
 if tau(val1,Iarg,v_tmp,x)-tau(val2.x[0],Iarg,v_tmp,x) > 0:
 	print "Our method is flawed."
@@ -166,8 +168,12 @@ elif tau(val1,Iarg,v_tmp,x)-tau(val2.x[0],Iarg,v_tmp,x) == 0:
 	print "Methods are exactly equal."
 else:
 	print "Their method sucks."
-print "Comparison: mine used", t2-t1, ", their used", time.time()-t2
-#show()
+print "Comparison: mine used", t2-t1, ", their used", t3-t2
+if t2-t1 < t3-t2:
+	print "Mine is faster by", (t3-t2)/(t2-t1), "."
+else:
+	print "Theirs is faster by", (t2-t1)/(t3-t2), "."
+show()
 
 
 
