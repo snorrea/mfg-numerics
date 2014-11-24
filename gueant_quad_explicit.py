@@ -16,7 +16,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 #INPUTS
 dx = 1/50 #these taken from Gueant's paper
-dt = 1/2000 
+dt = 1/2000
 xmin = 0
 xmax = 1
 T = 1
@@ -43,18 +43,29 @@ def f(xh,xi):
 	#return -0.1 + (xh*(1-xh))**2/(1+4*xi)**(1.5)
 	#return -xi - abs(xh-0.3)**2
 	#return -xi - 2*abs(xh-0.3)**2/(xi+1)
-	return 2*(xi)*abs(xh-0.5)**2
-sigma2 = 0.3**2
-m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
-fmax = 2 #this has to be chosen empirically
+	#return 2*(xi)*abs(xh-0.5)**2
+	return (xh-0.2)**2 #Carlini's no-game
+sigma2 = 0.09**2
+#m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
+m0 = np.exp(-(x-0.75)**2/0.1**2)
+fmax = max(abs(f(x,1))) #not really
 
 def g(x_array,m_array):
-	return -0.5*(x_array+0.5)**2 * (1.5-x_array)**2
+#	return -0.5*(x_array+0.5)**2 * (1.5-x_array)**2
+	return x_array*0 #carlini's no-game
 
 #uT = np.square(x*(1-x)) #gueant's original
 uT = g(x,m0)
 #uT = x*0 
 #uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
+
+#check CFL
+R = max(abs(uT)) + 2*T*fmax + sigma2 *max(abs(np.log(m0)))
+KR = 0
+crit = (sigma2+4*R)*(dt/dx2) + (dt/sigma2)*KR*np.exp(2*R/sigma2)
+if crit > 1:
+	print "CFL condition not satisfied, this will be weird."
+	print dx2/(sigma2+4*R)
 
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
 u = np.empty((I*J))
@@ -63,11 +74,10 @@ u_old = np.empty((I*J)); #actually this one might not be used at all
 v_old = np.empty((I*J)); #the improved guesses on v is the thing that keeps this method going
 print "Initialising done, now crunching."
 t = time.time()
-
 #initial guess for v(0)
 for i in range (0,I):
 	for j in range (0,J):
-		v_old[index(i,j)] = max(abs(uT)) + sigma2 * max(abs(np.log(m0))) + 2*T*fmax
+		v_old[index(i,j)] = R
 
 #initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
 ul1 = -1*np.ones((Niter,1))

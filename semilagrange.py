@@ -12,14 +12,15 @@ import sys
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.025#1/300 #these taken from Gueant's paper
-dt = dx
-xmin = 0
-xmax = 1
+dx = 0.0075*4#1/300 #these taken from Gueant's paper
+dt = dx*2
+xmin = 0-0.1
+xmax = 1+.1
 T = 1
-Niter = 5 #maximum number of iterations
+Niter = 20 #maximum number of iterations
 tolerance = 1e-3
-epsilon = 4*dt #for use in convolution thing
+epsilon = 3*dt #for use in convolution thing
+sigma = 2
 molly = 1
 quad_order = 15
 
@@ -34,8 +35,12 @@ Nt = int(T/dt)
 #	sys.exit("Grid size not possible.")
 I = int(Nx)+1 #space
 K = int(Nt)+1 #time
-x = np.arange(xmin,xmax+dx,dx)
-t = np.arange(0,T+dt,dt)
+x = np.arange(xmin,xmax,dx)
+t = np.arange(0,T,dt)
+#print x
+#print t
+#print x.size
+print K,t.size
 def index(i,k): #this is a jolly source of errors, no more, probably still
 	return int(i+(I)*k)
 def convolution(eps,x): #this is the convolution function used in the paper, use like np.convolve(u,v)
@@ -93,19 +98,21 @@ def min_approx1(function, (args)): #for some reason this is twice as slow as the
 
 #FUNCTIONS
 def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
-#	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
-	return 0 #Carlini's no-game
+	return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
+#	return 0 #Carlini's no-game
 
-def F(x_array,m_array,space_index,time_index): #this is the running cost
+def F(x_array,m_array,space_index,time_index,sigma): #this is the running cost
 #	return abs(x_array[space_index]-0.7)**2+0.4*m_array[index(space_index,time_index)]**2
-	return (x_array[space_index]-0.2)**2 #Carlini's no-game
+	return 0
+	return mollify_array(m_array,sigma,x_array,gll_x,gll_w)[space_index]
+	#return (x_array[space_index]-0.2)**2 #Carlini's no-game
 #	return (x_array[space_index]-0.2)**2 + 0.2*m_array[index(space_index,time_index)]
 
 m0 = np.empty(I)
 for i in range (0,x.size):
 	if x[i] >=0 and x[i]<=1:
-		#m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original
-		m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
+		m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original
+		#m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
 	else:
 		m0[i] = 0
 
@@ -144,10 +151,14 @@ for n in range (0,Niter):
 	v[(I*K-I):(I*K)] = np.copy(G(x,m)) 	#need to set the last value... oh my gawd you're so stupid
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)]) #this could still be wrong
+		molfedm = mollify_array(m[((k+1)*I):((k+1)*I+I)],sigma,x,gll_x,gll_w) #mollify the density
+		molfedm = 0.3*mollify_array(molfedm,sigma,x,gll_x,gll_w) #mollify the density
+		#molfedm = 0.3*mollify_array(mollify_array(m[((k)*I):((k)*I+I)],sigma,x,gll_x,gll_w),sigma,x,gll_x,gll_w)) #mollify the density
 		for i in range (0,I):
 			#t1 = time.time()
 			tmp = minimize(tau,0,args=(i,v_tmp,x))
-			v[index(i,k)] = dt*F(x,m,i,k) + tmp.fun
+			v[index(i,k)] = dt*molfedm[i] + tmp.fun
+			#v[index(i,k)] = dt*F(x,m,i,k,sigma) + tmp.fun
 			#tmp = min_approx1(tau,(i,v_tmp,x)) 
 			#v[index(i,k)] = dt*F(x,m,i,k) + tmp
 	print "Spent time", time.time()-temptime
@@ -192,7 +203,7 @@ vsoln = np.empty((I,K))
 gradsoln1 = np.empty((I*K))
 gradsoln = np.empty((I,K))
 mollgrad1 = np.empty((I*K))
-mollgrad = np.empty((I,K))
+mollgrad = np.empty((K,I))
 for k in range (0,K):
 	gradsoln1[(I*k):(I*k+I)] = np.gradient(v[(I*k):(I*k+I)],dx)
 	mollgrad1[(I*k):(I*k+I)] = mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w)
@@ -201,7 +212,7 @@ for i in range (0,I):
 		msoln[i,k] = m[index(i,k)]
 		vsoln[i,k] = v[index(i,k)]
 		gradsoln[i,k] = gradsoln1[index(i,k)]
-		mollgrad[i,k] = mollgrad1[index(i,k)]
+		mollgrad[k,i] = mollgrad1[index(i,k)]
 msoln = np.transpose(msoln)
 vsoln = np.transpose(vsoln)
 gradsoln = np.transpose(gradsoln)
@@ -214,10 +225,8 @@ vl2 = vl2[:kMax]
 vlinfty = vlinfty[:kMax]
 
 #init plotstuff
-#xi = np.linspace(xmin,xmax,Nx)
-#ti = np.linspace(0,T,Nt)
 Xplot, Tplot = np.meshgrid(x,t)
-
+print Xplot.shape,Tplot.shape,msoln.shape,vsoln.shape,gradsoln.shape,mollgrad.shape
 #plot solution of m(x,t)
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')
@@ -235,29 +244,29 @@ ax2.set_ylabel('t')
 ax2.set_zlabel('u(x,t)')
 fig2.suptitle('Solution of potential v(x,t)', fontsize=14)
 #plot the norms of change on u
-#fig3 = plt.figure(3)
-#plt.plot(np.arange(1,kMax+1), np.log10(ml1), label="L1-norm")
-#plt.plot(np.arange(1,kMax+1), np.log10(ml2), label="L2-norm")
-#plt.plot(np.arange(1,kMax+1), np.log10(mlinfty), label="Linf-norm")
-#legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
-#ax3 = fig3.add_subplot(111)
-#ax3.set_xlabel('Iteration number')
-#ax3.set_ylabel('Log10 of change')
-#fig3.suptitle('Convergence of m(x,t)', fontsize=14)
+fig3 = plt.figure(3)
+plt.plot(np.arange(1,kMax+1), np.log10(ml1), label="L1-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(ml2), label="L2-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(mlinfty), label="Linf-norm")
+legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
+ax3 = fig3.add_subplot(111)
+ax3.set_xlabel('Iteration number')
+ax3.set_ylabel('Log10 of change')
+fig3.suptitle('Convergence of m(x,t)', fontsize=14)
 #plot the norms of change on m
-#fig4 = plt.figure(4)
-#plt.plot(np.arange(1,kMax+1), np.log10(vl1), label="L1-norm")
-#plt.plot(np.arange(1,kMax+1), np.log10(vl2), label="L2-norm")
-#plt.plot(np.arange(1,kMax+1), np.log10(vlinfty), label="Linf-norm")
-#legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
-#ax4 = fig4.add_subplot(111)
-#ax4.set_xlabel('Iteration number')
-#ax4.set_ylabel('Log10 of change')
-#fig4.suptitle('Convergence of v(x,t)', fontsize=14)
+fig4 = plt.figure(4)
+plt.plot(np.arange(1,kMax+1), np.log10(vl1), label="L1-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(vl2), label="L2-norm")
+plt.plot(np.arange(1,kMax+1), np.log10(vlinfty), label="Linf-norm")
+legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
+ax4 = fig4.add_subplot(111)
+ax4.set_xlabel('Iteration number')
+ax4.set_ylabel('Log10 of change')
+fig4.suptitle('Convergence of v(x,t)', fontsize=14)
 #plot gradient
 fig5 = plt.figure(5)
 ax5 = fig5.add_subplot(111, projection='3d')
-ax5.plot_surface(Xplot,Tplot,gradsoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax5.plot_surface(Xplot,Tplot,gradsoln,rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax5.set_xlabel('x')
 ax5.set_ylabel('t')
 ax5.set_zlabel('grad v(x,t)')
@@ -265,7 +274,7 @@ fig5.suptitle('Solution of gradient of v(x,t)', fontsize=14)
 #sss
 fig6 = plt.figure(6)
 ax6 = fig6.add_subplot(111, projection='3d')
-ax6.plot_surface(Xplot,Tplot,mollgrad,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax6.plot_surface(Xplot,Tplot,mollgrad,rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax6.set_xlabel('x')
 ax6.set_ylabel('t')
 ax6.set_zlabel('mollified grad v(x,t)')

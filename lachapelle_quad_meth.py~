@@ -9,20 +9,20 @@ from mpl_toolkits.mplot3d import Axes3D
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 1/10 #these taken from Gueant's paper
-dt = 1/2000 
+dx = 1/50 #these taken from Gueant's paper
+dt = 1/100 
 xmin = 0
 xmax = 1
 T = 1
-Niter = 5 #maximum number of iterations
+Niter = 15 #maximum number of iterations
 tolerance = 1e-6
 
 #CRUNCH
 dx2 = dx**2
 Nx = int(abs(xmax-xmin)/dx)
 Nt = int(T/dt) 
-I = int(Nt)
-J = int(Nx)
+I = int(Nt)+1
+J = int(Nx)+1
 x = np.arange(xmin,xmax+dx,dx)
 t = np.arange(0,T+dt,dt)
 def index(i,j): #this is a jolly source of errors, no more, probably still
@@ -55,7 +55,7 @@ c2 = 1
 #constant for f
 beta = 0.7
 #the rest
-sigma2 = 0.8**2
+sigma2 = 0.14#0.8**2
 m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
 def cost(a):
 	return a**2/2
@@ -83,7 +83,6 @@ xi = np.empty((I*J))
 betaconst = np.empty((I*J))
 cconst = np.empty((I*J))
 print "Initialising done, now crunching."
-t = time.time()
 
 #crank out some constants
 delta = 2/(theta+1)
@@ -94,7 +93,8 @@ a_old = np.ones((I*J))*0.1
 
 #initial distribution
 m_old = np.empty((I*J))
-m_old[0:J+1]=np.copy(m0);
+for i in range (0,I): #set initial guess
+	m_old[(i*J):(J*(i+1))]=np.copy(m0);
 
 for k in range (0,Niter):
 	titer = time.time()
@@ -114,7 +114,7 @@ for k in range (0,Niter):
 	
 	#compute mtilde and mhat
 	for i in range(0,I-1):
-		for j in range(0,J):
+		for j in range(0,J): #set mtilde
 			if a_old[index(i,j)] < 0:
 				mhat[index(i,j)] = m_old[index(i,j)]
 				if j==J-1:
@@ -130,12 +130,18 @@ for k in range (0,Niter):
 		#now compute all the helping constants....	
 		for j in range(0,J-1):
 			#print mhat[index(i,j)],m_old[index(i,j)],m_old[index(i,j+1)]
-			#print i
-			mu[index(i,j)] = 2*mhat[index(i,j)]/(m_old[index(i,j)]+m_old[index(i,j+1)])
+			#print i,j,m0.size
+			#print mhat[index(i,j)]
+			mu[index(i,j)] = 2*mhat[index(i,j)]/(m_old[index(i,j)]+m_old[index(i,j+1)]) #explosion
 			muhat[index(i,j)] = 2*mtilde[index(i,j)]/(m_old[index(i,j)]+m_old[index(i,j+1)])
-			bconst[index(i,j)] = -2*(theta*a_old[index(i,j)] + mu[index(i,j)]*(v[index(i+1,j+1)]-v[index(i+1,j)])/dx)
-			cconst[index(i,j)] = (theta-1)*(a_old[index(i,j)])**2 + 2*a_old[index(i,j)]*muhat[index(i,j)]*(v[index(i+1,j+1)]-v[index(i+1,j)])/dx
-			
+			if i==I:
+				bconst[index(i,j)] = -2*(theta*a_old[index(i,j)] + mu[index(i,j)]*(v[index(i-1,j+1)]-v[index(i-1,j)])/dx)
+				cconst[index(i,j)] = (theta-1)*(a_old[index(i,j)])**2 + 2*a_old[index(i,j)]*muhat[index(i,j)]*(v[index(i-1,j+1)]-v[index(i-1,j)])/dx
+			else:
+				bconst[index(i,j)] = -2*(theta*a_old[index(i,j)] + mu[index(i,j)]*(v[index(i+1,j+1)]-v[index(i+1,j)])/dx)
+				cconst[index(i,j)] = (theta-1)*(a_old[index(i,j)])**2 + 2*a_old[index(i,j)]*muhat[index(i,j)]*(v[index(i+1,j+1)]-v[index(i+1,j)])/dx
+
+			#things
 			xi[index(i,j)] = (1-delta)*a_old[index(i,j)] + delta*muhat[index(i,j)]*(v[index(i+1,j+1)]-v[index(i+1,j)])/dx
 			betaconst[index(i,j)] = ( -bconst[index(i,j)] - np.sign(a_old[index(i,j)])*np.sqrt( (bconst[index(i,j)])**2 - 4*aconst*cconst[index(i,j)] ) )/(2*a_old[index(i,j)])
 
@@ -178,15 +184,13 @@ for k in range (0,Niter):
 #resolve solutions into a mesh
 #m = np.exp((u-v)/(sigma2)) #GET OUT OF HERE CRIMINAL SCUM
 msoln = np.empty((I,J))
-usoln = np.empty((I,J))
+vsoln = np.empty((I,J))
 for i in range (0,I):
 	for j in range (0,J):
 		msoln[i,j] = m[index(i,j)]
-		usoln[i,j] = u[index(i,j)]
+		vsoln[i,j] = v[index(i,j)]
 #shit attempt at plotting
-xi = np.linspace(xmin,xmax,Nx)
-ti = np.linspace(0,T,Nt)
-Xplot, Tplot = np.meshgrid(xi,ti)
+Xplot, Tplot = np.meshgrid(x,t)
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(111, projection='3d')
 ax1.plot_wireframe(Xplot,Tplot,msoln,rstride=15,cstride=5)
