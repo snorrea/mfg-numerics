@@ -15,13 +15,15 @@ from mpl_toolkits.mplot3d import Axes3D
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 1/50 #these taken from Gueant's paper
-dt = 1/2000
+dx = 1/100 #these taken from Gueant's paper
+dt = 1/60000
+#dt = dx**2/1.28
 xmin = 0
 xmax = 1
 T = 1
 Niter = 500 #maximum number of iterations
 tolerance = 1e-6
+sigma2 = 0.01**2
 
 #CRUNCH
 dx2 = dx**2
@@ -45,7 +47,7 @@ def f(xh,xi):
 	#return -xi - 2*abs(xh-0.3)**2/(xi+1)
 	#return 2*(xi)*abs(xh-0.5)**2
 	return (xh-0.2)**2 #Carlini's no-game
-sigma2 = 0.09**2
+#sigma2 = 0.2**2
 #m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
 m0 = np.exp(-(x-0.75)**2/0.1**2)
 fmax = max(abs(f(x,1))) #not really

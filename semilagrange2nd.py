@@ -12,7 +12,7 @@ import sys
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.0075#1/300 #these taken from Gueant's paper
+dx = 0.0075*2#1/300 #these taken from Gueant's paper
 dt = dx*2
 xmin = 0#-0.1
 xmax = 1#+.1
@@ -20,7 +20,7 @@ T = 1
 Niter = 10 #maximum number of iterations
 tolerance = 1e-3
 epsilon = 3*dt #for use in convolution thing
-sigma = 2
+sigma = 0.09
 molly = 0
 quad_order = 15
 
@@ -50,7 +50,7 @@ def beta(x_val,i,x_array):
 def tau(alpha,i,v_array,x_array): #the function to be minimised
 	tmp = 0.5*dt*alpha**2
 	for j in range (0,I):
-		tmp = tmp + v_array[j]*beta(x_array[i]-dt*alpha,j,x_array)
+		tmp = tmp + 0.5*v_array[j]*(beta(x_array[i]-dt*alpha+np.sqrt(dt)*sigma,j,x_array)+beta(x_array[i]-dt*alpha-np.sqrt(dt)*sigma,j,x_array))
 	return tmp
 def mollifier(x_val): #Evans' mollifier
 	if abs(x_val) < 1:
@@ -103,6 +103,9 @@ def F_global(x_array,m_array,sigma): #more effective running cost function
 	return (x-0.2)**2 #Carlini's no-game
 #	tmp = mollify_array(m_array,sigma,x_array,gll_x,gll_w)
 #	return 2*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
+
+def SIGMA(time):
+	return 0
 
 m0 = np.empty(I)
 for i in range (0,x.size):
@@ -174,7 +177,7 @@ for n in range (0,Niter):
 		for i in range (0,I): 
 			m[index(i,k+1)] = 0
 			for j in range (0,I): 
-				m[index(i,k+1)] += beta(x[j]-dt*v_grad[j],i,x)*m[index(j,k)]
+				m[index(i,k+1)] += 0.5*(beta(x[j]-dt*v_grad[j]+np.sqrt(dt)*sigma,i,x)+beta(x[j]-dt*v_grad[j]-np.sqrt(dt)*sigma,i,x))*m[index(j,k)]
 	print "Spent time", time.time()-temptime
 	#compute norms of stuff
 	mchange = np.copy(m-m_old)
@@ -271,6 +274,7 @@ ax6.set_ylabel('t')
 ax6.set_zlabel('mollified grad v(x,t)')
 fig5.suptitle('Solution of gradient of v(x,t)', fontsize=14)
 plt.show()
+
 
 
 

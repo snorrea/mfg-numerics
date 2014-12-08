@@ -12,7 +12,7 @@ import sys
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.0075*6#1/300 #these taken from Gueant's paper
+dx = 0.0075*4#1/300 #these taken from Gueant's paper
 dt = dx*2
 xmin = 0-0.1
 xmax = 1+.1
@@ -21,7 +21,7 @@ Niter = 10 #maximum number of iterations
 tolerance = 1e-3
 epsilon = 3*dt #for use in convolution thing
 sigma = 2
-molly = 1
+molly = 0
 quad_order = 15
 
 #CRUNCH
@@ -40,7 +40,7 @@ t = np.arange(0,T,dt)
 #print x
 #print t
 #print x.size
-print K,t.size
+#print K,t.size
 def index(i,k): 
 	return int(i+(I)*k)
 def convolution(eps,x): #this is the convolution function used in the paper, use like np.convolve(u,v)
@@ -107,8 +107,8 @@ def F_global(x_array,m_array,sigma): #more effective running cost function
 m0 = np.empty(I)
 for i in range (0,x.size):
 	if x[i] >=0 and x[i]<=1:
-		m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original, carlini's game
-		#m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
+		#m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original, carlini's game
+		m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
 	else:
 		m0[i] = 0
 
