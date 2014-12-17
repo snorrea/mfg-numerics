@@ -13,17 +13,17 @@ import sys
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.0075*2#1/300 #these taken from Gueant's paper
+dx = 0.0075/2#1/300 #these taken from Gueant's paper
 dt = dx*1.5
 xmin = 0-0.1
 xmax = 1+.1
 T = 1
 Niter = 30 #maximum number of iterations
-tolerance = 1e-3
+tolerance = 1e-4
 epsilon = 3*dt #for use in convolution thing
-sigma = 0.2
+sigma = 0.3
 noise = 0.2 #noise in the MFG sense
-molly = 1
+molly = 0
 second_order = 0 #1 for second-order, 0 for first order
 quad_order = 15
 
@@ -44,8 +44,8 @@ def index(i,k):
 m0 = np.empty(I)
 for i in range (0,x.size):
 	if x[i] >=0 and x[i]<=1:
-		m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original, carlini's game
-		#m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
+		#m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original, carlini's game
+		m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
 	else:
 		m0[i] = 0
 m0 = m0/(sum(m0)*dx)
@@ -57,7 +57,9 @@ m_old = np.empty((I*K))
 v_grad = np.empty((I))
 #initial guess on the distribution
 for k in range (0,K):
-	m[(I*k):(I*k+I)] = np.copy(m0)
+	m[k*I:k*I+I] = np.copy(m0)
+	if k>0:
+		m[k*I:k*I+I] = np.ones(m0.size)*0.0001
 
 #initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
 vl1 = -1*np.ones((Niter,1))
@@ -82,12 +84,12 @@ for n in range (0,Niter):
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		m_tmp = np.copy(m[((k)*I):((k)*I+I)])
-		m_tmp_m = iF.mollify_array(m_tmp,sigma,x,gll_x,gll_w)
-		F_var = iF.F_global(x,m_tmp_m,sigma) #using the mollified thing makes for interesting results...
+		F_var = iF.F_global(x,m_tmp,sigma)
+		#print max(F_var)
 		for i in range (0,I):
 			#tmp = minimize(iF.tau_first_order,0,args=(i,v_tmp,x,dt))
 			#v[index(i,k)] = dt*F_var[i] + tmp.fun
-			tmp = iF.min_approx1(iF.tau_first_order,(i,v_tmp,x,dt)) 
+			tmp = iF.find_minimum(iF.tau_first_order,(i,v_tmp,x,dt)) 
 			v[index(i,k)] = dt*F_var[i] + tmp
 	print "Spent time", time.time()-temptime
 	vchange = np.copy(v-v_old)
@@ -105,28 +107,24 @@ for n in range (0,Niter):
 	temptime = time.time()
 	for k in range(0,K-1):
 		if molly==1:
-			v_grad = iF.mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w) #this is completely fine
+			v_grad = iF.mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w)
 		else:
 			v_grad = np.gradient(v[(I*k):(I*k+I)],dx)
-#		xtraj = x-dt*v_grad
-#		m_update = np.zeros(v_grad.size)
-		for i in range (0,I): 
-		#	vi1 = np.floor((xtraj[i]-xmin)/dx)
-		#	tmp1 = (x[vi1+1]-xtraj[i])/dx #z = xtraj[j], x = x, i = vi1 
-		#	tmp2 = (xtraj[i]-x[vi1])/dx
-		#	m_update[vi1] += tmp1*m[index(i,k)]
-		#	m_update[vi1+1] += tmp2*m[index(i,k)]
-			m[index(i,k+1)]=0
-			if second_order==0:
-				m[index(i,k+1)] = sum(iF.beta_array(x-dt*v_grad,i,x)*m[(I*k):(I+I*k)])
+		xtraj = iF.restrain(x-dt*v_grad,x)
+		m_update = np.zeros(v_grad.size)
+		for i in range (1,I-1): 
+			refindex = np.floor((xtraj[i]-xmin)/dx)
+			if xtraj[i] < xmin: #out of bounds to the left
+				m_update[1] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+			elif xtraj[i] > xmax: #out of bounds to the right
+				m_update[I-1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
 			else:
-				for j in range (0,I): 
-					m[index(i,k+1)] += 0.5*(iF.beta(x[j]-dt*v_grad[j]+np.sqrt(dt)*noise,i,x)+iF.beta(x[j]-dt*v_grad[j]-np.sqrt(dt)*noise,i,x))*m[index(j,k)]
-		#m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
+				m_update[refindex] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+				m_update[refindex+1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+		m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
 	#########################################
 	################ WRAP UP ITERATION ######
 	#########################################
-
 	print "Spent time", time.time()-temptime
 	#compute norms of stuff
 	mchange = np.copy(m-m_old)
@@ -136,7 +134,7 @@ for n in range (0,Niter):
 	#Evaluate iteration
 	m_old = np.copy(m)
 	v_old = np.copy(v)
-	print "Iteration number", n+1, "completed, used time", time.time()-titer, "with change in m", ml2[n], "and change in v", vl2[n]
+	print "Iteration number", n+1, "completed, used time", time.time()-titer, "with change in m", mlinfty[n], "and change in v", vlinfty[n]
 	
 print "Time spent:", time.time()-time_total
 kMax = n
@@ -147,15 +145,19 @@ gradsoln1 = np.empty((I*K))
 gradsoln = np.empty((I,K))
 mollgrad1 = np.empty((I*K))
 mollgrad = np.empty((K,I))
+molldist1 = np.empty((I*K))
+molldist = np.empty((K,I))
 for k in range (0,K):
 	gradsoln1[(I*k):(I*k+I)] = np.gradient(v[(I*k):(I*k+I)],dx)
 	mollgrad1[(I*k):(I*k+I)] = iF.mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w)
+	molldist1[(I*k):(I*k+I)] = iF.mollify_array(m[(I*k):(I*k+I)],sigma,x,gll_x,gll_w)
 for i in range (0,I):
 	for k in range (0,K):
 		msoln[i,k] = m[index(i,k)]
 		vsoln[i,k] = v[index(i,k)]
 		gradsoln[i,k] = gradsoln1[index(i,k)]
 		mollgrad[k,i] = mollgrad1[index(i,k)]
+		molldist[k,i] = molldist1[index(i,k)]
 msoln = np.transpose(msoln)
 vsoln = np.transpose(vsoln)
 gradsoln = np.transpose(gradsoln)
@@ -214,14 +216,22 @@ ax5.set_xlabel('x')
 ax5.set_ylabel('t')
 ax5.set_zlabel('grad v(x,t)')
 fig5.suptitle('Solution of gradient of v(x,t)', fontsize=14)
-#sss
+#plot mollified gradient
 fig6 = plt.figure(6)
 ax6 = fig6.add_subplot(111, projection='3d')
 ax6.plot_surface(Xplot,Tplot,mollgrad,rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax6.set_xlabel('x')
 ax6.set_ylabel('t')
 ax6.set_zlabel('mollified grad v(x,t)')
-fig5.suptitle('Solution of gradient of v(x,t)', fontsize=14)
+fig6.suptitle('Solution of mollified gradient of v(x,t)', fontsize=14)
+#plot mollified distribution
+fig7 = plt.figure(7)
+ax7 = fig7.add_subplot(111, projection='3d')
+ax7.plot_surface(Xplot,Tplot,molldist,rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax7.set_xlabel('x')
+ax7.set_ylabel('t')
+ax7.set_zlabel('mollified m(x,t)')
+fig7.suptitle('Solution of mollified m(x,t)', fontsize=14)
 plt.show()
 
 

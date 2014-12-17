@@ -9,13 +9,13 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 ###################
 #MINIMISING FUNCTION
 ###################
-def min_approx1(function, (args)): #for some reason this is twice as slow as the built-in one :(
+def find_minimum(function, (args)): #for some reason this is twice as slow as the built-in one :(
 	left = -2
 	right = 2
 	linesearch_decrement = 0.5
 	linesearch_tolerance = 1/50
 	dx = 1
-	Nx = 10
+	Nx = 20
 	xpts = np.linspace(left,right,Nx)
 	fpts = np.empty((xpts.size,1))
 	fpts = function(xpts,*args)
@@ -49,21 +49,25 @@ def tau_second_order(alpha,i,v_array,x_array,dt):
 ###################
 def F_global(x_array,m_array,sigma): #more effective running cost function
 	#return (x_array-0.2)**2 #Carlini's no-game
-	output = np.zeros(x_array.size)
-	for i in range (0,output.size):
-		output[i] = min(1.4,max(m_array[i],0.7))
-	return output
+	#output = np.zeros(x_array.size)
+	#for i in range (0,output.size):
+	#	output[i] = min(1.4,max(m_array[i],0.7))
+	#return output
 	#return min(1.4,max(m_array,0.7))
-#	tmp = mollify_array(m_array,sigma,x_array,gll_x,gll_w)
-#	return 0.3*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
+	#tmp = mollify_array(m_array,sigma,x_array,gll_x,gll_w)
+	#tmp = mollify_array(tmp,sigma,x_array,gll_x,gll_w)
+	#return 0.03*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
+	#return 0.03*tmp
+	return 0.05/max(m_array)*m_array
+	#return np.zeros(x_array.size)
 
 ##################
 #TERMINAL COST
 #################
 def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
 	#return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
-	return -(xi*(1-xi))**2 #Gueant's game
-	#return 0 #Carlini's no-game
+	#return -(xi*(1-xi))**2 #Gueant's game
+	return 0 #Carlini's no-game
 
 
 ###################
@@ -80,6 +84,13 @@ def mollify_array(array,epsilon,x_array,gll_x,gll_w):
 		for j in range (0,gll_x.size):
 			output[k] += gll_w[j]*mollifier(gll_x[j])*np.interp(x_array[k]-epsilon*gll_x[j],x_array,array)
 	return output
+def restrain(trajectory,x_array):
+	for i in range(0,trajectory.size):
+		if trajectory[i]<x_array[1]:
+			trajectory[i] = x_array[1]
+		elif trajectory[i]>x_array[x_array.size-1]:
+			trajectory[i] = x_array[x_array.size-1]
+	return trajectory
 
 ###############THIS SHOULD GO AWAY
 def beta(x_val,i,x_array):
@@ -90,3 +101,11 @@ def beta_array(array,i,x_array):
 	for j in range (0,array.size):
 		output[j] = np.maximum(0,1-abs(array[j]-x_array[i])/(x_array[2]-x_array[1]))
 	return output
+
+def beta_left(z,x_array,dx,index):
+	return (x_array[index+1]-z)/dx
+
+def beta_right(z,x_array,dx,index):
+	return (z-x_array[index])/dx
+
+	
