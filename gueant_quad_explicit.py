@@ -19,12 +19,12 @@ import input_functions as iF
 dx = 1/50#0.0075*8#1/50 #these taken from Gueant's paper
 dt = 1/5000
 #dt = dx**2/1.28
-xmin = 0
-xmax = 1
+xmin = 0-0.2
+xmax = 1+0.2
 T = 1
 Niter = 500 #maximum number of iterations
 tolerance = 1e-3
-sigma2 = 0.1**2
+sigma2 = 0.05**2
 
 #CRUNCH
 dx2 = dx**2
@@ -38,9 +38,9 @@ def index(i,j): #this is a jolly source of errors, no more, probably still
 	return int(j+J*i)
 
 #INITIAL/TERMINAL CONDITIONS
-m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
+#m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
 #m0 = np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
-#m0 = np.exp(-(x-0.5)**2/0.05**2)
+m0 = np.exp(-(x-0.5)**2/0.05**2)
 uT = iF.G(x,m0)
 #Other stuff
 fmax = max(abs(iF.F_global(x,m0,0))) #not really
@@ -76,21 +76,24 @@ timestart = time.time()
 for k in range (0,Niter):
 	#known terminal conditions
 	titer = time.time()
-	u[J*I-J-1:-1] = uT
+	u[J*I-J:J*I] = uT
 	#solve for u
 	for i in range (I-2,-1,-1):
 		tmp = (u[((i+1)*J):((i+1)*J+J)] - v_old[((i+1)*J):((i+1)*J+J)])/sigma2
+		#print np.exp(tmp)
 		Fval = iF.F_global(x,np.exp(tmp),0)
+		#print max(Fval)
 		#print Fval
 		#print ss
 		u[i*J] = u[(i+1)*J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+1] - 2*u[(i+1)*J] )/(dx2) - Fval[1] + 0.5*( max(0,(u[(i+1)*J+1]-u[(i+1)*J])/dx)**2 + min(0,(u[(i+1)*J]-u[(i+1)*J+1])/dx)**2 ) )
 		u[i*J+J-1] = u[(i+1)*J+J-1] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-2] - 2*u[(i+1)*J+J-1] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-2]-u[(i+1)*J+J-1])/dx)**2 + min(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J-2])/dx)**2 ) )
-		u[(i*J+1):(i*J+J-2)] = u[((i+1)*J+1):((i+1)*J+J-2)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J-1)] + u[((i+1)*J):((i+1)*J+J-3)] - 2*u[((i+1)*J+1):((i+1)*J+J-2)] )/(dx2) - Fval[1:-2] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J-1)]-u[((i+1)*J+1):((i+1)*J+J-2)])/dx)**2 + np.maximum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-2)]-u[((i+1)*J):((i+1)*J+J-3)])/dx)**2 ) ) 
-	#u[((i+1)*J+1):((i+1)*J+J-2)] 
-	#u[((i+1)*J+2):((i+1)*J+J-1)] +1
-	#u[((i+1)*J):((i+1)*J+J-3)] -1
+		#u[i*J+J] = u[(i+1)*J+J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-1] - 2*u[(i+1)*J+J] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J])/dx)**2 + min(0,(u[(i+1)*J+J]-u[(i+1)*J+J-1])/dx)**2 ) )
+		u[(i*J+1):(i*J+J-2)] = u[((i+1)*J+1):((i+1)*J+J-2)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J-1)] + u[((i+1)*J):((i+1)*J+J-3)] - 2*u[((i+1)*J+1):((i+1)*J+J-2)] )/(dx2) - Fval[1:-2] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J-1)]-u[((i+1)*J+1):((i+1)*J+J-2)])/dx)**2 + np.maximum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-2)]-u[((i+1)*J):((i+1)*J+J-3)])/dx)**2 ) )
+		#u[(i*J+1):(i*J+J-1)] = u[((i+1)*J+1):((i+1)*J+J-1)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J)] + u[((i+1)*J):((i+1)*J+J-2)] - 2*u[((i+1)*J+1):((i+1)*J+J-1)] )/(dx2) - Fval[1:-2] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J)]-u[((i+1)*J+1):((i+1)*J+J-1)])/dx)**2 + np.maximum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-1)]-u[((i+1)*J):((i+1)*J+J-2)])/dx)**2 ) ) 
 	#known initial conditions on v
 	v[0:J] = np.copy(u[0:J]) - sigma2 * np.log(m0)
+	#print v[0:J+1]
+	print ss
 	
 	#solve for v
 	for i in range (0,I-1):
@@ -98,6 +101,7 @@ for k in range (0,Niter):
 		Fval = iF.F_global(x,np.exp(tmp),0)
 		v[(i+1)*J] = v[i*J] + dt * ( sigma2/2 * ( 2*v[i*J+1] - 2*v[i*J] )/(dx2) + Fval[0] - 0.5*( max(0,(v[i*J+1]-v[i*J])/dx)**2 + min(0,(v[i*J]-v[i*J+1])/dx)**2 ) )
 		v[(i+1)*J+J-1] = v[i*J+J-1] + dt * ( sigma2/2 * ( 2*v[i*J+J-2] - 2*v[i*J+J-1] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-2]-v[i*J+J-1])/dx)**2 + min(0,(v[i*J+J-1]-v[i*J+J-2])/dx)**2 ) )
+		#v[(i+1)*J+J] = v[i*J+J] + dt * ( sigma2/2 * ( 2*v[i*J+J-1] - 2*v[i*J+J] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-1]-v[i*J+J])/dx)**2 + min(0,(v[i*J+J]-v[i*J+J-1])/dx)**2 ) )
 		v[((i+1)*J+1):((i+1)*J+J-2)] = v[(i*J+1):(i*J+J-2)] + dt * ( sigma2/2 * ( v[(i*J+2):(i*J+J-1)] + v[(i*J):(i*J+J-3)] - 2*v[(i*J+1):(i*J+J-2)] )/(dx2) + Fval[1:-2] - 0.5*( np.maximum(BIGZ,(v[(i*J+2):(i*J+J-1)]-v[(i*J+1):(i*J+J-2)])/dx)**2 + np.maximum(BIGZ,(v[(i*J+1):(i*J+J-2)]-v[(i*J):(i*J+J-3)])/dx)**2 ) ) 
 	#compute norms of stuff
 	mchange = np.exp(( u-v )/(sigma2)) - np.exp(( u_old-v_old )/(sigma2))
@@ -177,21 +181,4 @@ ax4.set_xlabel('Iteration number')
 ax4.set_ylabel('Log10 of change')
 fig4.suptitle('Convergence of m(x,t)', fontsize=14)
 plt.show()
-
-#fig2 = plt.figure()
-#ax2 = fig1.add_subplot(111, projection='3d')
-#ax2.plot_wireframe(Xplot,Tplot,usoln,rstride=15,cstride=5)
-#plt.show()
-
-#surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=cm.coolwarm,
-#        linewidth=0, antialiased=False)
-#ax.set_zlim(-1.01, 1.01)
-
-#ax.zaxis.set_major_locator(LinearLocator(10))
-#ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-
-#fig.colorbar(surf, shrink=0.5, aspect=5)
-
-#plt.show()
-
 
