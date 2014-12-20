@@ -18,11 +18,11 @@ dt = dx*1.5
 xmin = 0-0.1
 xmax = 1+.1
 T = 1
-Niter = 30 #maximum number of iterations
+Niter = 150 #maximum number of iterations
 tolerance = 1e-4
-epsilon = 3*dt #for use in convolution thing
-sigma = 0.3
-noise = 0.2 #noise in the MFG sense
+epsilon = 10*dt #for use in convolution thing
+sigma = 10
+noise = 0.9 #noise in the MFG sense
 molly = 0
 second_order = 0 #1 for second-order, 0 for first order
 quad_order = 15
@@ -45,7 +45,8 @@ m0 = np.empty(I)
 for i in range (0,x.size):
 	if x[i] >=0 and x[i]<=1:
 		#m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original, carlini's game
-		m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
+		#m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
+		m0[i] = np.exp(-(x[i]-0.5)**2/0.05**2)#/0.177209 #shyness game
 	else:
 		m0[i] = 0
 m0 = m0/(sum(m0)*dx)
@@ -58,8 +59,8 @@ v_grad = np.empty((I))
 #initial guess on the distribution
 for k in range (0,K):
 	m[k*I:k*I+I] = np.copy(m0)
-	if k>0:
-		m[k*I:k*I+I] = np.ones(m0.size)*0.0001
+	#if k>0:
+	#	m[k*I:k*I+I] = np.ones(m0.size)*0.0001
 
 #initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
 vl1 = -1*np.ones((Niter,1))
@@ -68,7 +69,17 @@ vlinfty = -1*np.ones((Niter,1))
 ml1 = -1*np.ones((Niter,1))
 ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
-
+#used to search for minimum of tau
+N = 20 #searchpoints
+min_tol = 50*tolerance#1e-5 #tolerance for minimum
+min_left = -2 #search region left
+min_right = 2 #search region right
+relation = 2
+scatters = int(np.ceil(np.log((min_right-min_left)/min_tol)/np.log(N)))
+scatters2 = int(1 + np.ceil(np.log((min_right-min_left)/(N*min_tol))/np.log(relation)))
+print scatters
+xpts = np.linspace(min_left,min_right,N)
+fpts = np.empty((xpts.size,1))
 #set final value on v and copy the bitches
 v[(I*K-I):(I*K)] = iF.G(x,m)
 m_old = np.copy(m)
@@ -87,20 +98,26 @@ for n in range (0,Niter):
 		F_var = iF.F_global(x,m_tmp,sigma)
 		#print max(F_var)
 		for i in range (0,I):
-			#tmp = minimize(iF.tau_first_order,0,args=(i,v_tmp,x,dt))
-			#v[index(i,k)] = dt*F_var[i] + tmp.fun
-			tmp = iF.find_minimum(iF.tau_first_order,(i,v_tmp,x,dt)) 
-			v[index(i,k)] = dt*F_var[i] + tmp
+			if second_order==0:
+				fpts = iF.tau_first_order(xpts,i,v_tmp,x,dt)
+				x0 = xpts[np.argmin(fpts)]
+				#NUMPY
+				#tmp = minimize(iF.tau_first_order,x0,args=(i,v_tmp,x,dt),tol=min_tol)
+				#v[index(i,k)] = dt*F_var[i] + tmp.fun
+				#MY OWN WOLF 1
+				#tmp = iF.line_search(iF.tau_first_order,(i,v_tmp,x,dt),xpts[2]-xpts[1],x0) 
+				#v[index(i,k)] = dt*F_var[i] + tmp
+				#MY OWN WOLF 2
+				tmp = iF.scatter_search(iF.tau_first_order,(i,v_tmp,x,dt),xpts[2]-xpts[1],x0,N,scatters) 
+				v[index(i,k)] = dt*F_var[i] + tmp
+			else:
+				tmp = iF.find_minimum(iF.tau_second_order,(i,v_tmp,x,dt,noise)) 
+				v[index(i,k)] = dt*F_var[i] + tmp
 	print "Spent time", time.time()-temptime
 	vchange = np.copy(v-v_old)
 	vl1[n] = np.sum(abs(vchange))
 	vl2[n] = np.sqrt(np.sum(abs(vchange)**2))
 	vlinfty[n] = max(abs( vchange) )
-	if (vlinfty[n] < tolerance):
-		print "Method converged with final change" , vl2[n]
-		print "Time spent:", time.time()-time_total
-		kMax = n
-		break
 
 	#initial condition on m is already set, compute the rest of them
 	print "Computing iteration", n+1, "of m..."
@@ -110,17 +127,39 @@ for n in range (0,Niter):
 			v_grad = iF.mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w)
 		else:
 			v_grad = np.gradient(v[(I*k):(I*k+I)],dx)
-		xtraj = iF.restrain(x-dt*v_grad,x)
+		if second_order==0:
+			xtraj = iF.restrain(x-dt*v_grad,x)
+		else:
+			xtraj1 = iF.restrain(x-dt*v_grad+np.sqrt(dt)*noise,x)
+			xtraj2 = iF.restrain(x-dt*v_grad-np.sqrt(dt)*noise,x)
 		m_update = np.zeros(v_grad.size)
-		for i in range (1,I-1): 
-			refindex = np.floor((xtraj[i]-xmin)/dx)
-			if xtraj[i] < xmin: #out of bounds to the left
-				m_update[1] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
-			elif xtraj[i] > xmax: #out of bounds to the right
-				m_update[I-1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+		for i in range (1,I-1):
+			if second_order==0:
+				refindex = np.floor((xtraj[i]-xmin)/dx)
+				if xtraj[i] < xmin: #out of bounds to the left
+					m_update[1] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+				elif xtraj[i] > xmax: #out of bounds to the right
+					m_update[I-1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+				else:
+					m_update[refindex] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+					m_update[refindex+1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
 			else:
-				m_update[refindex] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
-				m_update[refindex+1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+				refindex1 = np.floor((xtraj1[i]-xmin)/dx)
+				refindex2 = np.floor((xtraj2[i]-xmin)/dx)
+				if xtraj1[i] < xmin: #out of bounds to the left
+					m_update[1] += 0.5*iF.beta_left(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
+				elif xtraj1[i] > xmax: #out of bounds to the right
+					m_update[I-1] += 0.5*iF.beta_right(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
+				else:
+					m_update[refindex1] += 0.5*iF.beta_left(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
+					m_update[refindex1+1] += 0.5*iF.beta_right(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
+				if xtraj2[i] < xmin: #out of bounds to the left
+					m_update[1] += 0.5*iF.beta_left(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
+				elif xtraj2[i] > xmax: #out of bounds to the right
+					m_update[I-1] += 0.5*iF.beta_right(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
+				else:
+					m_update[refindex2] += 0.5*iF.beta_left(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
+					m_update[refindex2+1] += 0.5*iF.beta_right(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
 		m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
 	#########################################
 	################ WRAP UP ITERATION ######
@@ -131,6 +170,11 @@ for n in range (0,Niter):
 	ml1[n] = np.sum(abs(mchange))
 	ml2[n] = np.sqrt(np.sum(abs(mchange)**2))
 	mlinfty[n] = max(abs( mchange) ) 
+	if (mlinfty[n] < tolerance):
+		print "Method converged with final change" , mlinfty[n]
+		print "Time spent:", time.time()-time_total
+		kMax = n
+		break
 	#Evaluate iteration
 	m_old = np.copy(m)
 	v_old = np.copy(v)
@@ -171,7 +215,7 @@ vlinfty = vlinfty[:kMax]
 
 #init plotstuff
 Xplot, Tplot = np.meshgrid(x,t)
-print Xplot.shape,Tplot.shape,msoln.shape,vsoln.shape,gradsoln.shape,mollgrad.shape
+#print Xplot.shape,Tplot.shape,msoln.shape,vsoln.shape,gradsoln.shape,mollgrad.shape
 #plot solution of m(x,t)
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')

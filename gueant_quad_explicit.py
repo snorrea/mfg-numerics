@@ -11,55 +11,39 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import time as time
 from mpl_toolkits.mplot3d import Axes3D
+import input_functions as iF
 
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 1/100 #these taken from Gueant's paper
-dt = 1/60000
+dx = 1/50#0.0075*8#1/50 #these taken from Gueant's paper
+dt = 1/5000
 #dt = dx**2/1.28
 xmin = 0
 xmax = 1
 T = 1
 Niter = 500 #maximum number of iterations
-tolerance = 1e-6
-sigma2 = 0.01**2
+tolerance = 1e-3
+sigma2 = 0.1**2
 
 #CRUNCH
 dx2 = dx**2
 Nx = int(abs(xmax-xmin)/dx)
-Nt = int(T/dt) 
-I = int(Nt)
-J = int(Nx)
-x = np.arange(xmin,xmax+dx,dx)
-t = np.arange(0,T+dt,dt)
+Nt = int(T/dt)
+x = np.arange(xmin,xmax,dx)
+t = np.arange(0,T,dt)
+I = t.size#int(Nt)+1 #time
+J = x.size#int(Nx)+1 #space
 def index(i,j): #this is a jolly source of errors, no more, probably still
-	return int(j+(J)*i)
+	return int(j+J*i)
 
-#input functions and constants
-def f(xh,xi):
-	#return -min(1.4,max(xi,0.7)) #gueant's original
-	#return xh*(1-xh)*xi #my thing which will explode but didn't
-	#return -(xi)
-	#return -100*np.log(xi)
-	#return -0.1 + (xh*(1-xh))**2/(1+4*xi)**(1.5)
-	#return -xi - abs(xh-0.3)**2
-	#return -xi - 2*abs(xh-0.3)**2/(xi+1)
-	#return 2*(xi)*abs(xh-0.5)**2
-	return (xh-0.2)**2 #Carlini's no-game
-#sigma2 = 0.2**2
-#m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
-m0 = np.exp(-(x-0.75)**2/0.1**2)
-fmax = max(abs(f(x,1))) #not really
-
-def g(x_array,m_array):
-#	return -0.5*(x_array+0.5)**2 * (1.5-x_array)**2
-	return x_array*0 #carlini's no-game
-
-#uT = np.square(x*(1-x)) #gueant's original
-uT = g(x,m0)
-#uT = x*0 
-#uT = abs(np.sin(np.pi*x)*np.cos(np.pi*x))
+#INITIAL/TERMINAL CONDITIONS
+m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
+#m0 = np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+#m0 = np.exp(-(x-0.5)**2/0.05**2)
+uT = iF.G(x,m0)
+#Other stuff
+fmax = max(abs(iF.F_global(x,m0,0))) #not really
 
 #check CFL
 R = max(abs(uT)) + 2*T*fmax + sigma2 *max(abs(np.log(m0)))
@@ -70,16 +54,13 @@ if crit > 1:
 	print dx2/(sigma2+4*R)
 
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
-u = np.empty((I*J))
-v = np.empty((I*J))
-u_old = np.empty((I*J)); #actually this one might not be used at all
-v_old = np.empty((I*J)); #the improved guesses on v is the thing that keeps this method going
+u = np.zeros((I*J))
+v = np.zeros((I*J))
+u_old = np.zeros((I*J)); #actually this one might not be used at all
+v_old = np.ones((I*J)); #the improved guesses on v is the thing that keeps this method going
 print "Initialising done, now crunching."
-t = time.time()
 #initial guess for v(0)
-for i in range (0,I):
-	for j in range (0,J):
-		v_old[index(i,j)] = R
+v_old = R*v_old
 
 #initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
 ul1 = -1*np.ones((Niter,1))
@@ -88,36 +69,36 @@ ulinfty = -1*np.ones((Niter,1))
 ml1 = -1*np.ones((Niter,1))
 ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
+BIGZ = np.zeros(J-3)
 
+timestart = time.time()
 #crunch
 for k in range (0,Niter):
 	#known terminal conditions
 	titer = time.time()
-	u[J*I-J-1:J*I] = uT 
-	#solve u
+	u[J*I-J-1:-1] = uT
+	#solve for u
 	for i in range (I-2,-1,-1):
-		for j in range (0,J):
-			if j==0:
-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j+1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j+1)])/dx)**2 ) )
-			elif j==J-1:
-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j-1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j-1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
-			else:
-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
-
+		tmp = (u[((i+1)*J):((i+1)*J+J)] - v_old[((i+1)*J):((i+1)*J+J)])/sigma2
+		Fval = iF.F_global(x,np.exp(tmp),0)
+		#print Fval
+		#print ss
+		u[i*J] = u[(i+1)*J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+1] - 2*u[(i+1)*J] )/(dx2) - Fval[1] + 0.5*( max(0,(u[(i+1)*J+1]-u[(i+1)*J])/dx)**2 + min(0,(u[(i+1)*J]-u[(i+1)*J+1])/dx)**2 ) )
+		u[i*J+J-1] = u[(i+1)*J+J-1] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-2] - 2*u[(i+1)*J+J-1] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-2]-u[(i+1)*J+J-1])/dx)**2 + min(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J-2])/dx)**2 ) )
+		u[(i*J+1):(i*J+J-2)] = u[((i+1)*J+1):((i+1)*J+J-2)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J-1)] + u[((i+1)*J):((i+1)*J+J-3)] - 2*u[((i+1)*J+1):((i+1)*J+J-2)] )/(dx2) - Fval[1:-2] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J-1)]-u[((i+1)*J+1):((i+1)*J+J-2)])/dx)**2 + np.maximum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-2)]-u[((i+1)*J):((i+1)*J+J-3)])/dx)**2 ) ) 
+	#u[((i+1)*J+1):((i+1)*J+J-2)] 
+	#u[((i+1)*J+2):((i+1)*J+J-1)] +1
+	#u[((i+1)*J):((i+1)*J+J-3)] -1
 	#known initial conditions on v
-	#print m0.shape
-	v[0:J+1] = np.copy(u[0:(J+1)]) - sigma2 * np.log(m0)
+	v[0:J] = np.copy(u[0:J]) - sigma2 * np.log(m0)
 	
 	#solve for v
 	for i in range (0,I-1):
-		for j in range (0,J):
-			if j==0: #j
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j+1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j+1)])/dx)**2 ) )
-			elif j==J-1:
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j-1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j-1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
-			else: #source of error could be the inputs of the f function in terms of u
-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
-	
+		tmp = (u[(i*J):(i*J+J)] - v_old[(i*J):(i*J+J)])/sigma2
+		Fval = iF.F_global(x,np.exp(tmp),0)
+		v[(i+1)*J] = v[i*J] + dt * ( sigma2/2 * ( 2*v[i*J+1] - 2*v[i*J] )/(dx2) + Fval[0] - 0.5*( max(0,(v[i*J+1]-v[i*J])/dx)**2 + min(0,(v[i*J]-v[i*J+1])/dx)**2 ) )
+		v[(i+1)*J+J-1] = v[i*J+J-1] + dt * ( sigma2/2 * ( 2*v[i*J+J-2] - 2*v[i*J+J-1] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-2]-v[i*J+J-1])/dx)**2 + min(0,(v[i*J+J-1]-v[i*J+J-2])/dx)**2 ) )
+		v[((i+1)*J+1):((i+1)*J+J-2)] = v[(i*J+1):(i*J+J-2)] + dt * ( sigma2/2 * ( v[(i*J+2):(i*J+J-1)] + v[(i*J):(i*J+J-3)] - 2*v[(i*J+1):(i*J+J-2)] )/(dx2) + Fval[1:-2] - 0.5*( np.maximum(BIGZ,(v[(i*J+2):(i*J+J-1)]-v[(i*J+1):(i*J+J-2)])/dx)**2 + np.maximum(BIGZ,(v[(i*J+1):(i*J+J-2)]-v[(i*J):(i*J+J-3)])/dx)**2 ) ) 
 	#compute norms of stuff
 	mchange = np.exp(( u-v )/(sigma2)) - np.exp(( u_old-v_old )/(sigma2))
 	uchange = u-u_old
@@ -138,7 +119,7 @@ for k in range (0,Niter):
 	print "Iteration number", k+1, "completed, used time", time.time()-titer, "with change", mlinfty[k]
 
 
-print "Crunching over. Total elapsed time (in seconds):", time.time()-t
+print "Crunching over. Total elapsed time (in seconds):", time.time()-timestart
 
 #resolve solutions into a mesh
 m = np.exp((u-v)/(sigma2))
@@ -158,10 +139,7 @@ ul2 = ul2[:kMax]
 ulinfty = ulinfty[:kMax]
 
 #init plotstuff
-xi = np.linspace(xmin,xmax,Nx)
-ti = np.linspace(0,T,Nt)
-Xplot, Tplot = np.meshgrid(xi,ti)
-
+Xplot, Tplot = np.meshgrid(x,t)
 #plot solution of m(x,t)
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')

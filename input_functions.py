@@ -35,39 +35,80 @@ def find_minimum(function, (args)): #for some reason this is twice as slow as th
 	#print "Time to minimise:",time.time()-t1
 	return function(x0,*args)
 
+def line_search(function, (args),dx,x0): #for some reason this is twice as slow as the built-in one :(
+	#here dx is the distance between tested sample points, and x0 is initial guess
+	linesearch_decrement = 0.5
+	linesearch_tolerance = 1/50
+	h = dx/2
+	while True:
+		if function(x0+h,*args) < function(x0-h,*args): #go right
+			x0 += h
+			h = h*linesearch_decrement
+		elif function(x0-h,*args) < function(x0+h,*args): #go left
+			x0 += -h
+			h = h*linesearch_decrement
+		elif h > linesearch_tolerance:
+			h = h*linesearch_decrement
+		else:
+			break
+	#print "Time to minimise:",time.time()-t1
+	return function(x0,*args)
+
+def scatter_search(function, (args),dx,x0,N,k): #here k is the number of laps going
+	x_naught = x0
+	dex = dx
+	for i in range (0,k):
+		xpts = np.linspace(x_naught-dex,x_naught+dex,N)
+		fpts = function(xpts,*args)
+		if i!=k-1:
+			x_naught = xpts[np.argmin(fpts)]
+			dex = xpts[2]-xpts[1]
+	return min(fpts)
+
+def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of laps going
+	x_naught = x0
+	dex = dx
+	for i in range (0,k):
+		xpts = np.linspace(x_naught-dex,x_naught+dex,N)
+		fpts = function(xpts,*args)
+		if i!=k-1:
+			x_naught = xpts[np.argmin(fpts)]
+			dex = xpts[2]-xpts[1]
+			N = alpha*N
+	return min(fpts)
+
+
 ###################
 #TAU FUNCTION
 ###################
 def tau_first_order(alpha,i,v_array,x_array,dt):
 	return 0.5*dt*alpha**2 + np.interp(x_array[i]-dt*alpha,x_array,v_array)
 
-def tau_second_order(alpha,i,v_array,x_array,dt):
+def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 	return 0.5*dt*alpha**2 + 0.5*(np.interp(x_array[i]-dt*alpha+np.sqrt(dt)*noise,x_array,v_array) + np.interp(x_array[i]-dt*alpha-np.sqrt(dt)*noise,x_array,v_array))
 
 ###################
 #RUNNING COST
 ###################
 def F_global(x_array,m_array,sigma): #more effective running cost function
-	#return (x_array-0.2)**2 #Carlini's no-game
-	#output = np.zeros(x_array.size)
-	#for i in range (0,output.size):
-	#	output[i] = min(1.4,max(m_array[i],0.7))
-	#return output
+	return (x_array-0.2)**2 #Carlini's no-game
+	#return np.minimum(1.4*np.ones(x_array.size),np.maximum(m_array,0.7*np.ones(x_array.size))) #Gueant's game
 	#return min(1.4,max(m_array,0.7))
 	#tmp = mollify_array(m_array,sigma,x_array,gll_x,gll_w)
 	#tmp = mollify_array(tmp,sigma,x_array,gll_x,gll_w)
-	#return 0.03*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
+	#return 0.05*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
 	#return 0.03*tmp
-	return 0.05/max(m_array)*m_array
+	#return m_array #shyness game
+	#return 1/max(m_array)*m_array
 	#return np.zeros(x_array.size)
 
 ##################
 #TERMINAL COST
 #################
-def G(xi,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
+def G(x_array,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
 	#return -0.5*(xi+0.5)**2 * (1.5-xi)**2 #Carlini's original
 	#return -(xi*(1-xi))**2 #Gueant's game
-	return 0 #Carlini's no-game
+	return 0*x_array #Carlini's no-game / Shyness game
 
 
 ###################
