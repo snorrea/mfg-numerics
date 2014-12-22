@@ -16,14 +16,14 @@ import input_functions as iF
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 1/50#0.0075*8#1/50 #these taken from Gueant's paper
+dx = 1/100#0.0075*8#1/50 #these taken from Gueant's paper
 dt = 1/5000
 #dt = dx**2/1.28
-xmin = 0-0.2
-xmax = 1+0.2
+xmin = 0
+xmax = 1
 T = 1
 Niter = 500 #maximum number of iterations
-tolerance = 1e-3
+tolerance = 1e-4
 sigma2 = 0.05**2
 
 #CRUNCH
@@ -39,14 +39,15 @@ def index(i,j): #this is a jolly source of errors, no more, probably still
 
 #INITIAL/TERMINAL CONDITIONS
 #m0 = 1-0.2*np.cos(np.pi*x) #gueant's original
-#m0 = np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
-m0 = np.exp(-(x-0.5)**2/0.05**2)
+m0 = np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+#m0 = np.exp(-(x-0.5)**2/0.1**2) #shyness game
 uT = iF.G(x,m0)
 #Other stuff
-fmax = max(abs(iF.F_global(x,m0,0))) #not really
+fmax = max(abs(iF.F_global(x,m0,0))) #sort of
 
 #check CFL
 R = max(abs(uT)) + 2*T*fmax + sigma2 *max(abs(np.log(m0)))
+print "Initial value for distribution:", R
 KR = 0
 crit = (sigma2+4*R)*(dt/dx2) + (dt/sigma2)*KR*np.exp(2*R/sigma2)
 if crit > 1:
@@ -54,13 +55,11 @@ if crit > 1:
 	print dx2/(sigma2+4*R)
 
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
-u = np.zeros((I*J))
-v = np.zeros((I*J))
-u_old = np.zeros((I*J)); #actually this one might not be used at all
-v_old = np.ones((I*J)); #the improved guesses on v is the thing that keeps this method going
-print "Initialising done, now crunching."
+u = np.empty((I*J))
+v = np.empty((I*J))
+u_old = np.empty((I*J)); 
 #initial guess for v(0)
-v_old = R*v_old
+v_old = R*np.ones((I*J))
 
 #initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
 ul1 = -1*np.ones((Niter,1))
@@ -69,8 +68,9 @@ ulinfty = -1*np.ones((Niter,1))
 ml1 = -1*np.ones((Niter,1))
 ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
-BIGZ = np.zeros(J-3)
+BIGZ = np.zeros(J-2)
 
+print "Initialising done, now crunching."
 timestart = time.time()
 #crunch
 for k in range (0,Niter):
@@ -80,29 +80,32 @@ for k in range (0,Niter):
 	#solve for u
 	for i in range (I-2,-1,-1):
 		tmp = (u[((i+1)*J):((i+1)*J+J)] - v_old[((i+1)*J):((i+1)*J+J)])/sigma2
-		#print np.exp(tmp)
 		Fval = iF.F_global(x,np.exp(tmp),0)
-		#print max(Fval)
-		#print Fval
-		#print ss
-		u[i*J] = u[(i+1)*J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+1] - 2*u[(i+1)*J] )/(dx2) - Fval[1] + 0.5*( max(0,(u[(i+1)*J+1]-u[(i+1)*J])/dx)**2 + min(0,(u[(i+1)*J]-u[(i+1)*J+1])/dx)**2 ) )
-		u[i*J+J-1] = u[(i+1)*J+J-1] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-2] - 2*u[(i+1)*J+J-1] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-2]-u[(i+1)*J+J-1])/dx)**2 + min(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J-2])/dx)**2 ) )
-		#u[i*J+J] = u[(i+1)*J+J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-1] - 2*u[(i+1)*J+J] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J])/dx)**2 + min(0,(u[(i+1)*J+J]-u[(i+1)*J+J-1])/dx)**2 ) )
-		u[(i*J+1):(i*J+J-2)] = u[((i+1)*J+1):((i+1)*J+J-2)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J-1)] + u[((i+1)*J):((i+1)*J+J-3)] - 2*u[((i+1)*J+1):((i+1)*J+J-2)] )/(dx2) - Fval[1:-2] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J-1)]-u[((i+1)*J+1):((i+1)*J+J-2)])/dx)**2 + np.maximum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-2)]-u[((i+1)*J):((i+1)*J+J-3)])/dx)**2 ) )
-		#u[(i*J+1):(i*J+J-1)] = u[((i+1)*J+1):((i+1)*J+J-1)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J)] + u[((i+1)*J):((i+1)*J+J-2)] - 2*u[((i+1)*J+1):((i+1)*J+J-1)] )/(dx2) - Fval[1:-2] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J)]-u[((i+1)*J+1):((i+1)*J+J-1)])/dx)**2 + np.maximum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-1)]-u[((i+1)*J):((i+1)*J+J-2)])/dx)**2 ) ) 
-	#known initial conditions on v
-	v[0:J] = np.copy(u[0:J]) - sigma2 * np.log(m0)
-	#print v[0:J+1]
-	print ss
-	
-	#solve for v
+		u[i*J] = u[(i+1)*J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+1] - 2*u[(i+1)*J] )/(dx2) - Fval[0] + 0.5*( max(0,(u[(i+1)*J+1]-u[(i+1)*J])/dx)**2 + min(0,(u[(i+1)*J]-u[(i+1)*J+1])/dx)**2 ) ) #first index
+		u[i*J+J-1] = u[(i+1)*J+J-1] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-2] - 2*u[(i+1)*J+J-1] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-2]-u[(i+1)*J+J-1])/dx)**2 + min(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J-2])/dx)**2 ) ) #last index
+		u[(i*J+1):(i*J+J-1)] = u[((i+1)*J+1):((i+1)*J+J-1)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J)] + u[((i+1)*J):((i+1)*J+J-2)] - 2*u[((i+1)*J+1):((i+1)*J+J-1)] )/(dx2) - Fval[1:-1] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J)]-u[((i+1)*J+1):((i+1)*J+J-1)])/dx)**2 + np.minimum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-1)]-u[((i+1)*J):((i+1)*J+J-2)])/dx)**2 ) ) #all other indices
+#for j in range (0,J):
+#-			if j==0:
+#-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j+1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j+1)])/dx)**2 ) )
+#-			elif j==J-1:
+#-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j-1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j-1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
+#-			else:
+#-				u[index(i,j)] = u[index(i+1,j)] + dt * ( sigma2/2 * ( u[index(i+1,j+1)] + u[index(i+1,j-1)] - 2*u[index(i+1,j)] )/(dx2) - f(x[j],np.exp( ( u[index(i+1,j)] - v_old[index(i+1,j)] )/(sigma2) )) + 0.5*( max(0,(u[index(i+1,j+1)]-u[index(i+1,j)])/dx)**2 + min(0,(u[index(i+1,j)]-u[index(i+1,j-1)])/dx)**2 ) )
+	v[0:J] = np.copy(u[0:J]) - sigma2 * np.log(m0)	
 	for i in range (0,I-1):
 		tmp = (u[(i*J):(i*J+J)] - v_old[(i*J):(i*J+J)])/sigma2
 		Fval = iF.F_global(x,np.exp(tmp),0)
-		v[(i+1)*J] = v[i*J] + dt * ( sigma2/2 * ( 2*v[i*J+1] - 2*v[i*J] )/(dx2) + Fval[0] - 0.5*( max(0,(v[i*J+1]-v[i*J])/dx)**2 + min(0,(v[i*J]-v[i*J+1])/dx)**2 ) )
-		v[(i+1)*J+J-1] = v[i*J+J-1] + dt * ( sigma2/2 * ( 2*v[i*J+J-2] - 2*v[i*J+J-1] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-2]-v[i*J+J-1])/dx)**2 + min(0,(v[i*J+J-1]-v[i*J+J-2])/dx)**2 ) )
-		#v[(i+1)*J+J] = v[i*J+J] + dt * ( sigma2/2 * ( 2*v[i*J+J-1] - 2*v[i*J+J] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-1]-v[i*J+J])/dx)**2 + min(0,(v[i*J+J]-v[i*J+J-1])/dx)**2 ) )
-		v[((i+1)*J+1):((i+1)*J+J-2)] = v[(i*J+1):(i*J+J-2)] + dt * ( sigma2/2 * ( v[(i*J+2):(i*J+J-1)] + v[(i*J):(i*J+J-3)] - 2*v[(i*J+1):(i*J+J-2)] )/(dx2) + Fval[1:-2] - 0.5*( np.maximum(BIGZ,(v[(i*J+2):(i*J+J-1)]-v[(i*J+1):(i*J+J-2)])/dx)**2 + np.maximum(BIGZ,(v[(i*J+1):(i*J+J-2)]-v[(i*J):(i*J+J-3)])/dx)**2 ) ) 
+		v[(i+1)*J] = v[i*J] + dt * ( sigma2/2 * ( 2*v[i*J+1] - 2*v[i*J] )/(dx2) + Fval[0] - 0.5*( max(0,(v[i*J+1]-v[i*J])/dx)**2 + min(0,(v[i*J]-v[i*J+1])/dx)**2 ) ) #first index
+		v[(i+1)*J+J-1] = v[i*J+J-1] + dt * ( sigma2/2 * ( 2*v[i*J+J-2] - 2*v[i*J+J-1] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-2]-v[i*J+J-1])/dx)**2 + min(0,(v[i*J+J-1]-v[i*J+J-2])/dx)**2 ) ) #last index
+		v[((i+1)*J+1):((i+1)*J+J-1)] = v[(i*J+1):(i*J+J-1)] + dt * ( sigma2/2 * ( v[(i*J+2):(i*J+J)] + v[(i*J):(i*J+J-2)] - 2*v[(i*J+1):(i*J+J-1)] )/(dx2) + Fval[1:-1] - 0.5*( np.minimum(BIGZ,(v[(i*J+2):(i*J+J)]-v[(i*J+1):(i*J+J-1)])/dx)**2 + np.maximum(BIGZ,(v[(i*J+1):(i*J+J-1)]-v[(i*J):(i*J+J-2)])/dx)**2 ) ) #all other indices
+#		for j in range (0,J):
+#-			if j==0: #j
+#-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j+1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j+1)])/dx)**2 ) )
+#-			elif j==J-1:
+#-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j-1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j-1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
+#-			else: #source of error could be the inputs of the f function in terms of u
+#-				v[index(i+1,j)] = v[index(i,j)] + dt * ( sigma2/2 * ( v[index(i,j+1)] + v[index(i,j-1)] - 2*v[index(i,j)] )/(dx2) + f(x[j],np.exp( ( u[index(i,j)] - v_old[index(i,j)] )/(sigma2) )) - 0.5*( min(0,(v[index(i,j+1)]-v[index(i,j)])/dx)**2 + max(0,(v[index(i,j)]-v[index(i,j-1)])/dx)**2 ) )
+	
 	#compute norms of stuff
 	mchange = np.exp(( u-v )/(sigma2)) - np.exp(( u_old-v_old )/(sigma2))
 	uchange = u-u_old
@@ -147,7 +150,8 @@ Xplot, Tplot = np.meshgrid(x,t)
 #plot solution of m(x,t)
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')
-ax1.plot_surface(Xplot,Tplot,msoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+#ax1.plot_surface(Xplot,Tplot,msoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax1.plot_surface(Xplot,Tplot,msoln,rstride=10,cstride=10,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax1.set_xlabel('x')
 ax1.set_ylabel('t')
 ax1.set_zlabel('m(x,t)')
@@ -155,7 +159,7 @@ fig1.suptitle('Solution of density m(x,t)', fontsize=14)
 #plot solution of u(x,t)
 fig2 = plt.figure(2)
 ax2 = fig2.add_subplot(111, projection='3d')
-ax2.plot_surface(Xplot,Tplot,usoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax2.plot_surface(Xplot,Tplot,usoln,rstride=10,cstride=10,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax2.set_xlabel('x')
 ax2.set_ylabel('t')
 ax2.set_zlabel('u(x,t)')
