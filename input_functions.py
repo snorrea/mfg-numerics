@@ -100,17 +100,24 @@ def F_global(x_array,m_array,sigma): #more effective running cost function
 	#return 0.03*tmp
 	#return m_array #shyness game
 	#return 1/max(m_array)*m_array #scaled shyness game
-	return np.zeros(x_array.size)
+	return np.zeros(x_array.size) #no-game
 
 ##################
 #TERMINAL COST
-#################
+##################
 def G(x_array,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
-	return 0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
-	#return (x_array*(1-x_array))**2 #Gueant's game
+	#return 0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
+	#return 0.5*(x_array*(1-x_array))**2 #Gueant's game
 	#return -((x_array+0.2)*(1.2-x_array))**4 #Shyness game
 	#return 0*x_array #Carlini's no-game / Shyness game
 
+##################
+#TERMINAL COST
+##################
+def initial_distribution(x):
+	return 1-0.2*np.cos(np.pi*x) #gueant's original
+	#return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+	#return = np.exp(-(x-0.5)**2/0.1**2) #shyness game
 
 ###################
 #AUXILIARY FUNCTIONS

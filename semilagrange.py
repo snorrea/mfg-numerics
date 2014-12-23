@@ -41,13 +41,9 @@ def index(i,k):
 	return int(i+(I)*k)
 
 #INITIAL CONDITION
-m0 = np.empty(I)
+m0 = iF.initial_distribution(x)
 for i in range (0,x.size):
-	if x[i] >=0 and x[i]<=1:
-		#m0[i] = 1-0.2*np.cos(np.pi*x[i]) #gueant's original, carlini's game
-		#m0[i] = np.exp(-(x[i]-0.75)**2/0.1**2)#/0.177209 #carlini's no-game
-		m0[i] = np.exp(-(x[i]-0.5)**2/0.05**2)#/0.177209 #shyness game
-	else:
+	if x[i]>1 or x[i]<0
 		m0[i] = 0
 m0 = m0/(sum(m0)*dx)
 
