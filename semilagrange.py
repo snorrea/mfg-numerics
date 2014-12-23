@@ -43,7 +43,7 @@ def index(i,k):
 #INITIAL CONDITION
 m0 = iF.initial_distribution(x)
 for i in range (0,x.size):
-	if x[i]>1 or x[i]<0
+	if x[i]>1 or x[i]<0:
 		m0[i] = 0
 m0 = m0/(sum(m0)*dx)
 
