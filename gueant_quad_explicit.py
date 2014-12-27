@@ -18,12 +18,12 @@ import input_functions as iF
 #INPUTS
 dx = 1/100#0.0075*8#1/50 #these taken from Gueant's paper
 dt = 1/5000
-xmin = 0
-xmax = 1
+xmin = 0-0.2
+xmax = 1+0.2
 T = 1
 Niter = 500 #maximum number of iterations
 tolerance = 1e-4
-sigma2 = 0.1**2
+sigma2 = 0.05**2
 
 #CRUNCH
 kMax=Niter
@@ -51,7 +51,6 @@ crit = (sigma2+4*R)*(dt/dx2) + (dt/sigma2)*KR*np.exp(2*R/sigma2)
 if crit > 1:
 	print "CFL condition not satisfied, this will be weird."
 	print dx2/(sigma2+4*R)
-
 #initialise solution VECTORS WHY WOULD YOU USE MATRICES
 u = np.empty((I*J))
 v = np.empty((I*J))
@@ -83,6 +82,8 @@ for k in range (0,Niter):
 		u[i*J+J-1] = u[(i+1)*J+J-1] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-2] - 2*u[(i+1)*J+J-1] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-2]-u[(i+1)*J+J-1])/dx)**2 + min(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J-2])/dx)**2 ) ) #last index
 		u[(i*J+1):(i*J+J-1)] = u[((i+1)*J+1):((i+1)*J+J-1)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J)] + u[((i+1)*J):((i+1)*J+J-2)] - 2*u[((i+1)*J+1):((i+1)*J+J-1)] )/(dx2) - Fval[1:-1] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J)]-u[((i+1)*J+1):((i+1)*J+J-1)])/dx)**2 + np.minimum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-1)]-u[((i+1)*J):((i+1)*J+J-2)])/dx)**2 ) ) #all other indices
 	v[0:J] = np.copy(u[0:J]) - sigma2 * np.log(m0)	
+	#print v[0:J]
+	#print ss
 	for i in range (0,I-1):
 		tmp = (u[(i*J):(i*J+J)] - v_old[(i*J):(i*J+J)])/sigma2
 		Fval = iF.F_global(x,np.exp(tmp),0)
