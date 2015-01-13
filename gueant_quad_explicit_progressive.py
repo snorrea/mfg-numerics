@@ -18,14 +18,14 @@ import input_functions as iF
 #INPUTS
 dx = 1/100#0.0075*8#1/50 #these taken from Gueant's paper
 dt = 1/5000
-xmin = 0-0.2
-xmax = 1+0.2
+xmin = 0#-0.2
+xmax = 1#+0.2
 T = 1
 Niter = 500 #maximum number of iterations
 tolerance = 1e-4
-sigma = 0.05
-starting_sigma = 0.4
-sigma_decrements = 3
+sigma = 0.1
+starting_sigma = 0.5
+sigma_decrements = 4
 
 #CRUNCH
 sigma2s = np.linspace(starting_sigma,sigma,num=sigma_decrements,endpoint=True)**2
@@ -44,7 +44,7 @@ def index(i,j):
 m0 = iF.initial_distribution(x) #carlini's no-game
 uT = iF.G(x,m0)
 #Other stuff
-fmax = max(abs(iF.F_global(x,m0,0))) #sort of
+fmax = max(abs(iF.F_global(x,m0,0,0.2))) #sort of
 
 #check CFL
 R = max(abs(uT)) + 2*T*fmax + sigma2s[-1] *max(abs(np.log(m0)))
@@ -83,7 +83,7 @@ for n in range (0,sigma2s.size):
 		#solve for u
 		for i in range (I-2,-1,-1):
 			tmp = (u[((i+1)*J):((i+1)*J+J)] - v_old[((i+1)*J):((i+1)*J+J)])/sigma2
-			Fval = iF.F_global(x,np.exp(tmp),0)
+			Fval = iF.F_global(x,np.exp(tmp),0,i*dt)
 			u[i*J] = u[(i+1)*J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+1] - 2*u[(i+1)*J] )/(dx2) - Fval[0] + 0.5*( max(0,(u[(i+1)*J+1]-u[(i+1)*J])/dx)**2 + min(0,(u[(i+1)*J]-u[(i+1)*J+1])/dx)**2 ) ) #first index
 			u[i*J+J-1] = u[(i+1)*J+J-1] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-2] - 2*u[(i+1)*J+J-1] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-2]-u[(i+1)*J+J-1])/dx)**2 + min(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J-2])/dx)**2 ) ) #last index
 			u[(i*J+1):(i*J+J-1)] = u[((i+1)*J+1):((i+1)*J+J-1)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J)] + u[((i+1)*J):((i+1)*J+J-2)] - 2*u[((i+1)*J+1):((i+1)*J+J-1)] )/(dx2) - Fval[1:-1] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J)]-u[((i+1)*J+1):((i+1)*J+J-1)])/dx)**2 + np.minimum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-1)]-u[((i+1)*J):((i+1)*J+J-2)])/dx)**2 ) ) #all other indices
@@ -92,7 +92,7 @@ for n in range (0,sigma2s.size):
 		#print ss
 		for i in range (0,I-1):
 			tmp = (u[(i*J):(i*J+J)] - v_old[(i*J):(i*J+J)])/sigma2
-			Fval = iF.F_global(x,np.exp(tmp),0)
+			Fval = iF.F_global(x,np.exp(tmp),0,i*dt)
 			v[(i+1)*J] = v[i*J] + dt * ( sigma2/2 * ( 2*v[i*J+1] - 2*v[i*J] )/(dx2) + Fval[0] - 0.5*( max(0,(v[i*J+1]-v[i*J])/dx)**2 + min(0,(v[i*J]-v[i*J+1])/dx)**2 ) ) #first index
 			v[(i+1)*J+J-1] = v[i*J+J-1] + dt * ( sigma2/2 * ( 2*v[i*J+J-2] - 2*v[i*J+J-1] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-2]-v[i*J+J-1])/dx)**2 + min(0,(v[i*J+J-1]-v[i*J+J-2])/dx)**2 ) ) #last index
 			v[((i+1)*J+1):((i+1)*J+J-1)] = v[(i*J+1):(i*J+J-1)] + dt * ( sigma2/2 * ( v[(i*J+2):(i*J+J)] + v[(i*J):(i*J+J-2)] - 2*v[(i*J+1):(i*J+J-1)] )/(dx2) + Fval[1:-1] - 0.5*( np.minimum(BIGZ,(v[(i*J+2):(i*J+J)]-v[(i*J+1):(i*J+J-1)])/dx)**2 + np.maximum(BIGZ,(v[(i*J+1):(i*J+J-1)]-v[(i*J):(i*J+J-2)])/dx)**2 ) ) #all other indices

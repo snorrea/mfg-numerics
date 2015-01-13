@@ -18,12 +18,12 @@ import input_functions as iF
 #INPUTS
 dx = 1/100#0.0075*8#1/50 #these taken from Gueant's paper
 dt = 1/5000
-xmin = 0-0.2
-xmax = 1+0.2
+xmin = 0#-0.2
+xmax = 1#+0.2
 T = 1
 Niter = 500 #maximum number of iterations
 tolerance = 1e-4
-sigma2 = 0.05**2
+sigma2 = 0.1**2
 
 #CRUNCH
 kMax=Niter
@@ -39,12 +39,14 @@ def index(i,j):
 
 #INITIAL/TERMINAL CONDITIONS
 m0 = iF.initial_distribution(x) #carlini's no-game
+m0 = m0/(sum(m0)*dx)
 uT = iF.G(x,m0)
 #Other stuff
-fmax = max(abs(iF.F_global(x,m0,0))) #sort of
+fmax = max(abs(iF.F_global(x,m0,0,T))) #sort of
 
 #check CFL
 R = max(abs(uT)) + 2*T*fmax + sigma2 *max(abs(np.log(m0)))
+R = R/100
 print "Initial value for distribution:", R
 KR = 0
 crit = (sigma2+4*R)*(dt/dx2) + (dt/sigma2)*KR*np.exp(2*R/sigma2)
@@ -73,11 +75,12 @@ timestart = time.time()
 for k in range (0,Niter):
 	#known terminal conditions
 	titer = time.time()
-	u[J*I-J:J*I] = uT
+	tmp = (u[J*I-J:J*I] - v_old[J*I-J:J*I])/sigma2
+	u[J*I-J:J*I] = iF.G(x,np.exp(tmp)) 
 	#solve for u
 	for i in range (I-2,-1,-1):
 		tmp = (u[((i+1)*J):((i+1)*J+J)] - v_old[((i+1)*J):((i+1)*J+J)])/sigma2
-		Fval = iF.F_global(x,np.exp(tmp),0)
+		Fval = iF.F_global(x,np.exp(tmp),0,i*dt)
 		u[i*J] = u[(i+1)*J] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+1] - 2*u[(i+1)*J] )/(dx2) - Fval[0] + 0.5*( max(0,(u[(i+1)*J+1]-u[(i+1)*J])/dx)**2 + min(0,(u[(i+1)*J]-u[(i+1)*J+1])/dx)**2 ) ) #first index
 		u[i*J+J-1] = u[(i+1)*J+J-1] + dt * ( sigma2/2 * ( 2*u[(i+1)*J+J-2] - 2*u[(i+1)*J+J-1] )/(dx2) - Fval[-1] + 0.5*( max(0,(u[(i+1)*J+J-2]-u[(i+1)*J+J-1])/dx)**2 + min(0,(u[(i+1)*J+J-1]-u[(i+1)*J+J-2])/dx)**2 ) ) #last index
 		u[(i*J+1):(i*J+J-1)] = u[((i+1)*J+1):((i+1)*J+J-1)] + dt * ( sigma2/2 * ( u[((i+1)*J+2):((i+1)*J+J)] + u[((i+1)*J):((i+1)*J+J-2)] - 2*u[((i+1)*J+1):((i+1)*J+J-1)] )/(dx2) - Fval[1:-1] + 0.5*( np.maximum(BIGZ,(u[((i+1)*J+2):((i+1)*J+J)]-u[((i+1)*J+1):((i+1)*J+J-1)])/dx)**2 + np.minimum(BIGZ,(u[((i+1)*J+1):((i+1)*J+J-1)]-u[((i+1)*J):((i+1)*J+J-2)])/dx)**2 ) ) #all other indices
@@ -86,7 +89,7 @@ for k in range (0,Niter):
 	#print ss
 	for i in range (0,I-1):
 		tmp = (u[(i*J):(i*J+J)] - v_old[(i*J):(i*J+J)])/sigma2
-		Fval = iF.F_global(x,np.exp(tmp),0)
+		Fval = iF.F_global(x,np.exp(tmp),0,dt*i)
 		v[(i+1)*J] = v[i*J] + dt * ( sigma2/2 * ( 2*v[i*J+1] - 2*v[i*J] )/(dx2) + Fval[0] - 0.5*( max(0,(v[i*J+1]-v[i*J])/dx)**2 + min(0,(v[i*J]-v[i*J+1])/dx)**2 ) ) #first index
 		v[(i+1)*J+J-1] = v[i*J+J-1] + dt * ( sigma2/2 * ( 2*v[i*J+J-2] - 2*v[i*J+J-1] )/(dx2) + Fval[-1] - 0.5*( max(0,(v[i*J+J-2]-v[i*J+J-1])/dx)**2 + min(0,(v[i*J+J-1]-v[i*J+J-2])/dx)**2 ) ) #last index
 		v[((i+1)*J+1):((i+1)*J+J-1)] = v[(i*J+1):(i*J+J-1)] + dt * ( sigma2/2 * ( v[(i*J+2):(i*J+J)] + v[(i*J):(i*J+J-2)] - 2*v[(i*J+1):(i*J+J-1)] )/(dx2) + Fval[1:-1] - 0.5*( np.minimum(BIGZ,(v[(i*J+2):(i*J+J)]-v[(i*J+1):(i*J+J-1)])/dx)**2 + np.maximum(BIGZ,(v[(i*J+1):(i*J+J-1)]-v[(i*J):(i*J+J-2)])/dx)**2 ) ) #all other indices

@@ -13,19 +13,20 @@ import sys
 #in this one we aim to not use so much fucking space
 
 #INPUTS
-dx = 0.0075/2#1/300 #these taken from Gueant's paper
+dx = 0.0075*2#/2#/2#/2#/2#1/300 #these taken from Gueant's paper
 dt = dx*1.5
-xmin = 0-0.1
-xmax = 1+.1
+xmin = 0#-0.2
+xmax = 1#+.2
 T = 1
-Niter = 150 #maximum number of iterations
+Niter = 500 #maximum number of iterations
 tolerance = 1e-4
-epsilon = 10*dt #for use in convolution thing
-sigma = 10
+epsilon = 3*dt #for use in convolution thing
+sigma = 10 #for use in cost function
 noise = 0.9 #noise in the MFG sense
-molly = 0
+molly = 1
 second_order = 0 #1 for second-order, 0 for first order
 quad_order = 15
+R = 10
 
 #CRUNCH
 gll_x = qn.GLL_points(quad_order) #quadrature nodes
@@ -55,8 +56,6 @@ v_grad = np.empty((I))
 #initial guess on the distribution
 for k in range (0,K):
 	m[k*I:k*I+I] = np.copy(m0)
-	#if k>0:
-	#	m[k*I:k*I+I] = np.ones(m0.size)*0.0001
 
 #initialise vectors to store l1, l2 and linfty norm errors/improvement in iterations
 vl1 = -1*np.ones((Niter,1))
@@ -67,17 +66,16 @@ ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
 #used to search for minimum of tau
 N = 20 #searchpoints
-min_tol = 50*tolerance#1e-5 #tolerance for minimum
-min_left = -2 #search region left
-min_right = 2 #search region right
+min_tol = tolerance#1e-5 #tolerance for minimum
+min_left = -R/2 #search region left
+min_right = R/2 #search region right
 relation = 2
 scatters = int(np.ceil(np.log((min_right-min_left)/min_tol)/np.log(N)))
 scatters2 = int(1 + np.ceil(np.log((min_right-min_left)/(N*min_tol))/np.log(relation)))
 print scatters
-xpts = np.linspace(min_left,min_right,N)
-fpts = np.empty((xpts.size,1))
+xpts_search = np.linspace(min_left,min_right,N)
+fpts = np.empty((xpts_search.size,1))
 #set final value on v and copy the bitches
-v[(I*K-I):(I*K)] = iF.G(x,m)
 m_old = np.copy(m)
 v_old = np.copy(v)
 print "Initialisation done, crunching..."
@@ -87,25 +85,25 @@ for n in range (0,Niter):
 	#compute next iteration of v given m_old
 	print "Computing iteration", n+1, "of v..."
 	temptime = time.time()
-	v[(I*K-I):(I*K)] = iF.G(x,m) 
+	v[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)]) 
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		m_tmp = np.copy(m[((k)*I):((k)*I+I)])
-		F_var = iF.F_global(x,m_tmp,sigma)
+		F_var = iF.F_global(x,m_tmp,sigma,k*dt)
 		#print max(F_var)
 		for i in range (0,I):
 			if second_order==0:
-				fpts = iF.tau_first_order(xpts,i,v_tmp,x,dt)
-				x0 = xpts[np.argmin(fpts)]
+				#find starting point
+				if i==0:
+					fpts = iF.tau_first_order(xpts_search,i,v_tmp,x,dt)
+					x0 = xpts_search[np.argmin(fpts)]
 				#NUMPY
 				#tmp = minimize(iF.tau_first_order,x0,args=(i,v_tmp,x,dt),tol=min_tol)
 				#v[index(i,k)] = dt*F_var[i] + tmp.fun
-				#MY OWN WOLF 1
-				#tmp = iF.line_search(iF.tau_first_order,(i,v_tmp,x,dt),xpts[2]-xpts[1],x0) 
-				#v[index(i,k)] = dt*F_var[i] + tmp
-				#MY OWN WOLF 2
-				tmp = iF.scatter_search(iF.tau_first_order,(i,v_tmp,x,dt),xpts[2]-xpts[1],x0,N,scatters) 
-				v[index(i,k)] = dt*F_var[i] + tmp
+				#MY OWN WOLF
+				tmp,tmpval = iF.scatter_search(iF.tau_first_order,(i,v_tmp,x,dt),xpts_search[2]-xpts_search[1],x0,N,scatters) 
+				v[index(i,k)] = dt*F_var[i] + tmpval
+				x0 = tmp
 			else:
 				tmp = iF.find_minimum(iF.tau_second_order,(i,v_tmp,x,dt,noise)) 
 				v[index(i,k)] = dt*F_var[i] + tmp
@@ -121,10 +119,12 @@ for n in range (0,Niter):
 	for k in range(0,K-1):
 		if molly==1:
 			v_grad = iF.mollify_array(np.gradient(v[(I*k):(I*k+I)],dx),epsilon,x,gll_x,gll_w)
+			#v_grad = np.minimum(v_grad,np.zeros(v_grad.size)) #isolation game
 		else:
 			v_grad = np.gradient(v[(I*k):(I*k+I)],dx)
 		if second_order==0:
 			xtraj = iF.restrain(x-dt*v_grad,x)
+			#xtraj = iF.restrain4isolation(x-dt*v_grad,x) #for the isolation modelling game
 		else:
 			xtraj1 = iF.restrain(x-dt*v_grad+np.sqrt(dt)*noise,x)
 			xtraj2 = iF.restrain(x-dt*v_grad-np.sqrt(dt)*noise,x)
@@ -132,13 +132,16 @@ for n in range (0,Niter):
 		for i in range (1,I-1):
 			if second_order==0:
 				refindex = np.floor((xtraj[i]-xmin)/dx)
-				if xtraj[i] < xmin: #out of bounds to the left
-					m_update[1] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
-				elif xtraj[i] > xmax: #out of bounds to the right
-					m_update[I-1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
-				else:
-					m_update[refindex] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
-					m_update[refindex+1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+				if (refindex > -1) and (refindex < x.size-1):
+					if xtraj[i] <= xmin: #out of bounds to the left; THERE'S NO LEAVING THIS GAME
+						#m_update[1] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+						m_update[1] += m[index(i,k)]
+					elif xtraj[i] >= xmax: #out of bounds to the right; THERE'S NO LEAVING THIS GAME
+						#m_update[-1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+						m_update[-1] += m[index(i,k)]
+					else:
+						m_update[refindex] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+						m_update[refindex+1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
 			else:
 				refindex1 = np.floor((xtraj1[i]-xmin)/dx)
 				refindex2 = np.floor((xtraj2[i]-xmin)/dx)
@@ -272,6 +275,16 @@ ax7.set_xlabel('x')
 ax7.set_ylabel('t')
 ax7.set_zlabel('mollified m(x,t)')
 fig7.suptitle('Solution of mollified m(x,t)', fontsize=14)
+#plot initial and terminal distribution in the same plot
+fig8 = plt.figure(8)
+plt.plot(x,m0,color="blue",label="Initial distribution")
+plt.plot(x,m[(I*K-I):(I*K)],color="red",label="Terminal distribution")
+legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
+ax8 = fig8.add_subplot(111)
+ax8.set_xlabel('x')
+ax8.set_ylabel('m(x)')
+fig8.suptitle('Initial and terminal distributions', fontsize=14)
+##########PLOT
 plt.show()
 
 
