@@ -29,14 +29,16 @@ v_sample = (x-0.2)**2
 taus1soln = np.empty((K,I))
 taus2soln = np.empty((K,I))
 taus3soln = np.empty((K,I))
-taus1minima_x = np.empty(I)
-taus1minima_y = np.empty(I)
+taus1minima_x = np.empty(I) #x index
+taus1minima_a = np.empty(I) #alpha values
+taus1minima_z = np.empty(I) #tau values
 for i in range(0,I):
 	#taus1soln[(i*K):((i+1)*K),:] = iF.tau_first_order(alphas,i,v_sample,x,dt) 
 	#taus2soln[(i*K):((i+1)*K),:] = np.interp(x[i]-dt*alphas,x,v_sample)
 	tmp = iF.tau_first_order(alphas,i,v_sample,x,dt)
-	taus1minima_x[i] = alphas[np.argmin(tmp)]
-	taus1minima_y[i] = tmp[np.argmin(tmp)]
+	taus1minima_x[i] = x[i]
+	taus1minima_a[i] = alphas[np.argmin(tmp)]
+	taus1minima_z[i] = tmp[np.argmin(tmp)]
 	taus1soln[:,i] = tmp
 	taus2soln[:,i] = np.interp(x[i]-dt*alphas,x,v_sample)
 	#taus3soln[:,i] = np.interp(x[i]-dt*alphas,x,v_sample) - v_sample
@@ -47,7 +49,7 @@ Aplot, Xplot = np.meshgrid(x,alphas)
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')
 ax1.plot_surface(Aplot,Xplot,taus1soln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
-ax1.plot(taus1minima_x,taus1minima_y,iF.tau_first_order(taus1minima_x,np.arange(0,I),v_sample,x,dt))
+ax1.plot(taus1minima_x,taus1minima_a,taus1minima_z,color="black",lw=3)
 #
 fig2 = plt.figure(2)
 ax2 = fig2.add_subplot(111, projection='3d')

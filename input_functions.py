@@ -99,7 +99,7 @@ def F_global(x_array,m_array,sigma,time): #more effective running cost function
 	#tmp = mollify_array(tmp,sigma,x_array,gll_x,gll_w)
 	#return 0.05*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
 	#return 0.03*tmp
-	#return 1e-3*m_array #shyness game
+	#return m_array #shyness game
 	#return (powerbill(time)*(1-0.8*x_array) + x_array/(0.1+m_array))
 	#return 0*x_array#no-game
 
@@ -120,7 +120,7 @@ def powerbill(time):
 def G(x_array,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
 	#return -0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
 	#return 0.1*(x_array*(1-x_array))**2 #Gueant's game
-	#return ((x_array+0.2)*(1.2-x_array))**4 #Shyness game
+	#return -((x_array+0.2)*(1.2-x_array))**4 #Shyness game
 	return 0*x_array #Carlini's no-game & Isolation game
 	#return 0.001*m_array
 

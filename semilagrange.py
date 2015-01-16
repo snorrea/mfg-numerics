@@ -22,11 +22,11 @@ Niter = 500 #maximum number of iterations
 tolerance = 1e-4
 epsilon = 3*dt #for use in convolution thing
 sigma = 10 #for use in cost function
-noise = 0.9 #noise in the MFG sense
+noise = 0.3 #noise in the MFG sense
 molly = 1
-second_order = 0 #1 for second-order, 0 for first order
+second_order = 1 #1 for second-order, 0 for first order
 quad_order = 15
-R = 10
+R = 50
 
 #CRUNCH
 gll_x = qn.GLL_points(quad_order) #quadrature nodes
@@ -65,7 +65,7 @@ ml1 = -1*np.ones((Niter,1))
 ml2 = -1*np.ones((Niter,1))
 mlinfty = -1*np.ones((Niter,1))
 #used to search for minimum of tau
-N = 20 #searchpoints
+N = 40 #searchpoints
 min_tol = tolerance#1e-5 #tolerance for minimum
 min_left = -R/2 #search region left
 min_right = R/2 #search region right
@@ -132,30 +132,35 @@ for n in range (0,Niter):
 		for i in range (1,I-1):
 			if second_order==0:
 				refindex = np.floor((xtraj[i]-xmin)/dx)
-				if (refindex > -1) and (refindex < x.size-1):
-					if xtraj[i] <= xmin: #out of bounds to the left; THERE'S NO LEAVING THIS GAME
-						#m_update[1] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
-						m_update[1] += m[index(i,k)]
-					elif xtraj[i] >= xmax: #out of bounds to the right; THERE'S NO LEAVING THIS GAME
-						#m_update[-1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
-						m_update[-1] += m[index(i,k)]
-					else:
-						m_update[refindex] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
-						m_update[refindex+1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+				#if (refindex > -1) and (refindex < x.size-1):
+				refindex = min(max(0,refindex),x.size-2)
+				if xtraj[i] <= xmin: #out of bounds to the left; THERE'S NO LEAVING THIS GAME
+					#m_update[1] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+					m_update[0] += m[index(i,k)]
+				elif xtraj[i] >= xmax: #out of bounds to the right; THERE'S NO LEAVING THIS GAME
+					#m_update[-1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
+					m_update[-1] += m[index(i,k)]
+				else:
+					m_update[refindex] += iF.beta_left(xtraj[i],x,dx,refindex)*m[index(i,k)]
+					m_update[refindex+1] += iF.beta_right(xtraj[i],x,dx,refindex)*m[index(i,k)]
 			else:
 				refindex1 = np.floor((xtraj1[i]-xmin)/dx)
 				refindex2 = np.floor((xtraj2[i]-xmin)/dx)
-				if xtraj1[i] < xmin: #out of bounds to the left
-					m_update[1] += 0.5*iF.beta_left(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
-				elif xtraj1[i] > xmax: #out of bounds to the right
-					m_update[I-1] += 0.5*iF.beta_right(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
+				refindex1 = min(max(0,refindex1),x.size-2)
+				refindex2 = min(max(0,refindex2),x.size-2)
+				#if (refindex1 > -1) and (refindex1 < x.size-1) and (refindex2 > -1) and (refindex2 < x.size-1) :
+				#print refindex1, refindex2, xtraj1[i], xtraj2[i], i
+				if xtraj1[i] <= xmin: #out of bounds to the left
+					m_update[0] += 0.5*iF.beta_left(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
+				elif xtraj1[i] >= xmax: #out of bounds to the right
+					m_update[-1] += 0.5*iF.beta_right(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
 				else:
 					m_update[refindex1] += 0.5*iF.beta_left(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
 					m_update[refindex1+1] += 0.5*iF.beta_right(xtraj1[i],x,dx,refindex1)*m[index(i,k)]
-				if xtraj2[i] < xmin: #out of bounds to the left
-					m_update[1] += 0.5*iF.beta_left(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
-				elif xtraj2[i] > xmax: #out of bounds to the right
-					m_update[I-1] += 0.5*iF.beta_right(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
+				if xtraj2[i] <= xmin: #out of bounds to the left
+					m_update[0] += 0.5*iF.beta_left(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
+				elif xtraj2[i] >= xmax: #out of bounds to the right
+					m_update[-1] += 0.5*iF.beta_right(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
 				else:
 					m_update[refindex2] += 0.5*iF.beta_left(xtraj2[i],x,dx,refindex2)*m[index(i,k)]
 					m_update[refindex2+1] += 0.5*iF.beta_right(xtraj2[i],x,dx,refindex2)*m[index(i,k)]

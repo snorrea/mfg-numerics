@@ -72,7 +72,7 @@ BIGZ = np.zeros(J-2)
 
 print "Initialising done, now crunching."
 timestart = time.time()
-TOTAL_ITERATIONS = 0
+TOTAL_ITERATIONS = 0	
 for n in range (0,sigma2s.size):
 	sigma2 = sigma2s[n]
 	print "Computing solution for sigma^2 =", sigma2, "..."
