@@ -1,59 +1,15 @@
 from __future__ import division
 import numpy as np
 import quadrature_nodes as qn
+from scipy.optimize import minimize as minimize
 quad_order = 15
 gll_x = qn.GLL_points(quad_order) #quadrature nodes
 gll_w = qn.GLL_weights(quad_order,gll_x)
 
 
 ###################
-#MINIMISING FUNCTION
+#MINIMISING FUNCTIONS
 ###################
-def find_minimum(function, (args)): #for some reason this is twice as slow as the built-in one :(
-	left = -2
-	right = 2
-	linesearch_decrement = 0.5
-	linesearch_tolerance = 1/50
-	dx = 1
-	Nx = 20
-	xpts = np.linspace(left,right,Nx)
-	fpts = np.empty((xpts.size,1))
-	fpts = function(xpts,*args)
-	x0 = xpts[np.argmin(fpts)] #choose smallest
-	h = dx/2
-	while True:
-		if function(x0+h,*args) < function(x0-h,*args): #go right
-			x0 += h
-			h = h*linesearch_decrement
-		elif function(x0-h,*args) < function(x0+h,*args): #go left
-			x0 += -h
-			h = h*linesearch_decrement
-		elif h > linesearch_tolerance:
-			h = h*linesearch_decrement
-		else:
-			break
-	#print "Time to minimise:",time.time()-t1
-	return function(x0,*args)
-
-def line_search(function, (args),dx,x0): #for some reason this is twice as slow as the built-in one :(
-	#here dx is the distance between tested sample points, and x0 is initial guess
-	linesearch_decrement = 0.5
-	linesearch_tolerance = 1/50
-	h = dx/2
-	while True:
-		if function(x0+h,*args) < function(x0-h,*args): #go right
-			x0 += h
-			h = h*linesearch_decrement
-		elif function(x0-h,*args) < function(x0+h,*args): #go left
-			x0 += -h
-			h = h*linesearch_decrement
-		elif h > linesearch_tolerance:
-			h = h*linesearch_decrement
-		else:
-			break
-	#print "Time to minimise:",time.time()-t1
-	return function(x0,*args)
-
 def scatter_search(function, (args),dx,x0,N,k): #here k is the number of laps going
 	x_naught = x0
 	dex = dx
@@ -77,8 +33,98 @@ def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of 
 			N = alpha*N
 	return min(fpts)
 
-def find_xnaught_1st(v,dt,a):
-	return 0
+###################
+#POLICY ITERATION FUNCTIONS
+###################
+
+def best_control(x_array,u_array,m_array,dt,dx,time): #let's be happy with this for a time... but this is probably seriously flawed
+	Radius = 1
+	Nx = x_array.size
+	dx2 = dx**2
+	alphas = np.linspace(-Radius,Radius,2*Radius/(dx*1e-2)+1)
+	#alphas = np.linspace(0,Radius,2*Radius/(dx)+1)
+	output = np.empty(x_array.size)
+	for index in range (0,Nx):
+		#stuff = hamiltonian(alphas,x_array,u_array,m_array,dt,dx,time,index)
+		#output[index] = alphas[np.argmin(stuff)]
+		sigma2 = Sigma_global(time,x_array[index],alphas,m_array[index])**2
+		L_var = L_global(time,x_array[index],alphas,m_array[index])
+		#print L_var, x_array[index], (x_array[index]-0.2)**2
+		#print ss
+		movement = f_global(time,x_array[index],alphas)
+		if index==0: #topmost stuff is correct
+			sigma2R = Sigma_global(time,x_array[index+1],alphas,m_array[index])**2
+			stuff = u_array[0]*(abs(movement)/dx - sigma2/dx2) + u_array[1]*(sigma2R/dx2 - abs(movement)/dx) + L_var
+			#stuff = u_array[0]*(-abs(movement)/dx - sigma2/dx2) + u_array[1]*(sigma2/dx2 + (movement)/dx) + L_var
+			output[index] = alphas[np.argmin(stuff)]
+		elif index==Nx-1:
+			sigma2L = Sigma_global(time,x_array[index-1],alphas,m_array[index])**2
+			stuff = u_array[-1]*(abs(movement)/dx - sigma2/dx2) + u_array[-2]*(sigma2L/dx2 - abs(movement)/dx) + L_var
+			#stuff = u_array[-1]*(-abs(movement)/dx - sigma2/dx2) + u_array[-2]*(sigma2/dx2 + (movement)/dx) + L_var
+			output[index] = alphas[np.argmin(stuff)]
+		else:
+			sigma2L = Sigma_global(time,x_array[index-1],alphas,m_array[index])**2
+			sigma2R = Sigma_global(time,x_array[index+1],alphas,m_array[index])**2
+			BIGZERO = np.zeros(alphas.size)
+			stuff = u_array[index]*(abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2R/(2*dx2) + np.minimum(movement,BIGZERO)/dx) + u_array[index-1]*(sigma2L/(2*dx2) - np.maximum(movement,BIGZERO)/dx) + L_var
+			#stuff = u_array[index]*(-abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2/(2*dx2) + np.minimum(movement,BIGZERO)/dx) + u_array[index-1]*(sigma2/(2*dx2) + np.maximum(movement,BIGZERO)/dx) + L_var
+			output[index] = alphas[np.argmin(stuff)]
+	#print u_array
+	#print stuff
+	#print output[-1]
+	#print output
+
+	#MOLLIFY because why the fuck not?
+	#output = mollify_array(output,3*dx,x_array,gll_x,gll_w)
+	#print output
+	return output
+
+#def naive_control(x_array,u_array,m_array,dt,dx,time,index):
+#	return minimize(hamiltonian,0,args=(x_array,u_array,m_array,dt,dx,time,index),tol=1e-3)
+def hamiltonian(alphas,x_array,u_array,m_array,dt,dx,time,index):
+	BIGZERO = np.zeros(alphas.size)
+	#print alphas
+	sigma2 = Sigma_local(time,x_array[index],alphas,m_array[index])**2
+	movement = f_global(time,x_array[index],alphas)
+	L_var = L_global(time,x_array[index],alphas,m_array[index])
+	dx2 = dx**2
+	if index==0: #topmost stuff is correct
+		#sigma2R = Sigma_local(time,x_array[index+1],alphas,m_array[index])**2
+		tmp = u_array[0]*(abs(movement)/dx - sigma2/dx2) + u_array[1]*(sigma2/dx2 - abs(movement)/dx) + L_var
+	elif index==x_array.size-1:
+		#sigma2L = Sigma_local(time,x_array[index-1],alphas,m_array[index])**2
+		tmp = u_array[-1]*(abs(movement)/dx - sigma2/dx2) + u_array[-2]*(sigma2/dx2 - abs(movement)/dx) + L_var
+	else:
+		#sigma2L = Sigma_local(time,x_array[index-1],alphas,m_array[index])**2
+		#sigma2R = Sigma_local(time,x_array[index+1],alphas,m_array[index])**2
+		#stuff = u_array[index]*(abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2R/(2*dx2) + np.minimum(movement,BIGZERO)/dx) + u_array[index-1]*(sigma2L/(2*dx2) - np.maximum(movement,BIGZERO)/dx) + L_var
+		tmp = u_array[index]*(abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2/(2*dx2) + min(movement,0)/dx) + u_array[index-1]*(sigma2/(2*dx2) - max(movement,0)/dx) + L_var
+	tmp = tmp[0]
+	#print tmp
+	print "Returning..."
+	return tmp
+
+def hamiltonian_local(alphas,x_array,u_array,m_array,dt,dx,time,index):
+	#BIGZERO = np.zeros(alphas.size)
+	#print alphas
+	sigma2 = Sigma_local(time,x_array[index],alphas,m_array[index])**2
+	movement = f_global(time,x_array[index],alphas)
+	L_var = L_global(time,x_array[index],alphas,m_array[index])
+	dx2 = dx**2
+	if index==0: #topmost stuff is correct
+		sigma2R = Sigma_local(time,x_array[index+1],alphas,m_array[index])**2
+		tmp = u_array[0]*(abs(movement)/dx - sigma2/dx2) + u_array[1]*(sigma2R/dx2 - abs(movement)/dx) + L_var
+	elif index==x_array.size-1:
+		sigma2L = Sigma_local(time,x_array[index-1],alphas,m_array[index])**2
+		tmp = u_array[-1]*(abs(movement)/dx - sigma2/dx2) + u_array[-2]*(sigma2L/dx2 - abs(movement)/dx) + L_var
+	else:
+		sigma2L = Sigma_local(time,x_array[index-1],alphas,m_array[index])**2
+		sigma2R = Sigma_local(time,x_array[index+1],alphas,m_array[index])**2
+		#stuff = u_array[index]*(abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2R/(2*dx2) + np.minimum(movement,BIGZERO)/dx) + u_array[index-1]*(sigma2L/(2*dx2) - np.maximum(movement,BIGZERO)/dx) + L_var
+		tmp = u_array[index]*(abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2R/(2*dx2) + min(movement,0)/dx) + u_array[index-1]*(sigma2L/(2*dx2) - max(movement,0)/dx) + L_var
+	tmp = tmp[0]
+	print tmp
+	return tmp
 
 ###################
 #TAU FUNCTION
@@ -93,13 +139,13 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 #RUNNING COST
 ###################
 def F_global(x_array,m_array,sigma,time): #more effective running cost function
-	return (x_array-0.2)**2 #Carlini's no-game
+	#return (x_array-0.2)**2 #Carlini's no-game
 	#return np.minimum(1.4*np.ones(x_array.size),np.maximum(m_array,0.7*np.ones(x_array.size))) #Gueant's game
 	#tmp = mollify_array(m_array,sigma,x_array,gll_x,gll_w)
 	#tmp = mollify_array(tmp,sigma,x_array,gll_x,gll_w)
 	#return 0.05*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
 	#return 0.03*tmp
-	#return m_array #shyness game
+	return 1e-2*m_array #shyness game
 	#return (powerbill(time)*(1-0.8*x_array) + x_array/(0.1+m_array))
 	#return 0*x_array#no-game
 
@@ -114,6 +160,21 @@ def powerbill(time):
 		return 0
 #	return 0
 
+def L_global(time,x_array,a_array,m_array): #general cost
+	#return a_array + np.sqrt(x_array) + a_array**2 #Classic Robstad
+	return 0.5*a_array**2 + F_global(x_array,m_array,0,time)
+
+def f_global(time,x_array,a_array):
+	#return 0.1*a_array*x_array #Classic Robstad
+	return a_array #standard MFG
+
+def Sigma_global(time,x_array,a_array,m_array):
+	#return 4+a_array*x_array #Classic Robstad
+	return 0.4*np.ones(x_array.size)
+
+def Sigma_local(time,x,a,m):
+	return 0*x
+
 ##################
 #TERMINAL COST
 ##################
@@ -121,17 +182,17 @@ def G(x_array,m_array): #this is the final cost, and is a function of the entire
 	#return -0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
 	#return 0.1*(x_array*(1-x_array))**2 #Gueant's game
 	#return -((x_array+0.2)*(1.2-x_array))**4 #Shyness game
-	return 0*x_array #Carlini's no-game & Isolation game
+	return np.zeros(x_array.size) #Carlini's no-game & Isolation game
 	#return 0.001*m_array
 
 
 ##################
-#TERMINAL COST
+#INITIAL DISTRIBUTION
 ##################
 def initial_distribution(x):
 	#return 1-0.2*np.cos(np.pi*x) #gueant's original
-	return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
-	#return np.exp(-(x-0.5)**2/0.1**2) #shyness game
+	#return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+	return np.exp(-(x-0.5)**2/0.1**2) #shyness game
 	#return np.exp(-(x-0.3)**2/0.1**2) #isolation game
 	#return 1/(3*x+1)**3 #isolation game 2
 
@@ -150,12 +211,6 @@ def mollify_array(array,epsilon,x_array,gll_x,gll_w):
 			output[k] += gll_w[j]*mollifier(gll_x[j])*np.interp(x_array[k]-epsilon*gll_x[j],x_array,array)
 	return output
 def restrain(trajectory,x_array):
-	#for i in range(0,trajectory.size):
-	#	if trajectory[i]<x_array[0]:
-	#		trajectory[i] = x_array[0]
-	#	elif trajectory[i]>x_array[-1]:
-	#		trajectory[i] = x_array[-1]
-	#
 	trajectory = np.minimum(np.maximum(x_array[0]*np.ones(x_array.size),trajectory),x_array[-1]*np.ones(x_array.size))
 	return trajectory
 def restrain4isolation(trajectory,x_array):

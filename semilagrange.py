@@ -85,7 +85,7 @@ for n in range (0,Niter):
 	#compute next iteration of v given m_old
 	print "Computing iteration", n+1, "of v..."
 	temptime = time.time()
-	v[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)]) 
+	v[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)])
 	for k in range (K-2,-1,-1):
 		v_tmp = np.copy(v[((k+1)*I):((k+1)*I+I)])
 		m_tmp = np.copy(m[((k)*I):((k)*I+I)])
@@ -105,8 +105,12 @@ for n in range (0,Niter):
 				v[index(i,k)] = dt*F_var[i] + tmpval
 				x0 = tmp
 			else:
-				tmp = iF.find_minimum(iF.tau_second_order,(i,v_tmp,x,dt,noise)) 
-				v[index(i,k)] = dt*F_var[i] + tmp
+				if i==0:
+					fpts = iF.tau_first_order(xpts_search,i,v_tmp,x,dt)
+					x0 = xpts_search[np.argmin(fpts)]
+				tmp,tmpval = iF.scatter_search(iF.tau_second_order,(i,v_tmp,x,dt,noise),xpts_search[2]-xpts_search[1],x0,N,scatters) 
+				v[index(i,k)] = dt*F_var[i] + tmpval
+				x0 = tmp
 	print "Spent time", time.time()-temptime
 	vchange = np.copy(v-v_old)
 	vl1[n] = np.sum(abs(vchange))
