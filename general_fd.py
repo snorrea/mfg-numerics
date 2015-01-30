@@ -1,6 +1,5 @@
 from __future__ import division
 import numpy as np
-import scipy.weave as weave
 import matplotlib.pyplot as plt
 import time as time
 from mpl_toolkits.mplot3d import Axes3D
@@ -8,18 +7,41 @@ from scipy.optimize import minimize as minimize
 from matplotlib import cm
 import quadrature_nodes as qn
 import input_functions as iF
-import sys
+
 
 #in this one we aim to not use so much fucking space
 
 #INPUTS; IF OSCILLATION AT BOUNDARY, MAKE SURE dt << dx
 dx = 1/100
 dt = 1/500
+#dx = 0.75*0.1/2
+#dx = 0.3**2/(2*0.7)
+dx = 0.2**2/2
+#dx = 0.1*dx
+#print 
+dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
+print dx,dt
 xmin = 0#-0.2
 xmax = 1#+.2
 T = 1
-Niter = 20 #maximum number of iterations
+Niter = 100 #maximum number of iterations
 tolerance = 1e-4
+alpha_upper = 1
+alpha_lower = -1
+quad_order = 15
+gll_x = qn.GLL_points(quad_order) #quadrature nodes
+gll_w = qn.GLL_weights(quad_order,gll_x)
+
+#STUFF TO MINIMIZE
+N = 60 #searchpoints
+min_tol = 1e-6#tolerance#1e-5 #tolerance for minimum
+min_left = alpha_lower #search region left
+min_right = alpha_upper #search region right
+relation = 2
+scatters = int(np.ceil(np.log((min_right-min_left)/min_tol)/np.log(N)))
+#scatters2 = int(1 + np.ceil(np.log((min_right-min_left)/(N*min_tol))/np.log(relation)))
+xpts_search = np.linspace(min_left,min_right,N)
+fpts = np.empty((xpts_search.size,1))
 
 #CRUNCH
 dx2 = dx**2
@@ -76,42 +98,22 @@ for n in range (0,Niter):
 		################################
 		#POLICY ITERATION HERE
 		###############################
-		#for i in range (0,I):
-		#while True: #policy iteration over all the space steps
-		#	sigma2 = iF.Sigma_global(k*dt,x,a_last,m_tmp)**2
-		#	L_var = iF.L_global(k*dt,x,a_last,m_tmp)
-		#	movement = iF.f_global(k*dt,x,a_last)
-		#	#compute the current guess of next u using a reflective boundary
-		#	#u_tmp[1:-2] = u_last[1:-2] + (dt/(2*dx2))*(sigma2[0:-3]*u_last[0:-3] + sigma2[2:-1]*u_last[2:-1] - 2*sigma2[1:-2]*u_last[1:-2]) + dt*L_var[1:-2]+ dt/dx*(np.maximum(movement[1:-2],BIGZERO[1:-2])*( u_last[1:-2] - u_last[0:-3] )  + np.minimum(movement[1:-2],BIGZERO[1:-2])*( u_last[2:-1] - u_last[1:-2] ) )
-		#	#u_tmp[0] = u_last[0] + (dt/dx2)*(sigma2[1]*u_last[1] - sigma2[0]*u_last[0]) + dt*L_var[0]+ dt/dx * np.sign(movement[0])*(movement[0])*(u_last[0]-u_last[1])
-		#	#u_tmp[-1] = u_last[-1] + (dt/dx2)*(sigma2[-2]*u_last[-2] - sigma2[-1]*u_last[-1]) + dt*L_var[-1]+ dt/dx * np.sign(movement[-1])*(movement[-1])*(u_last[-1]-u_last[-2])
-		#	#compute the best guess of the control
-		#	a_tmp = iF.best_control(x,u_last,m_tmp,dt,dx,k*dt) #gets best control for the current guess of u
-		#	#print a_tmp
-		#	if (np.max(abs(a_last-a_tmp)) < 1e-4):
-		#		#print "Found best control"#, max(a_tmp)
-		#		break
-		#	else:
-		#		a_last = np.copy(a_tmp)
 		#a_tmp = iF.best_control(x,u_last,m_tmp,dt,dx,k*dt)
-		for index in range (0,Nx):
-			#print x,u_last,m_tmp,dt,dx,k*dt,index
-			#print iF.hamiltonian(np.empty(2),x,u_last,m_tmp,dt,dx,k*dt,index)
-			#a_tmp[index] = minimize(iF.hamiltonian,0,(x,u_last,m_tmp,dt,dx,k*dt,index),tol=1e-3)
-			tup = (x,u_last,m_tmp,dt,dx,k*dt,index)
-			#print tup
-			a_tmp[index] = minimize(iF.hamiltonian,0,tup,tol=1e-3)
-			#a_tmp[index] = minimize(iF.hamiltonian,0,args=(x,u_last,m_tmp,dt,dx,k*dt,index))
+		a_tmp = np.empty(x.size)
+		#u_choice = np.empty(x.size)
+		for i in range (0,Nx):
+			fpts = iF.hamiltonian(xpts_search,x,u_last,m_tmp,dt,dx,k*dt,i)
+			x0 = xpts_search[np.argmin(fpts)]
+			tmp,tmpval = iF.scatter_search(iF.hamiltonian,(x,u_last,m_tmp,dt,dx,k*dt,i),xpts_search[2]-xpts_search[1],x0,N,scatters) 
+			a_tmp[i] = tmp
+			#u_choice[i] = tmpval
 		sigma2 = iF.Sigma_global(k*dt,x,a_tmp,m_tmp)**2
 		L_var = iF.L_global(k*dt,x,a_tmp,m_tmp)
 		movement = iF.f_global(k*dt,x,a_tmp)
-		#no sigma-shift
+		#u_tmp = np.copy(u_last) + dt*u_choice
 		u_tmp[1:-1] = u_last[1:-1]*(1-sigma2[1:-1]*dt/dx2 + abs(movement[1:-1])*dt/dx) + u_last[2:]*(sigma2[1:-1]*dt/(2*dx2) + np.minimum(movement[1:-1],BIGZERO)*dt/dx) +  u_last[0:-2]*(sigma2[1:-1]*dt/(2*dx2) - np.maximum(movement[1:-1],BIGZERO)*dt/dx) + dt*L_var[1:-1]
-		u_tmp[0] = u_last[0]*(1-sigma2[0]*dt/dx2 + abs(movement[0])*dt/dx) + dt*u_last[1]*(sigma2[0]/dx2 - abs(movement[0])/dx) + dt*L_var[0]
-		u_tmp[-1] = u_last[-1]*(1-sigma2[-1]*dt/dx2 + abs(movement[-1])*dt/dx) + dt*u_last[-2]*(sigma2[-1]/dx2 - abs(movement[-1])/dx) + dt*L_var[-1]
-		#u_tmp[1:-1] = u_last[1:-1]*(1-sigma2[1:-1]*dt/dx2 + abs(movement[1:-1])*dt/dx) + u_last[2:]*(sigma2[1:-1]*dt/(2*dx2) + np.minimum(movement[1:-1],BIGZERO)*dt/dx) +  u_last[0:-2]*(sigma2[1:-1]*dt/(2*dx2) - np.maximum(movement[1:-1],BIGZERO)*dt/dx) + dt*L_var[1:-1]
-		#u_tmp[0] = u_last[0]*(1-sigma2[0]*dt/dx2 + abs(movement[0])*dt/dx) + dt*u_last[1]*(sigma2[0]/dx2 - abs(movement[0])/dx) + dt*L_var[0]
-		#u_tmp[-1] = u_last[-1]*(1-sigma2[-1]*dt/dx2 + abs(movement[-1])*dt/dx) + dt*u_last[-2]*(sigma2[-1]/dx2 - abs(movement[-1])/dx) + dt*L_var[-1]
+		u_tmp[0] = u_last[0] + dt*(abs(movement[0])/dx - sigma2[0]/dx2)*(u_last[0] - u_last[1]) + dt*L_var[0]
+		u_tmp[-1] = u_last[-1] + dt*(abs(movement[-1])/dx - sigma2[-1]/dx2)*(u_last[-1] - u_last[-2]) + dt*L_var[-1]
 		u[(k*I):(k*I+I)] = np.copy(u_tmp)
 		a[(k*I):(k*I+I)] = np.copy(a_tmp)
 	print "Spent time", time.time()-temptime, "on computing u"
@@ -138,7 +140,10 @@ for n in range (0,Niter):
 		#m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2-abs(movement[1:-1])*dt/dx) + m_tmp[2:]*(dt/dx)*(sigma2[1:-1]/(2*dx) - np.minimum(movement[1:-1],BIGZERO)) + m_tmp[0:-2]*(dt/dx)*(sigma2[1:-1]/(2*dx) + np.maximum(movement[1:-1],BIGZERO))
 		#m_update[0] = m_tmp[0] + dt/(2*dx2) * (2*sigma2[1]*m_tmp[1] - 2*sigma2[0]*m_tmp[0] ) - dt/dx * ( max(0,movement[0])*(m_tmp[0]) + min(0,movement[0])*(m_tmp[1]-m_tmp[0]) )
 		#m_update[-1] = m_tmp[-1] + dt/(2*dx2) * (2*sigma2[-2]*m_tmp[-2] - 2*sigma2[-1]*m_tmp[-1] ) - dt/dx * ( max(0,movement[-1] ) * (m_tmp[-1]-m_tmp[-2]) + min(0,movement[-1]) * ( - m_tmp[-1] ) )
-		m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[2:]*(dt/(2*dx))*(sigma2[1:-1]/dx - movement[2:]) + m_tmp[0:-2]*(dt/(2*dx))*(sigma2[1:-1]/dx + movement[0:-2])
+		#m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[2:]*(dt/(2*dx))*(sigma2[1:-1]/dx - movement[2:]) + m_tmp[0:-2]*(dt/(2*dx))*(sigma2[1:-1]/dx + movement[0:-2])
+		#m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2) + m_tmp[1]*dt*(sigma2[1]/dx2 - 0.5*(movement[1])/dx)
+		#m_update[-1] = m_tmp[0]*(1-sigma2[-1]*dt/dx2) + m_tmp[-2]*dt*(sigma2[-2]/dx2 + 0.5*(movement[-2])/dx)
+		m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[2:]*(dt/(2*dx))*(sigma2[2:]/dx - movement[2:]) + m_tmp[0:-2]*(dt/(2*dx))*(sigma2[0:-2]/dx + movement[0:-2])
 		m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2) + m_tmp[1]*dt*(sigma2[1]/dx2 - 0.5*(movement[1])/dx)
 		m_update[-1] = m_tmp[0]*(1-sigma2[-1]*dt/dx2) + m_tmp[-2]*dt*(sigma2[-2]/dx2 + 0.5*(movement[-2])/dx)
 		#m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2 - dt/(2*dx)*(movement[2:]-movement[0:-2] + 2*abs(movement[1:-1]) )) + dt*m_tmp[2:]*(sigma2[1:-1]/dx2 - np.minimum(movement[1:-1],BIGZERO)/dx) + dt*m_tmp[0:-2]*(sigma2[1:-1]/dx2 + np.maximum(movement[1:-1],BIGZERO)/dx)
@@ -193,7 +198,7 @@ Xplot, Tplot = np.meshgrid(x,t)
 #plot solution of m(x,t)
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')
-ax1.plot_surface(Xplot,Tplot,msoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax1.plot_surface(Xplot,Tplot,msoln,rstride=10,cstride=10,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax1.set_xlabel('x')
 ax1.set_ylabel('t')
 ax1.set_zlabel('m(x,t)')
@@ -201,7 +206,7 @@ fig1.suptitle('Solution of the density m(x,t)', fontsize=14)
 #plot solution of u(x,t)
 fig2 = plt.figure(2)
 ax2 = fig2.add_subplot(111, projection='3d')
-ax2.plot_surface(Xplot,Tplot,usoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax2.plot_surface(Xplot,Tplot,usoln,rstride=10,cstride=10,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax2.set_xlabel('x')
 ax2.set_ylabel('t')
 ax2.set_zlabel('u(x,t)')
@@ -209,7 +214,7 @@ fig2.suptitle('Solution of the potential v(x,t)', fontsize=14)
 #plot solution of a(x,t)
 fig3 = plt.figure(3)
 ax3 = fig3.add_subplot(111, projection='3d')
-ax3.plot_surface(Xplot,Tplot,asoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax3.plot_surface(Xplot,Tplot,asoln,rstride=10,cstride=10,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax3.set_xlabel('x')
 ax3.set_ylabel('t')
 ax3.set_zlabel('a(x,t)')
@@ -244,6 +249,8 @@ ax6 = fig6.add_subplot(111)
 ax6.set_xlabel('Iteration number')
 ax6.set_ylabel('Log10 of change')
 fig6.suptitle('Convergence of a(x,t)', fontsize=14)
+fig7 = plt.figure(7)
+plt.plot(a[0:Nx])
 
 ##########PLOT
 plt.show()
