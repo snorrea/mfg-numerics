@@ -57,12 +57,12 @@ def hamiltonian(ax_array,ay_array,x_array,y_array,u_array,m_array,dt,dx,time,ind
 		tmp += u_array[ind+1-I]*np.minimum(d12,0)/(2*dx2)
 	#print tmp
 	#print ss
-	if np.amax(tmp) > 100:
-		print "(i,j,k)=(",index_x,index_y,time/dt,")"
-		print "u_array",u_array
-		print "L",L
-		print "Tmp",tmp
-		print ss
+	#if np.amax(tmp) > 100:
+	#	print "(i,j,k)=(",index_x,index_y,time/dt,")"
+	#	print "u_array",u_array
+	#	print "L",L
+	#	print "Tmp",tmp
+	#	print ss
 	return tmp
 
 ###################
@@ -107,14 +107,14 @@ def Sigma_D11_test(time,x,y,ax_array,ay_array,m_array):
 def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
 	return 0.3**2*np.ones((ax_array.size,ay_array.size))
 def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
-	return 0.05**2*np.ones((ax_array.size,ay_array.size))
+	return 0.0**2*np.ones((ax_array.size,ay_array.size))
 
 def Sigma_D11(time,x,y,ax,ay,m):
 	return 0.3**2
 def Sigma_D22(time,x,y,ax,ay,m):
 	return 0.3**2
 def Sigma_D12(time,x,y,ax,ay,m):
-	return 0
+	return 0.07**2
 ##################
 #TERMINAL COST
 ##################

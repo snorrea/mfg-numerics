@@ -6,13 +6,14 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.optimize import minimize as minimize
 from matplotlib import cm
 from scipy.sparse.linalg import spsolve
+from numpy.linalg import cond
 import input_functions_2D as iF
 import applications as app
 import matrix_gen as mg
+from scipy.spatial import Voronoi, voronoi_plot_2d
+from scipy.spatial import Delaunay
 
-#in this one we aim to not use so much fucking space
-
-dx = 0.05
+dx = 0.1
 dt = 0.05
 #dx = 0.75*0.1/2
 #dx = 0.3**2/(2*0.7)
@@ -53,6 +54,27 @@ t = np.linspace(0,T,Nt)
 I = x.size #space
 J = y.size
 K = t.size #time
+
+
+#grid = np.array([[0,0],[0,1],[1,1],[1,0]])
+#tri = Delaunay(grid)
+
+#grid = np.empty((I*J,2))
+#print grid
+#for i in range(0,I):
+#	for j in range(0,J):
+#		#print np.array((x[i],y[j]))
+#		grid[i+I*j] = np.array((x[i],y[j]))
+#tri = Delaunay(grid)
+#plt.triplot(grid[:,0], grid[:,1], tri.simplices.copy())
+#plt.plot(grid[:,0], grid[:,1], 'o')
+#plt.show()
+
+#print grid
+#vor = Voronoi(grid)
+#voronoi_plot_2d(vor)
+#plt.show()
+#print ss
 
 #INITIALISE STORAGE
 u = np.zeros((I*J*K)) #potential
@@ -123,7 +145,13 @@ for n in range (0,Niter):
 		#U_WORK_4_DIS = mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
 		#u_tmp = U_WORK_4_DIS*np.ravel(u_last) + dt*L_var #I don't trust that this actually works, but hey
 		U = mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		print U
+		#print ss
 		u_tmp = spsolve(U,np.ravel(u_last)+dt*L_var)
+		#print U.shape
+		#U_I = 0.5*mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		#U_E = 0.5*mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		#u_tmp = spsolve(U_I,U_E*np.ravel(u_last)+dt*L_var)
 		#plt.spy(U_WORK_4_DIS)
 		#plt.show()
 		u[(k*I*J):(k*I*J+I*J)] = np.copy(u_tmp)
