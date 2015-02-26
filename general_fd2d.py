@@ -14,7 +14,7 @@ from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial import Delaunay
 
 dx = 0.1
-dt = 0.05
+dt = 0.01
 #dx = 0.75*0.1/2
 #dx = 0.3**2/(2*0.7)
 #dx = 0.5**2/2
@@ -142,12 +142,11 @@ for n in range (0,Niter):
 		#and now generate the matrix and solve
 		#print "Generating working matrix..."
 		#toptimise = time.time()
-		#U_WORK_4_DIS = mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
-		#u_tmp = U_WORK_4_DIS*np.ravel(u_last) + dt*L_var #I don't trust that this actually works, but hey
-		U = mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		U = mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		u_tmp = U*np.ravel(u_last) + dt*L_var #I don't trust that this actually works, but hey
+		#U = mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		#u_tmp = spsolve(U,np.ravel(u_last)+dt*L_var)
 		print U
-		#print ss
-		u_tmp = spsolve(U,np.ravel(u_last)+dt*L_var)
 		#print U.shape
 		#U_I = 0.5*mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
 		#U_E = 0.5*mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
@@ -184,7 +183,7 @@ for n in range (0,Niter):
 		D12 = iF.Sigma_D12_test(time,x,y,a1_tmp,a2_tmp,m_tmp)
 		D22 = iF.Sigma_D22_test(time,x,y,a1_tmp,a2_tmp,m_tmp)
 		#the actual computation
-		M = mg.m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) 
+		M = mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) 
 		m_update = M*np.ravel(m_tmp) #computed!
 		#M = mg.m_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) 
 		#m_update = spsolve(M,np.ravel(m_tmp))
