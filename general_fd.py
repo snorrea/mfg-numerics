@@ -8,29 +8,22 @@ from matplotlib import cm
 import quadrature_nodes as qn
 import input_functions as iF
 
-
-#in this one we aim to not use so much fucking space
-
-#INPUTS; IF OSCILLATION AT BOUNDARY, MAKE SURE dt << dx
-dx = 1/100
-dt = 1/500
-#dx = 0.75*0.1/2
-#dx = 0.3**2/(2*0.7)
-dx = 0.2**2/2
+#INPUTS
+FINITE_VOLUME = 1 #0 if FD, 1 if FV
+#dx = 0.1**2/2
+dx = 1/50
 #dx = 0.1*dx
 #print 
-dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
+dt = 0.1*dx
+#dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
-xmin = 0#-0.2
-xmax = 1#+.2
+xmin = 0-0.2
+xmax = 1+.2
 T = 1
 Niter = 100 #maximum number of iterations
 tolerance = 1e-4
 alpha_upper = 1
 alpha_lower = -1
-quad_order = 15
-gll_x = qn.GLL_points(quad_order) #quadrature nodes
-gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #STUFF TO MINIMIZE
 N = 60 #searchpoints
@@ -110,10 +103,14 @@ for n in range (0,Niter):
 		sigma2 = iF.Sigma_global(k*dt,x,a_tmp,m_tmp)**2
 		L_var = iF.L_global(k*dt,x,a_tmp,m_tmp)
 		movement = iF.f_global(k*dt,x,a_tmp)
-		#u_tmp = np.copy(u_last) + dt*u_choice
-		u_tmp[1:-1] = u_last[1:-1]*(1-sigma2[1:-1]*dt/dx2 + abs(movement[1:-1])*dt/dx) + u_last[2:]*(sigma2[1:-1]*dt/(2*dx2) + np.minimum(movement[1:-1],BIGZERO)*dt/dx) +  u_last[0:-2]*(sigma2[1:-1]*dt/(2*dx2) - np.maximum(movement[1:-1],BIGZERO)*dt/dx) + dt*L_var[1:-1]
-		u_tmp[0] = u_last[0] + dt*(abs(movement[0])/dx - sigma2[0]/dx2)*(u_last[0] - u_last[1]) + dt*L_var[0]
-		u_tmp[-1] = u_last[-1] + dt*(abs(movement[-1])/dx - sigma2[-1]/dx2)*(u_last[-1] - u_last[-2]) + dt*L_var[-1]
+		#Kushner
+		u_tmp[1:-1] = u_last[1:-1]*(1-sigma2[1:-1]*dt/dx2 - abs(movement[1:-1])*dt/dx) + u_last[2:]*(sigma2[1:-1]*dt/(2*dx2) + np.maximum(movement[1:-1],BIGZERO)*dt/dx) +  u_last[0:-2]*(sigma2[1:-1]*dt/(2*dx2) - np.minimum(movement[1:-1],BIGZERO)*dt/dx) + dt*L_var[1:-1]
+		u_tmp[0] = u_last[0]*(1-sigma2[0]*dt/dx2 - abs(movement[0])*dt/dx)+u_last[1]*dt/dx2*(dx*abs(movement[0])+sigma2[0]) + dt*L_var[0]
+		u_tmp[-1] = u_last[-1]*(1-sigma2[-1]*dt/dx2 - abs(movement[-1])*dt/dx)+u_last[-2]*dt/dx2*(dx*abs(movement[-1])+sigma2[-1]) + dt*L_var[-1]
+		#old thing
+		#u_tmp[1:-1] = u_last[1:-1]*(1-sigma2[1:-1]*dt/dx2 + abs(movement[1:-1])*dt/dx) + u_last[2:]*(sigma2[1:-1]*dt/(2*dx2) + np.minimum(movement[1:-1],BIGZERO)*dt/dx) +  u_last[0:-2]*(sigma2[1:-1]*dt/(2*dx2) - np.maximum(movement[1:-1],BIGZERO)*dt/dx) + dt*L_var[1:-1]
+		#u_tmp[0] = u_last[0] + dt*(abs(movement[0])/dx - sigma2[0]/dx2)*(u_last[0] - u_last[1]) + dt*L_var[0]
+		#u_tmp[-1] = u_last[-1] + dt*(abs(movement[-1])/dx - sigma2[-1]/dx2)*(u_last[-1] - u_last[-2]) + dt*L_var[-1]
 		u[(k*I):(k*I+I)] = np.copy(u_tmp)
 		a[(k*I):(k*I+I)] = np.copy(a_tmp)
 	print "Spent time", time.time()-temptime, "on computing u"
@@ -128,30 +125,46 @@ for n in range (0,Niter):
 	alinfty[n] = max(abs(achange) )
 	#GET GOING WITH M
 	print "Computing iteration", n+1, "of m..."
+	m[0:I] = np.copy(m0)
 	temptime = time.time()
 	for k in range(0,K-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
 		a_tmp = a[(k*I):(k*I+I)]
 		m_tmp = m[(k*I):(k*I+I)]
-		sigma2 = iF.Sigma_global(k*dt,x,a_tmp,m_tmp)**2
+		sigma = iF.Sigma_global(k*dt,x,a_tmp,m_tmp)
+		sigma2 = sigma**2
 		L_var = iF.L_global(k*dt,x,a_tmp,m_tmp)
 		movement = iF.f_global(k*dt,x,a_tmp) #the function f
 		#the actual computation
 		m_update = np.empty(m_tmp.size)
-		#m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2-abs(movement[1:-1])*dt/dx) + m_tmp[2:]*(dt/dx)*(sigma2[1:-1]/(2*dx) - np.minimum(movement[1:-1],BIGZERO)) + m_tmp[0:-2]*(dt/dx)*(sigma2[1:-1]/(2*dx) + np.maximum(movement[1:-1],BIGZERO))
-		#m_update[0] = m_tmp[0] + dt/(2*dx2) * (2*sigma2[1]*m_tmp[1] - 2*sigma2[0]*m_tmp[0] ) - dt/dx * ( max(0,movement[0])*(m_tmp[0]) + min(0,movement[0])*(m_tmp[1]-m_tmp[0]) )
-		#m_update[-1] = m_tmp[-1] + dt/(2*dx2) * (2*sigma2[-2]*m_tmp[-2] - 2*sigma2[-1]*m_tmp[-1] ) - dt/dx * ( max(0,movement[-1] ) * (m_tmp[-1]-m_tmp[-2]) + min(0,movement[-1]) * ( - m_tmp[-1] ) )
-		#m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[2:]*(dt/(2*dx))*(sigma2[1:-1]/dx - movement[2:]) + m_tmp[0:-2]*(dt/(2*dx))*(sigma2[1:-1]/dx + movement[0:-2])
-		#m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2) + m_tmp[1]*dt*(sigma2[1]/dx2 - 0.5*(movement[1])/dx)
-		#m_update[-1] = m_tmp[0]*(1-sigma2[-1]*dt/dx2) + m_tmp[-2]*dt*(sigma2[-2]/dx2 + 0.5*(movement[-2])/dx)
-		m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[2:]*(dt/(2*dx))*(sigma2[2:]/dx - movement[2:]) + m_tmp[0:-2]*(dt/(2*dx))*(sigma2[0:-2]/dx + movement[0:-2])
-		m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2) + m_tmp[1]*dt*(sigma2[1]/dx2 - 0.5*(movement[1])/dx)
-		m_update[-1] = m_tmp[0]*(1-sigma2[-1]*dt/dx2) + m_tmp[-2]*dt*(sigma2[-2]/dx2 + 0.5*(movement[-2])/dx)
-		#m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2 - dt/(2*dx)*(movement[2:]-movement[0:-2] + 2*abs(movement[1:-1]) )) + dt*m_tmp[2:]*(sigma2[1:-1]/dx2 - np.minimum(movement[1:-1],BIGZERO)/dx) + dt*m_tmp[0:-2]*(sigma2[1:-1]/dx2 + np.maximum(movement[1:-1],BIGZERO)/dx)
-		#m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2 - dt/(2*dx)*(movement[1]+2*abs(movement[0]))) + m_tmp[1]*dt*(sigma2[1]/dx2 + abs(movement[1])/dx)
-		#m_update[-1] = m_tmp[0]*(1-sigma2[-1]*dt/dx2 - dt/(2*dx)*(-movement[-2]+2*abs(movement[-1]))) + m_tmp[-2]*dt*(sigma2[-2]/dx2 + abs(movement[-2])/dx)
-		#the actual update
-		#m_update = m_update/(sum(m_update)*dx) #normalise; this is a hack
+		#finite differences
+		if FINITE_VOLUME == 0:
+			m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[2:]*(dt/(2*dx))*(sigma2[2:]/dx - movement[2:]) + m_tmp[0:-2]*(dt/(2*dx))*(sigma2[0:-2]/dx + movement[0:-2])
+			m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2) + m_tmp[1]*dt*(sigma2[1]/dx2 - 0.5*(movement[1])/dx)
+			m_update[-1] = m_tmp[-1]*(1-sigma2[-1]*dt/dx2) + m_tmp[-2]*dt*(sigma2[-2]/dx2 + 0.5*(movement[-2])/dx)
+		#finite volume gold standard
+		else:
+			#generate the flux vectors
+			Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
+			Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
+			Fi = np.insert(Fi,0,(dx*movement[0]-sigma[0]*sigma[1])/dx)
+			D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2
+			D_down = iF.hmean(sigma2[1:-1],sigma2[0:-2])/2
+			zero = np.zeros(movement[1:-1].size)
+			#regular upwinding
+			m_update[1:-1] = m_tmp[1:-1]*(1 - dt/dx2*(D_up+D_down+dx*abs(Fi[1:-1])) )  
+			m_update[1:-1] += m_tmp[2:]*dt/dx2*(  D_up - dx*np.minimum(Fi[2:],zero)  )
+			m_update[1:-1] += m_tmp[0:-2]*dt/dx2*( D_down + dx*np.maximum(Fi[0:-2],zero) )
+			D_w = iF.hmean_scalar(sigma2[0],sigma2[1])/2 #west boundary diffusion
+			D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])/2#east boundary diffusion
+			m_update[0] = (m_tmp[0]*(1-dt/dx2*(D_w+dx*abs(Fi[0]))) + m_tmp[1]*dt/dx2*(D_w-dx*np.min(Fi[1],0)))
+			m_update[-1]= (m_tmp[-1]*(1-dt/dx2*(D_e+dx*abs(Fi[-1]))) + m_tmp[-2]*dt/dx2*(D_e+dx*np.max(Fi[-2],0)))
+			#Check positive coefficients
+			tmp1 = min(1 - dt/dx2*(D_up+D_down+dx*abs(Fi[1:-1])) )
+			if tmp1<0:
+				print "Decrease dt/dx ratio!", tmp1
 		m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
+		#if sum(m_update)*dx is not 1:
+		#	print sum(m_update)*dx-1
 	print "Spent time", time.time()-temptime, "on computing m"
 	#compute norms of stuff
 	mchange = np.copy(m-m_old)
@@ -198,7 +211,7 @@ Xplot, Tplot = np.meshgrid(x,t)
 #plot solution of m(x,t)
 fig1 = plt.figure(1)
 ax1 = fig1.add_subplot(111, projection='3d')
-ax1.plot_surface(Xplot,Tplot,msoln,rstride=10,cstride=10,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax1.plot_surface(Xplot,Tplot,msoln,rstride=5,cstride=5,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 ax1.set_xlabel('x')
 ax1.set_ylabel('t')
 ax1.set_zlabel('m(x,t)')

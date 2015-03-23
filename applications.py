@@ -72,6 +72,9 @@ def policy_implicit(search,x,y,u0,m,dt,dx,time,I,J,tol,scatters,N):
 ###################
 #AUXILIARY FUNCTIONS
 ###################
+def hmean(a,b): #returns harmonic mean of a,b
+	return 2*a*b/(a+b)
+
 def recover_index(crit_ind,key): #where key is as in index:=i+I*j, with I=key. this function recovers i,j
 	i=0
 	j=0

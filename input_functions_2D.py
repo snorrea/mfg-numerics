@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy as np
+import math
 from scipy import sparse
 
 ###################
@@ -20,31 +21,31 @@ def hamiltonian(ax_array,ay_array,x_array,y_array,u_array,m_array,dt,dx,time,ind
 	ybound1 = range(0,I*J,I)
 	xbound2 = range(I*J-I,I*J)
 	ybound2 = range(I-1,I*J,I)
-	tmp = u_array[ind]*( -(f1+f2)/dx + ( d12-d11-d22 )/dx2 ) + L
+	tmp = u_array[ind]*( -(abs(f1)+abs(f2))/dx + ( abs(d12)-d11-d22 )/dx2 ) + L
 	#avoid segfaults
 	if not ismember_sorted(ind,xbound1): #allows (i,j-1)
-		tmp += u_array[ind-I]*( np.minimum(f2,zero)/dx + (d22-d12)/(2*dx2) )
+		tmp += u_array[ind-I]*( -np.minimum(f2,zero)/dx + (d22-abs(d12))/(2*dx2) )
 	if not ismember_sorted(ind,xbound2): #allows (i,j+1)
-		tmp += u_array[ind+I]*( np.maximum(f2,zero)/dx + (d22-d12)/(2*dx2) )
+		tmp += u_array[ind+I]*( np.maximum(f2,zero)/dx + (d22-abs(d12))/(2*dx2) )
 	if not ismember_sorted(ind,ybound1): #allows (i-1,j)
-		tmp += u_array[ind-1]*( np.minimum(f1,zero)/dx + (d11-d12)/(2*dx2) )
+		tmp += u_array[ind-1]*( -np.minimum(f1,zero)/dx + (d11-abs(d12))/(2*dx2) )
 	if not ismember_sorted(ind,ybound2): #allows (i+1,j)
-		tmp += u_array[ind+1]*( np.maximum(f1,zero)/dx + (d11-d12)/(2*dx2) )
+		tmp += u_array[ind+1]*( np.maximum(f1,zero)/dx + (d11-abs(d12))/(2*dx2) )
 	if not ismember_sorted(ind,xbound1) and not ismember_sorted(ind,ybound1): #allows (i-1,j-1)
 		tmp += u_array[ind-1-I]*np.maximum(d12,0)/(2*dx2)
 	if not ismember_sorted(ind,xbound2) and not ismember_sorted(ind,ybound2): #allows (i+1,j+1)
 		tmp += u_array[ind+1+I]*np.maximum(d12,0)/(2*dx2)
 	if not ismember_sorted(ind,xbound1) and not ismember_sorted(ind,ybound2): #allows (i+1,j-1)
-		tmp += u_array[ind+1-I]*np.minimum(d12,0)/(2*dx2)
+		tmp += -u_array[ind+1-I]*np.minimum(d12,0)/(2*dx2)
 	if not ismember_sorted(ind,ybound1) and not ismember_sorted(ind,xbound2): #allows (i-1,j+1)
-		tmp += u_array[ind-1+I]*np.minimum(d12,0)/(2*dx2)
+		tmp += -u_array[ind-1+I]*np.minimum(d12,0)/(2*dx2)
 	#then add boundary conditions
 	if ismember_sorted(ind,xbound1): 
-		tmp += u_array[ind+I]*( np.minimum(f2,zero)/dx + (d22-d12)/(2*dx2) )
+		tmp += u_array[ind+I]*( -np.minimum(f2,zero)/dx + (d22-d12)/(2*dx2) )
 	if ismember_sorted(ind,xbound2):
 		tmp += u_array[ind-I]*( np.maximum(f2,zero)/dx + (d22-d12)/(2*dx2) )
 	if ismember_sorted(ind,ybound1):
-		tmp += u_array[ind+1]*( np.minimum(f1,zero)/dx + (d11-d12)/(2*dx2) )
+		tmp += u_array[ind+1]*( -np.minimum(f1,zero)/dx + (d11-d12)/(2*dx2) )
 	if ismember_sorted(ind,ybound2):	
 		tmp += u_array[ind-1]*( np.maximum(f1,zero)/dx + (d11-d12)/(2*dx2) )
 	if ismember_sorted(ind,xbound1) and ismember_sorted(ind,ybound1): #allows (i-1,j-1)
@@ -52,9 +53,9 @@ def hamiltonian(ax_array,ay_array,x_array,y_array,u_array,m_array,dt,dx,time,ind
 	if ismember_sorted(ind,xbound2) and ismember_sorted(ind,ybound2): #allows (i+1,j+1)
 		tmp += u_array[ind-1-I]*np.maximum(d12,0)/(2*dx2)
 	if ismember_sorted(ind,xbound1) and ismember_sorted(ind,ybound2): #allows (i+1,j-1)
-		tmp += u_array[ind-1+I]*np.minimum(d12,0)/(2*dx2)
+		tmp += -u_array[ind-1+I]*np.minimum(d12,0)/(2*dx2)
 	if ismember_sorted(ind,ybound1) and ismember_sorted(ind,xbound2): #allows (i-1,j+1)
-		tmp += u_array[ind+1-I]*np.minimum(d12,0)/(2*dx2)
+		tmp += -u_array[ind+1-I]*np.minimum(d12,0)/(2*dx2)
 	#print tmp
 	#print ss
 	#if np.amax(tmp) > 100:
@@ -77,7 +78,7 @@ def F_global(x,y,m_array,time): #more effective running cost function
 
 def L_global(time,x,y,ax_array,ay_array,m_array): #general cost
 	x,y = np.meshgrid(x,y)
-	return 0.5*(ax_array**2 + ay_array**2) + (x-0.7)**2 + (y-0.7)**2
+	return 0.5*(ax_array**2 + ay_array**2) + (x-0.0)**2 + (y-0.0)**2
 	#output = np.empty(x_array.size,y_array.size)
 	#for i in range (0,y_array.size):
 	#	output[:,i] = 0.5*(ax_array**2 + ay_array**2) + (x-0.2)**2 * (y-0.2)**2 #location bias
@@ -86,7 +87,7 @@ def L_global(time,x,y,ax_array,ay_array,m_array): #general cost
 
 def L_test(time,x,y,ax_array,ay_array,m): #only dof is alphas
 	a1,a2 = np.meshgrid(ax_array,ay_array)
-	return 0.5*(a1**2+a2**2) + (x-0.7)**2 + (y-0.7)**2
+	return 0.5*(a1**2+a2**2) + (x-0.0)**2 + (y-0.0)**2
 	
 def f_test(time,x,y,ax_array,ay_array):
 	a1,a2 = np.meshgrid(ax_array,ay_array)
@@ -107,14 +108,14 @@ def Sigma_D11_test(time,x,y,ax_array,ay_array,m_array):
 def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
 	return 0.3**2*np.ones((ax_array.size,ay_array.size))
 def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
-	return 0.0**2*np.ones((ax_array.size,ay_array.size))
+	return 0.1**2*np.ones((ax_array.size,ay_array.size))
 
 def Sigma_D11(time,x,y,ax,ay,m):
 	return 0.3**2
 def Sigma_D22(time,x,y,ax,ay,m):
 	return 0.3**2
 def Sigma_D12(time,x,y,ax,ay,m):
-	return 0.07**2
+	return 0.00**2
 ##################
 #TERMINAL COST
 ##################
@@ -130,12 +131,34 @@ def G(x_array,y_array,m_array): #this is the final cost, and is a function of th
 ##################
 def initial_distribution(x,y): #this now works
 	x,y = np.meshgrid(x,y)
-	return np.exp( -(x-0.5)**2/(0.2**2) - (y-0.5)**2/(0.2**2) )
+	#return np.exp( -(x-0.)**2/(0.2**2) - (y-0.)**2/(0.2**2) )
+	return np.exp( -(x-0.5)**2/(0.1**2) - (y-0.5)**2/(0.1**2) )
 	#return 1-0.2*np.cos(np.pi*x) #gueant's original
 	#return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
 	#return np.exp(-(np.outer(x,y)-0.5)**2/0.1**2) #shyness game
 	#return np.exp(-(x-0.3)**2/0.1**2) #isolation game
 	#return 1/(3*x+1)**3 #isolation game 2
+
+def known_diffusion1(x,y,D11,D12,D22,time):
+	x,y = np.meshgrid(x,y)
+	det = D11*D22-D12**2
+	#print "Culprit"
+	#print x*y
+	#print ss
+	print np.exp( ( D22*x**2+D11*y**2-2*D12*x*y )/(4*det*time) )
+	return 1/(4*math.pi*np.sqrt(det)*time) * np.exp( ( D22*x**2+D11*y**2-2*D12*x*y )/(4*det*time) )
+
+def known_diffusion2(x,y,D11,D12,D22,time):
+	I = len(x)
+	J = len(y)
+	output = np.empty((I,J))
+	for i in range(0,I):
+		for j in range(0,J):
+			if abs(x[i])>0.25 or abs(y[j])>0.25:
+				output[i,j] = 1
+			else:
+				output[i,j] = 0
+	return output
 
 #OTHER STUFF
 def ismember(a, b):

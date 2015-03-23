@@ -13,8 +13,8 @@ import matrix_gen as mg
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial import Delaunay
 
-dx = 0.1
-dt = 0.01
+dx = 0.05
+dt = 0.05
 #dx = 0.75*0.1/2
 #dx = 0.3**2/(2*0.7)
 #dx = 0.5**2/2
@@ -26,7 +26,7 @@ xmin = 0
 xmax = 1
 ymin = 0
 ymax = 1
-T = 1
+T = 2
 Niter = 1 #maximum number of iterations
 tolerance = 1e-4
 alpha_upper = 2
@@ -126,27 +126,18 @@ for n in range (0,Niter):
 		a1_tmp = np.empty((x.size,y.size))
 		a2_tmp = np.empty((x.size,y.size))
 		#find the bestest controls for the entire grid...
-		#print "Computing optimal control..."
-		#toptimise = time.time()
 		a1_tmp, a2_tmp = app.policy_implicit(xpts_search,x,y,u_last,m_tmp,dt,dx,k*dt,I,J,1e-4,scatters,N)
-		#print a2_tmp
-		#print ss
-		#print "Time to optimise:", time.time()-toptimise
-		#now evaluate the functions that are coming to play
-		#this means L, f, D11, D12, D22...
 		L_var = np.ravel(iF.L_global(k*dt,x,y,a1_tmp,a2_tmp,m_tmp)) #this has been vetted
 		[f1_array, f2_array] = iF.f_global(k*dt,x,y,a1_tmp,a2_tmp)
 		D11 = iF.Sigma_D11_test(time,x,y,a1_tmp,a2_tmp,m_tmp)
 		D12 = iF.Sigma_D12_test(time,x,y,a1_tmp,a2_tmp,m_tmp)
 		D22 = iF.Sigma_D22_test(time,x,y,a1_tmp,a2_tmp,m_tmp)
 		#and now generate the matrix and solve
-		#print "Generating working matrix..."
-		#toptimise = time.time()
-		U = mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
-		u_tmp = U*np.ravel(u_last) + dt*L_var #I don't trust that this actually works, but hey
-		#U = mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
-		#u_tmp = spsolve(U,np.ravel(u_last)+dt*L_var)
-		print U
+		#U = mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		#u_tmp = U*np.ravel(u_last) + dt*L_var #I don't trust that this actually works, but hey
+		U = mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
+		u_tmp = spsolve(U,np.ravel(u_last)+dt*L_var)
+		#print U
 		#print U.shape
 		#U_I = 0.5*mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
 		#U_E = 0.5*mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) #work matrix
@@ -183,10 +174,14 @@ for n in range (0,Niter):
 		D12 = iF.Sigma_D12_test(time,x,y,a1_tmp,a2_tmp,m_tmp)
 		D22 = iF.Sigma_D22_test(time,x,y,a1_tmp,a2_tmp,m_tmp)
 		#the actual computation
-		M = mg.u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) 
-		m_update = M*np.ravel(m_tmp) #computed!
+		#M = mg.m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) 
+		#M = mg.m_matrix_explicit_diagonal_diffusion(f1_array,f2_array,D11,D22,I,J,dx,dt)
+		#m_update = M*np.ravel(m_tmp) #computed!
 		#M = mg.m_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) 
 		#m_update = spsolve(M,np.ravel(m_tmp))
+		LHS,RHS = mg.m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt) 
+		m_update = spsolve(LHS,RHS*np.ravel(m_tmp))
+		#print M
 		m[I*J*(k+1):(I*J+I*J*(k+1))] = np.copy(m_update)
 	print "Spent time", time.time()-temptime, "on computing m"
 	#compute norms of stuff
