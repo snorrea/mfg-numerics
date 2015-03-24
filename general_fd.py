@@ -7,20 +7,21 @@ from scipy.optimize import minimize as minimize
 from matplotlib import cm
 import quadrature_nodes as qn
 import input_functions as iF
+import solvers_1D as solve
 
 #INPUTS
-FINITE_VOLUME = 1 #0 if FD, 1 if FV
+FINITE_VOLUME = 0 #0 if FD, 1 if FV
 #dx = 0.1**2/2
 dx = 1/50
 #dx = 0.1*dx
 #print 
-dt = 0.1*dx
+dt = 0.2*dx
 #dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
-xmin = 0-0.2
-xmax = 1+.2
+xmin = 0-2
+xmax = 0+.2
 T = 1
-Niter = 100 #maximum number of iterations
+Niter = 1 #maximum number of iterations
 tolerance = 1e-4
 alpha_upper = 1
 alpha_lower = -1
@@ -81,36 +82,11 @@ for n in range (0,Niter):
 	temptime = time.time()
 	#Compute u
 	u[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)])
-	for k in range (K-2,-1,-1): #this is extremely messy but might just work
-		#u_tmp = np.copy(u[((k+1)*I):((k+1)*I+I)]) #this one to iterate over
-		u_tmp = np.empty(x.size)
+	for k in range (K-2,-1,-1): 
 		u_last = np.copy(u[((k+1)*I):((k+1)*I+I)]) #this one to keep
 		m_tmp = np.copy(m[((k)*I):((k)*I+I)]) #only actually need this, amirite?
-		#a_last = np.copy(a_old[((k)*I):((k)*I+I)]) #this one to iterate over
-		#a_last = np.zeros(x.size) #this one to iterate over
-		################################
-		#POLICY ITERATION HERE
-		###############################
-		#a_tmp = iF.best_control(x,u_last,m_tmp,dt,dx,k*dt)
-		a_tmp = np.empty(x.size)
-		#u_choice = np.empty(x.size)
-		for i in range (0,Nx):
-			fpts = iF.hamiltonian(xpts_search,x,u_last,m_tmp,dt,dx,k*dt,i)
-			x0 = xpts_search[np.argmin(fpts)]
-			tmp,tmpval = iF.scatter_search(iF.hamiltonian,(x,u_last,m_tmp,dt,dx,k*dt,i),xpts_search[2]-xpts_search[1],x0,N,scatters) 
-			a_tmp[i] = tmp
-			#u_choice[i] = tmpval
-		sigma2 = iF.Sigma_global(k*dt,x,a_tmp,m_tmp)**2
-		L_var = iF.L_global(k*dt,x,a_tmp,m_tmp)
-		movement = iF.f_global(k*dt,x,a_tmp)
-		#Kushner
-		u_tmp[1:-1] = u_last[1:-1]*(1-sigma2[1:-1]*dt/dx2 - abs(movement[1:-1])*dt/dx) + u_last[2:]*(sigma2[1:-1]*dt/(2*dx2) + np.maximum(movement[1:-1],BIGZERO)*dt/dx) +  u_last[0:-2]*(sigma2[1:-1]*dt/(2*dx2) - np.minimum(movement[1:-1],BIGZERO)*dt/dx) + dt*L_var[1:-1]
-		u_tmp[0] = u_last[0]*(1-sigma2[0]*dt/dx2 - abs(movement[0])*dt/dx)+u_last[1]*dt/dx2*(dx*abs(movement[0])+sigma2[0]) + dt*L_var[0]
-		u_tmp[-1] = u_last[-1]*(1-sigma2[-1]*dt/dx2 - abs(movement[-1])*dt/dx)+u_last[-2]*dt/dx2*(dx*abs(movement[-1])+sigma2[-1]) + dt*L_var[-1]
-		#old thing
-		#u_tmp[1:-1] = u_last[1:-1]*(1-sigma2[1:-1]*dt/dx2 + abs(movement[1:-1])*dt/dx) + u_last[2:]*(sigma2[1:-1]*dt/(2*dx2) + np.minimum(movement[1:-1],BIGZERO)*dt/dx) +  u_last[0:-2]*(sigma2[1:-1]*dt/(2*dx2) - np.maximum(movement[1:-1],BIGZERO)*dt/dx) + dt*L_var[1:-1]
-		#u_tmp[0] = u_last[0] + dt*(abs(movement[0])/dx - sigma2[0]/dx2)*(u_last[0] - u_last[1]) + dt*L_var[0]
-		#u_tmp[-1] = u_last[-1] + dt*(abs(movement[-1])/dx - sigma2[-1]/dx2)*(u_last[-1] - u_last[-2]) + dt*L_var[-1]
+		a_tmp = solve.control_general(x,k*dt,u_last,m_tmp,dt,dx,xpts_search,N,scatters)
+		u_tmp = solve.hjb_upwind(x,time,u_last,m_last,a_tmp,dt,dx)
 		u[(k*I):(k*I+I)] = np.copy(u_tmp)
 		a[(k*I):(k*I+I)] = np.copy(a_tmp)
 	print "Spent time", time.time()-temptime, "on computing u"
@@ -130,38 +106,15 @@ for n in range (0,Niter):
 	for k in range(0,K-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
 		a_tmp = a[(k*I):(k*I+I)]
 		m_tmp = m[(k*I):(k*I+I)]
-		sigma = iF.Sigma_global(k*dt,x,a_tmp,m_tmp)
-		sigma2 = sigma**2
-		L_var = iF.L_global(k*dt,x,a_tmp,m_tmp)
-		movement = iF.f_global(k*dt,x,a_tmp) #the function f
-		#the actual computation
-		m_update = np.empty(m_tmp.size)
 		#finite differences
 		if FINITE_VOLUME == 0:
-			m_update[1:-1] = m_tmp[1:-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[2:]*(dt/(2*dx))*(sigma2[2:]/dx - movement[2:]) + m_tmp[0:-2]*(dt/(2*dx))*(sigma2[0:-2]/dx + movement[0:-2])
-			m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2) + m_tmp[1]*dt*(sigma2[1]/dx2 - 0.5*(movement[1])/dx)
-			m_update[-1] = m_tmp[-1]*(1-sigma2[-1]*dt/dx2) + m_tmp[-2]*dt*(sigma2[-2]/dx2 + 0.5*(movement[-2])/dx)
+			#shitty centered differences
+			#m_update = solve.fp_fd_centered(x,k*dt,m_tmp,a_tmp,dt,dx)
+			#excellent, monotone, upwind
+			m_update = solve.fp_fd_upwind(x,k*dt,m_tmp,a_tmp,dt,dx)
 		#finite volume gold standard
 		else:
-			#generate the flux vectors
-			Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
-			Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
-			Fi = np.insert(Fi,0,(dx*movement[0]-sigma[0]*sigma[1])/dx)
-			D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2
-			D_down = iF.hmean(sigma2[1:-1],sigma2[0:-2])/2
-			zero = np.zeros(movement[1:-1].size)
-			#regular upwinding
-			m_update[1:-1] = m_tmp[1:-1]*(1 - dt/dx2*(D_up+D_down+dx*abs(Fi[1:-1])) )  
-			m_update[1:-1] += m_tmp[2:]*dt/dx2*(  D_up - dx*np.minimum(Fi[2:],zero)  )
-			m_update[1:-1] += m_tmp[0:-2]*dt/dx2*( D_down + dx*np.maximum(Fi[0:-2],zero) )
-			D_w = iF.hmean_scalar(sigma2[0],sigma2[1])/2 #west boundary diffusion
-			D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])/2#east boundary diffusion
-			m_update[0] = (m_tmp[0]*(1-dt/dx2*(D_w+dx*abs(Fi[0]))) + m_tmp[1]*dt/dx2*(D_w-dx*np.min(Fi[1],0)))
-			m_update[-1]= (m_tmp[-1]*(1-dt/dx2*(D_e+dx*abs(Fi[-1]))) + m_tmp[-2]*dt/dx2*(D_e+dx*np.max(Fi[-2],0)))
-			#Check positive coefficients
-			tmp1 = min(1 - dt/dx2*(D_up+D_down+dx*abs(Fi[1:-1])) )
-			if tmp1<0:
-				print "Decrease dt/dx ratio!", tmp1
+			m_update = solve.fp_fv(x,k*dt,m_tmp,a_tmp,dt,dx)
 		m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
 		#if sum(m_update)*dx is not 1:
 		#	print sum(m_update)*dx-1

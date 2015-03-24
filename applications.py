@@ -92,6 +92,7 @@ def mollifier(x_val): #Evans' mollifier
 		return np.exp(1/(x_val**2 - 1))/0.443994
 	else:
 		return 0
+
 def mollify_array(array,epsilon,x_array,gll_x,gll_w): 
 	output = np.zeros((array.size))
 	for k in range (0,array.size):

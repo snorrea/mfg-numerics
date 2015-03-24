@@ -108,9 +108,9 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 #RUNNING COST
 ###################
 def F_global(x_array,m_array,sigma,time): #more effective running cost function
-	#return (x_array-0.2)**2 #Carlini's no-game
-	ONE = np.ones(m_array.size)
-	return (x_array-0.2)**2 + np.minimum(4*ONE,np.maximum(m_array,ONE))
+	return (x_array-0.2)**2 #Carlini's no-game
+	#ONE = np.ones(m_array.size)
+	#return (x_array-0.2)**2 + np.minimum(4*ONE,np.maximum(m_array,ONE))
 	#return np.minimum(1.4*np.ones(x_array.size),np.maximum(m_array,0.7*np.ones(x_array.size))) #Gueant's game
 	#tmp = mollify_array(m_array,sigma,x_array,gll_x,gll_w)
 	#tmp = mollify_array(tmp,sigma,x_array,gll_x,gll_w)
@@ -137,12 +137,16 @@ def L_global(time,x_array,a_array,m_array): #general cost
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
-	return a_array #standard MFG
+	#return -0.1*np.ones(x_array.size) #FP test, constant coefficients
+	return 0.1*x_array #Ornstein FP test
+	#return a_array #standard MFG
 
 def Sigma_global(time,x_array,a_array,m_array):
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
-	return 0.0*np.ones(x_array.size)
+	#return 0.01*time*np.exp(1)*np.ones(x_array.size) #exact FP test
+	#return np.sqrt(0.1*time*np.exp(1)*2)*np.ones(x_array.size) #exact FP test, Ornstein
+	return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
 
 def Sigma_local(time,x,a,m):
 	return 0*x
