@@ -137,8 +137,8 @@ def L_global(time,x_array,a_array,m_array): #general cost
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
-	#return -0.1*np.ones(x_array.size) #FP test, constant coefficients
-	return 0.1*x_array #Ornstein FP test
+	#return -0.3*np.ones(x_array.size) #FP test, constant coefficients
+	return 2*x_array #Ornstein FP test
 	#return a_array #standard MFG
 
 def Sigma_global(time,x_array,a_array,m_array):
