@@ -348,10 +348,11 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 		output[i,i] += 1/lamb
 		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound1) and not ismember_sorted(i,ybound2):
 			#convection terms
-			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
-			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
-			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
-			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
+			#north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
+			#south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
+			#west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
+			#east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
+			#here1 = 0.5*(2*f1[index]-
 			output[i,i] += max(0,east)+max(0,north)-min(0,west)-min(0,south)
 			output[i,i+1] += min(0,east)
 			output[i,i-1] += -max(0,west)

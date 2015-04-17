@@ -8,18 +8,21 @@ from matplotlib import cm
 import quadrature_nodes as qn
 import input_functions as iF
 import solvers_1D as solve
+import matrix_gen1d as mg
+import scipy.sparse as sparse
 
 #INPUTS
-FINITE_VOLUME = 0 #0 if FD, 1 if FV
+FINITE_VOLUME = 1 #0 if FD, 1 if FV
+NICE_DIFFUSION = 1 #1 if diffusion indep of t,m,alpha
 #dx = 0.1**2/2
-dx = 1/50
+dx = 0.05
 #dx = 0.1*dx
 #print 
-dt = 0.2*dx
+dt = dx#**2
 #dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
-xmin = 0-2
-xmax = 0+.2
+xmin = 0#-2
+xmax = 1+.2
 T = 1
 Niter = 1 #maximum number of iterations
 tolerance = 1e-4
@@ -76,6 +79,11 @@ a_old = np.copy(a)
 a_tmp = np.copy(a)
 time_total = time.time()
 BIGZERO = np.zeros(x.size-2)
+
+#matrix-generation if stuff
+LHS_HJB = np.zeros(I)
+LHS_FP = np.zeros(I)
+
 for n in range (0,Niter):
 	titer = time.time()
 	print "Computing iteration",n+1,"of u..."
@@ -84,9 +92,19 @@ for n in range (0,Niter):
 	u[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)])
 	for k in range (K-2,-1,-1): 
 		u_last = np.copy(u[((k+1)*I):((k+1)*I+I)]) #this one to keep
-		m_tmp = np.copy(m[((k)*I):((k)*I+I)]) #only actually need this, amirite?
-		a_tmp = solve.control_general(x,k*dt,u_last,m_tmp,dt,dx,xpts_search,N,scatters)
-		u_tmp = solve.hjb_upwind(x,time,u_last,m_last,a_tmp,dt,dx)
+		m_last = np.copy(m[((k)*I):((k)*I+I)]) #only actually need this, amirite?
+		a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_search,N,scatters)
+		#u_tmp = solve.hjb_kushner(x,k*dt,u_last,m_last,a_tmp,dt,dx) #explicit
+		#implicit
+		if NICE_DIFFUSION==0:
+			u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,m_last,a_tmp,dt,dx) #implicit
+		else:
+			if n==0 and k==K-2:
+				LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,m_last,dt,dx)
+			RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,m_last,dt,dx)
+			Ltmp = iF.L_global(k*dt,x,a_tmp,m_last)
+			#print RHS_HJB*u_last
+			u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*Ltmp)
 		u[(k*I):(k*I+I)] = np.copy(u_tmp)
 		a[(k*I):(k*I+I)] = np.copy(a_tmp)
 	print "Spent time", time.time()-temptime, "on computing u"
@@ -114,7 +132,13 @@ for n in range (0,Niter):
 			m_update = solve.fp_fd_upwind(x,k*dt,m_tmp,a_tmp,dt,dx)
 		#finite volume gold standard
 		else:
-			m_update = solve.fp_fv(x,k*dt,m_tmp,a_tmp,dt,dx)
+			if NICE_DIFFUSION==0:
+				m_update = solve.fp_fv(x,k*dt,m_tmp,a_tmp,dt,dx)
+			else:
+				if n==0 and k==0:
+					LHS_FP = mg.fp_fv_diffusion(0,x,a_tmp,m_tmp,dt,dx)
+				RHS_FP = mg.fp_fv_convection(0,x,a_tmp,m_tmp,dt,dx)
+				m_update = sparse.linalg.spsolve(LHS_FP,RHS_FP*m_tmp)
 		m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
 		#if sum(m_update)*dx is not 1:
 		#	print sum(m_update)*dx-1

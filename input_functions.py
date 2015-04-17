@@ -78,13 +78,6 @@ def hamiltonian(alphas,x_array,u_array,m_array,dt,dx,time,index):
 	movement = f_global(time,x_array[index],alphas)
 	L_var = L_global(time,x_array[index],alphas,m_array[index])
 	dx2 = dx**2
-	#Old
-	#if index==0: #topmost stuff is correct
-	#	tmp = (abs(movement)/dx - sigma2/dx2)*(u_array[0] - u_array[1]) + L_var
-	#elif index==x_array.size-1:
-	#	tmp = (abs(movement)/dx - sigma2/dx2)*(u_array[-1] - u_array[-2]) + L_var
-	#else:
-	#	tmp = u_array[index]*(abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2/(2*dx2) + np.minimum(movement,BIGZERO)/dx) + u_array[index-1]*(sigma2/(2*dx2) - np.maximum(movement,BIGZERO)/dx) + L_var
 	#Kushner
 	if index==0: #topmost stuff is correct
 		tmp = u_array[index]*(-abs(movement)/dx - sigma2/dx2) +u_array[index+1]*(abs(movement)/dx+sigma2/dx2)+ L_var
@@ -108,7 +101,10 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 #RUNNING COST
 ###################
 def F_global(x_array,m_array,sigma,time): #more effective running cost function
-	return (x_array-0.2)**2 #Carlini's no-game
+	#return (x_array-0.2)**2 #Carlini's no-game
+	omega = 10
+	tau = 5
+	return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
 	#ONE = np.ones(m_array.size)
 	#return (x_array-0.2)**2 + np.minimum(4*ONE,np.maximum(m_array,ONE))
 	#return np.minimum(1.4*np.ones(x_array.size),np.maximum(m_array,0.7*np.ones(x_array.size))) #Gueant's game
@@ -133,20 +129,21 @@ def powerbill(time):
 
 def L_global(time,x_array,a_array,m_array): #general cost
 	#return a_array + np.sqrt(x_array) + a_array**2 #Classic Robstad
-	return 0.5*a_array**2 + F_global(x_array,m_array,0,time)
+	return 0.5*a_array**2 + F_global(x_array,m_array,0,time) #HJB test and "nice" MFG
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#return -0.3*np.ones(x_array.size) #FP test, constant coefficients
-	return 2*x_array #Ornstein FP test
-	#return a_array #standard MFG
+	#return 2*x_array #Ornstein FP test
+	return a_array #standard MFG, HJB test
 
-def Sigma_global(time,x_array,a_array,m_array):
+def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJB test
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
 	#return 0.01*time*np.exp(1)*np.ones(x_array.size) #exact FP test
+	return 1*np.ones(x_array.size)
 	#return np.sqrt(0.1*time*np.exp(1)*2)*np.ones(x_array.size) #exact FP test, Ornstein
-	return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
+	#return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
 
 def Sigma_local(time,x,a,m):
 	return 0*x

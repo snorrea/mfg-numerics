@@ -14,10 +14,10 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #INPUTS
 dx0 = 2*0.1
-REFINEMENTS = 2
+REFINEMENTS = 4
 X_NAUGHT = 0.0
 #constant coefficient test
-DT = 0.125/2
+DT = 1#0.125/2
 velocity = -2
 D = 0.1 #diffusion
 #for the initial condition
@@ -155,7 +155,7 @@ slope4_inf, intercept = np.polyfit(np.log(dexes[1:]), np.log(e4_inf[1:]), 1)
 
 print slope1, slope2, slope3
 
-fig4 = plt.figure(1)
+fig4 = plt.figure(6)
 str1 = "Centered FD, slope:", "%.2f" %slope1
 str2 = "Upwind FD, slope:", "%.2f" %slope2
 str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3
@@ -177,15 +177,17 @@ fig3 = plt.figure(2)
 plt.plot(x,(m1-m_exact),label="Centered FD")
 plt.plot(x,(m2-m_exact),label="Upwind FD")
 plt.plot(x,(m3-m_exact),label="Upwind FD with viscosity")
-plt.plot(x,(m4-m_exact),label="Finite volume FD")
+plt.plot(x,(m4-m_exact),label="Finite volume")
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
+fig3.suptitle('Deviation from true solution', fontsize=14)
 
 fig2 = plt.figure(3)
 plt.plot(x,m1,label="Centered FD")
 plt.plot(x,m2,label="Upwind FD")
 plt.plot(x,m3,label="Upwind FD with viscosity")
-plt.plot(x,m4,label="Finite volume FD")
+plt.plot(x,m4,label="Finite volume")
 plt.plot(x,m_exact,label="Exact solution")
+fig2.suptitle('Solutions', fontsize=14)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 
 #1-norm
@@ -206,7 +208,7 @@ plt.grid(True,which="both",ls="-")
 ax4.invert_xaxis()
 fig5.suptitle('Convergence of m(x,t) in 1-norm', fontsize=14)
 #inf-norm
-fig6 = plt.figure(6)
+fig6 = plt.figure(7)
 str1 = "Centered FD, slope:", "%.2f" %slope1_inf
 str2 = "Upwind FD, slope:", "%.2f" %slope2_inf
 str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3_inf
