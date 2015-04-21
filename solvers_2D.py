@@ -9,10 +9,10 @@ import scipy.sparse as sparse
 #HAMILTON-JACOBI-BELLMAN
 ###################
 
-def hjb_kushner_mod(time,x,y,a1_tmp,a2_tmp,m_tmp,dx,dt):
+def hjb_kushner_mod(time,x,y,a1_tmp,a2_tmp,m_tmp,dx,dy,dt):
 	#generate, solve
-	LHS = mg.HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dt)
-	RHS = mg.HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dt)
+	LHS = mg.HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dy,dt)
+	RHS = mg.HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dy,dt)
 	Ltmp = iF.L_global(time,x,y,a1,a2,m_tmp)
 	return sparse.linalg.spsolve(LHS,RHS*u_last+dt*Ltmp)
 ###################

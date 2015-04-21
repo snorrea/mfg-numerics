@@ -102,8 +102,8 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 ###################
 def F_global(x_array,m_array,sigma,time): #more effective running cost function
 	#return (x_array-0.2)**2 #Carlini's no-game
-	omega = 5
-	tau = 5
+	tau = 10
+	omega = 20
 	return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
 	#ONE = np.ones(m_array.size)
 	#return (x_array-0.2)**2 + np.minimum(4*ONE,np.maximum(m_array,ONE))
@@ -133,7 +133,7 @@ def L_global(time,x_array,a_array,m_array): #general cost
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
-	#return -2*np.ones(x_array.size) #FP test, constant coefficients
+	#return -.5*np.ones(x_array.size) #FP test, constant coefficients
 	#return 2*x_array #Ornstein FP test
 	return a_array #standard MFG, HJB test
 

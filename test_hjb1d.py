@@ -18,11 +18,12 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 REFINEMENTS = 8
 X_NAUGHT = 0.0
 n = 2
-omega = 5
-tau = 5
-DT = .5 #ratio as in dt = DT*dx(**2)
+tau = 10
+omega = 20
+DT = 1 #ratio as in dt = DT*dx(**2)
 POINTS = 20
 NICE_DIFFUSION = 1
+cutoff = 0
 xmax = np.pi/omega*(n-0.5)
 xmin = -xmax
 T = 1
@@ -40,7 +41,7 @@ dexes = np.zeros(REFINEMENTS)
 
 ################################
 for N in range(0,REFINEMENTS):
-	dx = dx/2 #starts at dx=0.25
+	dx = dx/2
 	dexes[N] = dx
 	dt = DT*dx
 	#CRUNCH
@@ -53,20 +54,13 @@ for N in range(0,REFINEMENTS):
 	#INITIALISE STORAGE
 	u = np.zeros(I) #distribution
 	u_exact = np.zeros(I)
-	
 	#INITIAL/TERMINAL CONDITIONS, INITIAL GUESS and COPYING
 	uT = exact_solution(x,T)
 	u = exact_solution(x,T)
-	#plt.plot(u)
-	#plt.show()
-	
 	#SOLVE STUFF
 	t0 = time.time()
 	for k in range(Nt-1,-1,-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-		#print 1-k/K
 		a_tmp = -np.gradient(u,dx)
-		#a_tmp = solve.control_general(x,k*dt,u,u,dt,dx,xpts_search,N,scatters)
-		#u = solve.hjb_kushner_mod(x,k*dt,u,u,a_tmp,dt,dx)
 		if NICE_DIFFUSION==0:
 			u = solve.hjb_kushner_mod(x,k*dt,u,u,a_tmp,dt,dx) #implicit
 		else:
@@ -74,7 +68,6 @@ for N in range(0,REFINEMENTS):
 				LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,u,dt,dx)
 			RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,u,dt,dx)
 			Ltmp = iF.L_global(k*dt,x,a_tmp,u)
-			#print RHS_HJB*u_last
 			u = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u+dt*Ltmp)
 	print "Time spent:",time.time()-t0
 	#compute error in 2-norm
@@ -87,17 +80,17 @@ for N in range(0,REFINEMENTS):
 #print e2
 #print e3
 #crunch the slopes and put in the figures
-slope1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1[1:]), 1)
-slope1_1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1_1[1:]), 1)
-slope1_inf, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1_inf[1:]), 1)
+slope1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1[cutoff:]), 1)
+slope1_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_1[cutoff:]), 1)
+slope1_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_inf[cutoff:]), 1)
 #x = x[cutoffindexmin:cutoffindexmax]
 
 fig4 = plt.figure(6)
 str1 = "1-norm slope:", "%.2f" %slope1_1
 str2 = "2-norm slope:", "%.2f" %slope1
 str3 = "inf-norm slope:", "%.2f" %slope1_inf
-plt.loglog(dexes,e1,'o-',label=str1)
-plt.loglog(dexes,e1_1,'o-',label=str2)
+plt.loglog(dexes,e1,'o-',label=str2)
+plt.loglog(dexes,e1_1,'o-',label=str1)
 plt.loglog(dexes,e1_inf,'o-',label=str3)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 ax4 = fig4.add_subplot(111)

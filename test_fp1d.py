@@ -14,18 +14,19 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #INPUTS
 dx0 = 2*0.1
-REFINEMENTS = 6
-X_NAUGHT = 0.0
+REFINEMENTS = 5
+X0 = -0.5
+cutoff = 0
 #constant coefficient test
-DT = .8#0.125/2
+DT = .7#0.125/2
 velocity = -2
 D = 0.1 #diffusion
 #for the initial condition
 epsilon = 0.3
 C = 1/0.00000224497
 ########
-xmin = 0-4
-xmax = 4
+xmin = 0-6
+xmax = 6
 T = 1
 #set dx
 dx = dx0
@@ -115,50 +116,49 @@ for N in range(0,REFINEMENTS):
 	for k in range(0,K-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
 		m1 = solve.fp_fd_centered(x,(k)*dt,m1,m0,dt,dx)
 		m2 = solve.fp_fd_upwind(x,(k)*dt,m2,m0,dt,dx)
-		m3 = solve.fp_fd_upwind_visc(x,(k)*dt,m2,m0,dt,dx)
+		#m3 = solve.fp_fd_upwind_visc(x,(k)*dt,m2,m0,dt,dx)
 		m4 = solve.fp_fv(x,(k)*dt,m4,m0,dt,dx)
 	print "Time spent:",time.time()-t0
 	#compute error in 2-norm
 	#m_exact = convolution(x-velocity*T,T) #CONSTANT COEFFICIENT TEST
 	####m_exact = heat_kernel(x-velocity*T,T) #the other one
-	m_exact = ornstein_kernel(x,T) #the other one
-	#m_exact = convolution(x,T)
+	#m_exact = ornstein_kernel(x,T) #the other one
+	m_exact = convolution(x,T)
 	e1[N] = np.linalg.norm(m1-m_exact)*dx
 	e2[N] = np.linalg.norm(m2-m_exact)*dx
-	e3[N] = np.linalg.norm(m3-m_exact)*dx
+	#e3[N] = np.linalg.norm(m3-m_exact)*dx
 	e4[N] = np.linalg.norm(m4-m_exact)*dx
 	e1_1[N] = np.linalg.norm(m1-m_exact,ord=1)*dx
 	e2_1[N] = np.linalg.norm(m2-m_exact,ord=1)*dx
-	e3_1[N] = np.linalg.norm(m3-m_exact,ord=1)*dx
+	#e3_1[N] = np.linalg.norm(m3-m_exact,ord=1)*dx
 	e4_1[N] = np.linalg.norm(m4-m_exact,ord=1)*dx
 	e1_inf[N] = np.linalg.norm(m1-m_exact,ord=np.inf)
 	e2_inf[N] = np.linalg.norm(m2-m_exact,ord=np.inf)
-	e3_inf[N] = np.linalg.norm(m3-m_exact,ord=np.inf)
+	#e3_inf[N] = np.linalg.norm(m3-m_exact,ord=np.inf)
 	e4_inf[N] = np.linalg.norm(m4-m_exact,ord=np.inf)
 
 #print e1
 #print e2
 #print e3
 #crunch the slopes and put in the figures
-slope1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1[1:]), 1)
-slope2, intercept = np.polyfit(np.log(dexes[1:]), np.log(e2[1:]), 1)
-slope3, intercept = np.polyfit(np.log(dexes[1:]), np.log(e3[1:]), 1)
-slope4, intercept = np.polyfit(np.log(dexes[1:]), np.log(e4[1:]), 1)
-slope1_1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1_1[1:]), 1)
-slope2_1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e2_1[1:]), 1)
-slope3_1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e3_1[1:]), 1)
-slope4_1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e4_1[1:]), 1)
-slope1_inf, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1_inf[1:]), 1)
-slope2_inf, intercept = np.polyfit(np.log(dexes[1:]), np.log(e2_inf[1:]), 1)
-slope3_inf, intercept = np.polyfit(np.log(dexes[1:]), np.log(e3_inf[1:]), 1)
-slope4_inf, intercept = np.polyfit(np.log(dexes[1:]), np.log(e4_inf[1:]), 1)
 
-print slope1, slope2, slope3
+slope1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1[cutoff:]), 1)
+slope2, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2[cutoff:]), 1)
+#slope3, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3[cutoff:]), 1)
+slope4, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4[cutoff:]), 1)
+slope1_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_1[cutoff:]), 1)
+slope2_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2_1[cutoff:]), 1)
+#slope3_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3_1[cutoff:]), 1)
+slope4_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4_1[cutoff:]), 1)
+slope1_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_inf[cutoff:]), 1)
+slope2_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2_inf[cutoff:]), 1)
+#slope3_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3_inf[cutoff:]), 1)
+slope4_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4_inf[cutoff:]), 1)
 
 fig4 = plt.figure(6)
 str1 = "Centered FD, slope:", "%.2f" %slope1
 str2 = "Upwind FD, slope:", "%.2f" %slope2
-str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3
+#str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3
 str4 = "Finite volume, slope:", "%.2f" %slope4
 plt.loglog(dexes,e1,'o-',label=str1)
 plt.loglog(dexes,e2,'o-',label=str2)
@@ -198,7 +198,7 @@ str2 = "Upwind FD, slope:", "%.2f" %slope2_1
 str4 = "Finite volume, slope:", "%.2f" %slope4_1
 plt.loglog(dexes,e1_1,'o-',label=str1)
 plt.loglog(dexes,e2_1,'o-',label=str2)
-plt.loglog(dexes,e3_1,'o-',label=str3)
+#plt.loglog(dexes,e3_1,'o-',label=str3)
 plt.loglog(dexes,e4_1,'o-',label=str4)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 ax4 = fig5.add_subplot(111)
@@ -215,7 +215,7 @@ str2 = "Upwind FD, slope:", "%.2f" %slope2_inf
 str4 = "Finite volume, slope:", "%.2f" %slope4_inf
 plt.loglog(dexes,e1_inf,'o-',label=str1)
 plt.loglog(dexes,e2_inf,'o-',label=str2)
-plt.loglog(dexes,e3_inf,'o-',label=str3)
+#plt.loglog(dexes,e3_inf,'o-',label=str3)
 plt.loglog(dexes,e4_inf,'o-',label=str4)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 ax4 = fig6.add_subplot(111)

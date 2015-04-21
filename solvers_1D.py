@@ -68,7 +68,7 @@ def fp_fd_upwind(x,time,m_tmp,a_tmp,dt,dx):
 	#the actual computation
 	m_update = np.empty(m_tmp.size)
 	zero = np.zeros(movement[1:-1].size)
-	m_update[1:-1] = m_tmp[1:-1]*( 1-dt/dx2*sigma2[1:-1] - dt/(2*dx)*(movement[2:]-movement[0:-2]) - dt/dx *abs(movement[1:-1]) )
+	m_update[1:-1] = m_tmp[1:-1]*( 1-dt/dx2*sigma2[1:-1] - dt/(2*dx)*(movement[2:]-movement[0:-2]) - dt/dx *abs(movement[1:-1])  )
 	m_update[1:-1] += m_tmp[2:]*dt/dx2*(sigma2[2:]/2 - dx*np.minimum(movement[1:-1],zero))
 	m_update[1:-1] += m_tmp[0:-2]*dt/dx2*(sigma2[0:-2]/2 + dx*np.maximum(movement[1:-1],zero))
 	#reflective
@@ -83,9 +83,9 @@ def fp_fd_upwind_visc(x,time,m_tmp,a_tmp,dt,dx):
 	#the actual computation
 	m_update = np.empty(m_tmp.size)
 	zero = np.zeros(movement[1:-1].size)
-	m_update[1:-1] = m_tmp[1:-1]*( 1-dt/dx2*sigma2[1:-1] - dt/(2*dx)*(movement[2:]-movement[0:-2]) + dt/dx *abs(movement[1:-1]))
-	m_update[1:-1] += m_tmp[2:]*dt/dx2*(sigma2[2:]/2 - dx*np.minimum(movement[1:-1],zero) - dx*abs(movement[1:-1]))
-	m_update[1:-1] += m_tmp[0:-2]*dt/dx2*(sigma2[0:-2]/2 + dx*np.maximum(movement[1:-1],zero)- dx*abs(movement[1:-1]))
+	m_update[1:-1] = m_tmp[1:-1]*( 1-dt/dx2*sigma2[1:-1] - dt/(2*dx)*(movement[2:]-movement[0:-2]))#- dt/dx *abs(movement[1:-1])*2   ) 
+	m_update[1:-1] += m_tmp[2:]*dt/dx2*(sigma2[2:]/2 - dx*np.minimum(movement[1:-1],zero) -dx*abs(movement[1:-1]) ) 
+	m_update[1:-1] += m_tmp[0:-2]*dt/dx2*(sigma2[0:-2]/2 + dx*np.maximum(movement[1:-1],zero)-dx*abs(movement[1:-1]))
 	#reflective
 	m_update[0] = m_tmp[0]*( 1-dt/dx2*sigma2[0] - dt/(2*dx)*(movement[1]) + dt/dx *abs(movement[0]) ) + m_tmp[1]*dt/dx2*( sigma2[1]/2)
 	m_update[-1] = m_tmp[-1]*( 1-dt/dx2*sigma2[-1] - dt/(2*dx)*(-movement[-2]) - dt/dx *abs(3*movement[-1]) ) + m_tmp[-2]*dt/dx2*( sigma2[-2]/2)

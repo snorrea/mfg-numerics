@@ -73,19 +73,25 @@ def F_global(x,y,m_array,time): #more effective running cost function
 	#return (x-0.2)**2 + (y-0.2)**2
 	#return 0.1*m_array #shyness game
 	#return (powerbill(time)*(1-0.8*x_array) + x_array/(0.1+m_array))
-	tau = 1
+	tau = 0
 	alpha = 1
 	beta = 1
 	D11 = Sigma_D11_test(time,x,y,x,x,x)
 	D22 = Sigma_D22_test(time,x,y,x,x,x)
 	D12 = Sigma_D12_test(time,x,y,x,x,x)
 	x,y = np.meshgrid(x,y)
+	#print "Meshgrid:", x.shape,y.shape
 	return np.exp(-tau*time)*(tau + 0.5*D11*alpha**2 + 0.5*D22*beta**2)*np.sin(alpha*x)*np.cos(beta*y) + np.exp(-tau*time)*alpha*beta*np.cos(alpha*x)*np.sin(beta*y)*D12+0.5*np.exp(-2*tau*time)*((alpha*np.cos(alpha*x)*np.cos(beta*y))**2+(beta*np.sin(alpha*x)*np.sin(beta*y))**2) #Exact HJB test
 	#return 0*x_array#no-game
 
 def L_global(time,x,y,a1,a2,m_array): #general cost
 	#x,y = np.meshgrid(x,y)
-	return 0.5*(a1**2 + a2**2) + F_global(x,y,x,time)
+	FUCK = F_global(x,y,x,time)
+	#print FUCK
+	#print FUCK.shape
+	#print a1.shape
+	#print x.shape,y.shape
+	return 0.5*(a1**2 + a2**2) + FUCK#np.transpose(FUCK)
 	#output = np.empty(x_array.size,y_array.size)
 	#for i in range (0,y_array.size):
 	#	output[:,i] = 0.5*(ax_array**2 + ay_array**2) + (x-0.2)**2 * (y-0.2)**2 #location bias
@@ -117,7 +123,7 @@ def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
 	return .5**2*np.ones(x.shape)
 def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
 	x,y = np.meshgrid(x,y)
-	return .1**2*np.ones(x.shape)
+	return .0**2*np.ones(x.shape)
 
 def Sigma_D11(time,x,y,ax,ay,m):
 	return 0.3**2

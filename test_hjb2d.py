@@ -12,22 +12,28 @@ import scipy.sparse as sparse
 import matrix_gen as mg
 
 #INPUTS
-dx0 = 2*0.1
+POINTSx = 20 #points in x-direction
+POINTSy = 20 #points in y-direction
 REFINEMENTS = 2
 X_NAUGHT = 0.0
+tau = 0
 alpha = 1
 beta = 1
-tau = 1
-DT = .5#ratio as in dt = DT*dx(**2)
+DT = 0.5#ratio as in dt = DT*dx(**2)
 NICE_DIFFUSION = 1
 n = 1 #must be integer greater than 0
+cutoff = 0 #for convergence slope
 xmax = np.pi/alpha * (n-0.5)
 xmin = -xmax
 ymax = np.pi/beta*n
 ymin = -ymax
 T = 1
 #set dx
+dx0 = abs(xmax-xmin)/POINTSx
+dy0 = abs(ymax-ymin)/POINTSy
 dx = dx0
+dy = dy0
+
 def exact_solution(x,y,t):
 	x,y=np.meshgrid(x,y)
 	return np.exp(-tau*t)*np.sin(alpha*x)*np.cos(beta*y)
@@ -42,48 +48,47 @@ dexes = np.zeros(REFINEMENTS)
 ################################
 for N in range(0,REFINEMENTS):
 	t1,t2=0,0
-	dx = dx/2 #starts at dx=0.25
-	dexes[N] = dx
-	dt = DT*dx
+	dx = dx/2
+	dy = dy/2
+	dexes[N] = max(dx,dy)
+	dt = DT*min(dx,dy)
 	#CRUNCH
-	print "(",dx,",",dt,")"
-	dx2 = dx**2
+	print "(",dx,",",dy,",",dt,")"
 	Nx = int(abs(xmax-xmin)/dx)+1
-	Ny = int(abs(ymax-ymin)/dx)+1
+	Ny = int(abs(ymax-ymin)/dy)+1
 	Nt = int(np.ceil(T/dt))
 	x = np.linspace(xmin,xmax,Nx)
-	y = np.linspace(ymin,ymax,Nx)
+	y = np.linspace(ymin,ymax,Ny)
 	t = np.linspace(0,T,Nt)
 	I = x.size #space
 	J = y.size
-	#print cutoffindexmin,cutoffindexmax,Nx
-	#INITIALISE STORAGE
 	u = np.zeros((I,J))
 	u_exact = np.zeros((I,J))
-	#INITIAL/TERMINAL CONDITIONS, INITIAL GUESS and COPYING
 	u = exact_solution(x,y,T)
 	#SOLVE STUFF
 	t0 = time.time()
 	for k in range(Nt-1,-1,-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-		#print np.gradient(u,dx)
-		#print ss
-		a1,a2 = np.gradient(np.reshape(u,(I,J)),dx,dx) #this ought to do it
-		#a1,a2=-a1,-a2
+		ush = np.reshape(u,(I,J))
+		a1,a2 = np.gradient(ush,dx,dy) #this ought to do it
+		a1 = -a1
+		a2 = -a2
 		t1_tmp = time.time()
+		#print u_rsh.shape,a1.shape,a2.shape
+		#print ss
+
 		if NICE_DIFFUSION==0:
-			u = solve.hjb_kushner_mod(k*dt,x,y,a1_tmp,a2_tmp,m_tmp,dx,dt)
+			u = solve.hjb_kushner_mod(k*dt,x,y,a1_tmp,a2_tmp,m_tmp,dx,dy,dt)
 		else:
 			if k==Nt-1:
-				LHS_HJB = mg.HJB_diffusion_implicit(k*dt,x,y,a1,a2,u,dx,dt)
+				LHS_HJB = mg.HJB_diffusion_implicit(k*dt,x,y,a1,a2,u,dx,dy,dt)
 				#print LHS_HJB
 				#print ss
-			RHS_HJB = mg.HJB_convection_explicit(k*dt,x,y,a1,a2,u,dx,dt)
-			t1 += time.time() - t1_tmp
+			RHS_HJB = mg.HJB_convection_explicit(k*dt,x,y,a1,a2,u,dx,dy,dt)
 			#print RHS_HJB
 			#print ss
+			t1 += time.time() - t1_tmp
 			Ltmp = iF.L_global(k*dt,x,y,a1,a2,u)
-			#plt.spy(RHS_HJB)
-			#plt.show()
+			#print Ltmp
 			t2_tmp = time.time()
 			u = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*np.ravel(u)+dt*np.ravel(Ltmp))
 			t2 += time.time()-t2_tmp
@@ -91,11 +96,10 @@ for N in range(0,REFINEMENTS):
 	print "Time spent:",t0
 	print "\tGenerating matrices:",t1/t0*100
 	print "\tSolving linear systems:",t2/t0*100
-	#compute error in 2-norm
 	u = np.reshape(u,(I,J))
 	u_exact = exact_solution(x,y,0)
-	e1[N] = np.linalg.norm(u-u_exact)*dx
-	e1_1[N] = np.linalg.norm(u-u_exact,ord=1)*dx
+	e1[N] = np.linalg.norm(u-u_exact)*max(dx,dy)
+	e1_1[N] = np.linalg.norm(u-u_exact,ord=1)*max(dx,dy)
 	e1_inf[N] = np.linalg.norm(u-u_exact,ord=np.inf)
 
 #print e1
@@ -104,9 +108,9 @@ for N in range(0,REFINEMENTS):
 #crunch the slopes and put in the figures
 Xplot, Yplot = np.meshgrid(x,y)
 if REFINEMENTS>1:
-	slope1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1[1:]), 1)
-	slope1_1, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1_1[1:]), 1)
-	slope1_inf, intercept = np.polyfit(np.log(dexes[1:]), np.log(e1_inf[1:]), 1)
+	slope1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1[cutoff:]), 1)
+	slope1_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_1[cutoff:]), 1)
+	slope1_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_inf[cutoff:]), 1)
 	fig4 = plt.figure(6)
 	str1 = "2-norm slope:", "%.2f" %slope1
 	str2 = "1-norm slope:", "%.2f" %slope1_1

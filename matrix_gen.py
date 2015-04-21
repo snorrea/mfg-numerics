@@ -10,15 +10,16 @@ import time as timer
 # MATRIX GENERATION: HJB
 ##################
 
-def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dt): #this works, at least for constant diffusion and without D12; CORNERS ARE BAD FOR D12
+def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this works, at least for constant diffusion and without D12; CORNERS ARE BAD FOR D12
 	I,J = x.size,y.size
 	output = sparse.lil_matrix((I*J,I*J))
 	dx2 = dx**2
+	dy2 = dy**2
+	dxy = dx*dy
 	xbound1 = range(0,I)
 	ybound1 = range(0,I*J,I)
 	xbound2 = range(I*J-I,I*J)
 	ybound2 = range(I-1,I*J,I)
-	#
 	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m_tmp)
 	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m_tmp)
 	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m_tmp)
@@ -26,7 +27,7 @@ def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dt): #this works, at least fo
 	D22 = np.ravel(D22)
 	D12 = np.ravel(D12)
 	#generate the vectors
-	here = np.zeros(I*J) #[i,i]
+	here = 1+dt/dx2*D11 + dt/dy2*D22- dt/dxy*abs(D12) #[i,i]
 	north = np.zeros(I*J) #[i,i+I]
 	south = np.zeros(I*J) #[i,i-I]
 	west = np.zeros(I*J) #[i,i-1]
@@ -40,52 +41,49 @@ def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dt): #this works, at least fo
 		d12 = D12[i]
 		d11 = D11[i]
 		d22 = D22[i]
-		here[i] += 1 - dt/dx2*(abs(d12) - d11 - d22)
 		#avoid segfaults
 		if not ismember_sorted(i,xbound1): #allows (i,j-1)
-			south[i] += -dt/dx2*(d22-abs(d12))/2
+			south[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
 		if not ismember_sorted(i,xbound2): #allows (i,j+1)
-			north[i] += -dt/dx2*(d22-abs(d12))/2
+			north[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
 		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
-			west[i] += -dt/dx2*(d11-abs(d12))/2
+			west[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
 		if not ismember_sorted(i,ybound2): #allows (i+1,j)
-			east[i] += -dt/dx2*(d11-abs(d12))/2
+			east[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
 		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound1): #allows (i-1,j-1)
-			south_west[i] += -dt/dx2*max(d12,0)/2
+			south_west[i] += -dt/dxy*max(d12,0)/2
 		if not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound2): #allows (i+1,j+1)
-			north_east[i] += -dt/dx2*max(d12,0)/2
+			north_east[i] += -dt/dxy*max(d12,0)/2
 		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound2): #allows (i+1,j-1)
-			north_west[i] += dt/dx2*min(d12,0)/2
+			north_west[i] += dt/dxy*min(d12,0)/2
 		if not ismember_sorted(i,ybound1) and not ismember_sorted(i,xbound2): #allows (i-1,j+1)
-			south_east[i] += dt/dx2*min(d12,0)/2
+			south_east[i] += dt/dxy*min(d12,0)/2
 		#then add boundary conditions
 		if ismember_sorted(i,xbound1): #allows (i,j-1)
-			north[i] += -dt/dx2*(d22-abs(d12))/2
+			north[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
 		if ismember_sorted(i,xbound2): #allows (i,j+1)
-			south[i] += -dt/dx2*(d22-abs(d12))/2
+			south[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
 		if ismember_sorted(i,ybound1): #allows (i-1,j) 
-			east[i] += -dt/dx2*(d11-abs(d12))/2
+			east[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
 		if ismember_sorted(i,ybound2): #allows (i+1,j)
-			west[i] += -dt/dx2*(d11-abs(d12))/2
+			west[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
 		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #allows (i-1,j-1)
-			north_east[i] += -dt/dx2*max(d12,0)/2
+			#north_east[i] += -dt/dx2*max(d12,0)/2
+			north_east[i] += dt/dxy*min(d12,0)/2
 		if ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #allows (i+1,j+1)
-			south_west[i] += -dt/dx2*max(d12,0)/2
+			#south_west[i] += -dt/dx2*max(d12,0)/2
+			south_west[i] += dt/dxy*min(d12,0)/2
 		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #allows (i+1,j-1)
-			north_west[i] += dt/dx2*min(d12,0)/2
+			#south_east[i] += dt/dx2*min(d12,0)/2
+			south_east[i] += -dt/dxy*max(d12,0)/2
 		if ismember_sorted(i,ybound1) and ismember_sorted(i,xbound2): #allows (i-1,j+1)
-			south_east[i] += dt/dx2*min(d12,0)/2
-	#set vectors
-	#output.setdiag(north_east,I+1)
-	#output.setdiag(south_west[(I+1):],-I-1)
-	#output.setdiag(north_west,I-1)
-	#output.setdiag(south_east[(I-1):],-I+1)
+			#north_west[i] += dt/dx2*min(d12,0)/2
+			north_west[i] += -dt/dxy*max(d12,0)/2
 	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1], north_east[0:-I-1], south_west[(I+1):], north_west[0:-I+1], south_east[(I-1):]],[0, I, -I, -1, 1,I+1,-I-1,I-1,-I+1])
 	return sparse.csr_matrix(output)
 
-def HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dt): #this should work, but also needs BC
+def HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this should work, but also needs BC
 	I,J = x.size,y.size
-	#output = sparse.csc_matrix((I*J,I*J))
 	[f1_array, f2_array] = iF.f_global(time,x,y,a1,a2)
 	xbound1 = range(0,I)
 	ybound1 = range(0,I*J,I)
@@ -94,106 +92,86 @@ def HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dt): #this should work, but 
 	f1_array = np.ravel(f1_array)
 	f2_array = np.ravel(f2_array)
 	zero = np.zeros(f1_array.size)
-	here = np.zeros(I*J) #[i,i]
+	here = 1-dt*(abs(f1_array)/dx+abs(f2_array)/dy) #[i,i]
 	north = np.zeros(I*J) #[i,i+I]
 	south = np.zeros(I*J) #[i,i-I]
 	west = np.zeros(I*J) #[i,i-1]
 	east = np.zeros(I*J) #[i,i+1]
+	f1min = np.minimum(f1_array,zero)
+	f1max = np.maximum(f1_array,zero)
+	f2min = np.minimum(f2_array,zero)
+	f2max = np.maximum(f2_array,zero)
 	#finalise
-	#output.setdiag(1-dt/dx*(abs(f1)+abs(f2)),0) #here
-	#output.setdiag(dt/dx*f1max,1) #east
-	#output.setdiag(dt/dx*f1min[1:],-1) #west
-	#output.setdiag(dt/dx*f2max,I) #north
-	#output.setdiag(dt/dx*f2min[I:],-I) #south
 	for i in range(0,I*J):
-		f1 = f1_array[i]
-		f2 = f2_array[i]
-		here[i] += 1 - dt/dx*(abs(f1)+abs(f2))
 		#avoid segfaults
 		if not ismember_sorted(i,xbound1): #allows (i,j-1)
-			south[i] += - dt/dx*min(f2,0)
+			south[i] += - dt/dy*f2min[i]
 		if not ismember_sorted(i,xbound2): #allows (i,j+1)
-			north[i] += dt/dx*max(f2,0)
+			north[i] += dt/dy*f2max[i]
 		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
-			west[i] += - dt/dx*min(f1,0)
+			west[i] += - dt/dx*f1min[i]
 		if not ismember_sorted(i,ybound2): #allows (i+1,j)
-			east[i] += dt/dx*max(f1,0)
+			east[i] += dt/dx*f1max[i]
 		#then add boundary conditions
 		if ismember_sorted(i,xbound1): #allows (i,j-1)
-			north[i] += - dt/dx*min(f2,0)
+			north[i] += - dt/dy*f2min[i]
 		if ismember_sorted(i,xbound2): #allows (i,j+1)
-			south[i] += dt/dx*max(f2,0)
+			south[i] += dt/dy*f2max[i]
 		if ismember_sorted(i,ybound1): #allows (i-1,j) 
-			east[i] += - dt/dx*min(f1,0)
+			east[i] += - dt/dx*f1min[i]
 		if ismember_sorted(i,ybound2): #allows (i+1,j)
-			west[i] += dt/dx*max(f1,0)
+			west[i] += dt/dx*f1max[i]
 	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1]],[0, I, -I, -1, 1])
 	return sparse.csr_matrix(output)
-
-#########################
-def u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
-	output = np.zeros((I*J,I*J))
-	lamb = dt/(dx**2)
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	output = np.zeros((I*J,I*J))
-	lamb = dt/(dx**2)
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
-	#flatten out D12, D11, D22, f1_array, f2_array
-	D12 = np.ravel(D12)
-	D11 = np.ravel(D11)
-	D22 = np.ravel(D22)
-	f1_array = np.ravel(f1_array)
-	f2_array = np.ravel(f2_array)
-	for i in range(0,I*J):
-		d12 = D12[i]
-		d11 = D11[i]
-		d22 = D22[i]
-		f1 = f1_array[i]
-		f2 = f2_array[i]
-		output[i,i] += 1/lamb - dx*(abs(f1)+abs(f2)) + abs(d12) - d11 - d22
-		#avoid segfaults
-		if not ismember_sorted(i,xbound1): #allows (i,j-1)
-			output[i,i-I] += (d22-abs(d12))/2 - dx*min(f2,0)
-		if not ismember_sorted(i,xbound2): #allows (i,j+1)
-			output[i,i+I] += (d22-abs(d12))/2 + dx*max(f2,0)
-		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
-			output[i,i-1] += (d11-abs(d12))/2 - dx*min(f1,0)
-		if not ismember_sorted(i,ybound2): #allows (i+1,j)
-			output[i,i+1] += (d11-abs(d12))/2 + dx*max(f1,0)
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound1): #allows (i-1,j-1)
-			output[i,i-1-I] += max(d12,0)/2
-		if not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound2): #allows (i+1,j+1)
-			output[i,i+1+I] += max(d12,0)/2
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound2): #allows (i+1,j-1)
-			output[i,i+1-I] += -min(d12,0)/2
-		if not ismember_sorted(i,ybound1) and not ismember_sorted(i,xbound2): #allows (i-1,j+1)
-			output[i,i-1+I] += -min(d12,0)/2
-		#then add boundary conditions
-		if ismember_sorted(i,xbound1): #allows (i,j-1)
-			output[i,i+I] += (d22-abs(d12))/2 - dx*min(f2,0)
-		if ismember_sorted(i,xbound2): #allows (i,j+1)
-			output[i,i-I] += (d22-abs(d12))/2 + dx*max(f2,0)
-		if ismember_sorted(i,ybound1): #allows (i-1,j) 
-			output[i,i+1] += (d11-abs(d12))/2 - dx*min(f1,0)
-		if ismember_sorted(i,ybound2): #allows (i+1,j)
-			output[i,i-1] += (d11-abs(d12))/2 + dx*max(f1,0)
-		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #allows (i-1,j-1)
-			output[i,i+1+I] += max(d12,0)/2
-		if ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #allows (i+1,j+1)
-			output[i,i-1-I] += max(d12,0)/2
-		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #allows (i+1,j-1)
-			output[i,i-1+I] += -min(d12,0)/2
-		if ismember_sorted(i,ybound1) and ismember_sorted(i,xbound2): #allows (i-1,j+1)
-			output[i,i+1-I] += -min(d12,0)/2
-	return lamb*sparse.csr_matrix(output)
 
 #####################
 #MATRIX GENERATION: FOKKER-PLANCK
 #####################
+
+def FP_convection_explicit(time,x,y,a1,a2,m,dx,dt):
+	I,J = x.size,y.size
+	[f1, f2] = iF.f_global(time,x,y,a1,a2)
+	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m_tmp)
+	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m_tmp)
+	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m_tmp)
+	D11x,D11y = np.gradient(D11,dx,dx)
+	D22x,D22y = np.gradient(D22,dx,dx)
+	D12x,D12y = np.gradient(D12,dx,dx)
+	#make the fluxes
+	F1 = np.ravel(f1 - 0.5*D11x-0.5*D12y) #may be too simple... but it sure feels delish
+	F2 = np.ravel(f2 - 0.5*D12x-0.5*D22y)
+	#make vectors
+	zero = np.zeros(F1.size)
+	here = 1-dt/dx*(abs(F1)+abs(F2)) #[i,i]
+	north = np.zeros(I*J) #[i,i+I]
+	south = np.zeros(I*J) #[i,i-I]
+	west = np.zeros(I*J) #[i,i-1]
+	east = np.zeros(I*J) #[i,i+1]
+	F1min = np.minimum(F1,zero)
+	F1max = np.maximum(F1,zero)
+	F2min = np.minimum(F2,zero)
+	F2max = np.maximum(F2,zero)
+	for i in range(0,I*J):
+		if not ismember_sorted(i,xbound1): #allows (i,j-1)
+			south[i] += - dt/dx*F2min[i-I]
+		if not ismember_sorted(i,xbound2): #allows (i,j+1)
+			north[i] += dt/dx*F2max[i+I]
+		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
+			west[i] += - dt/dx*F1min[i-1]
+		if not ismember_sorted(i,ybound2): #allows (i+1,j)
+			east[i] += dt/dx*F1max[i+1]
+		#then add boundary conditions #NO SUCH THINGS HERE, NO SIR
+		#if ismember_sorted(i,xbound1): #allows (i,j-1)
+		#	north[i] += - dt/dx*F2min[i]
+		#if ismember_sorted(i,xbound2): #allows (i,j+1)
+		#	south[i] += dt/dx*F2max[i]
+		#if ismember_sorted(i,ybound1): #allows (i-1,j) 
+		#	east[i] += - dt/dx*F1min[i]
+		#if ismember_sorted(i,ybound2): #allows (i+1,j)
+		#	west[i] += dt/dx*F1max[i]
+	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1]],[0, I, -I, -1, 1])
+	return sparse.csr_matrix(output)
+
 
 def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt): #there is no quick-fix to fixing the signs
 	h = dx
