@@ -13,8 +13,8 @@ import matrix_gen as mg
 from scipy import sparse
 
 animate = False
-dx = 0.1
-dt = 0.1*dx**2 #0.25*dx2 this is the finest CFL we can find for (D11,D22,D12)=(1,1,0); but not necessarily enough for monotonicity
+dx = 0.01
+dt = 0.1*dx #0.25*dx2 this is the finest CFL we can find for (D11,D22,D12)=(1,1,0); but not necessarily enough for monotonicity
 xmin = 0
 xmax = 1
 ymin = 0
@@ -57,7 +57,9 @@ lamb = dt/dx2
 #IIOE
 #LHS,RHS = mg.diffusion_flux_iioe(D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt)
 #O-method
-M = np.identity(I*J)/lamb
+#M = np.identity(I*J)/lamb
+M = sparse.eye(I*J)/lamb
+M = sparse.lil_matrix(M)
 M = mg.add_diffusion_flux_Ometh(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt)
 M,u = mg.add_direchlet_boundary(M,u,I,J,dt/dx2,0)
 M = sparse.csr_matrix(M)*lamb
@@ -97,7 +99,8 @@ if animate:
 #ACTUALLY SOLVE
 for k in range(0,K-1):
 	#u = spsolve(LHS,RHS*np.ravel(u)) #IIOE
-	u = M*np.ravel(u) #O-method
+	#u = M*np.ravel(u) #O-method
+	u = spsolve(M,u) #implicit O-method
 print "Time spent:", time.time()-time_total
 
 #PLOT STUFF

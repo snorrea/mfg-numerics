@@ -3,132 +3,77 @@ import numpy as np
 from scipy import sparse
 import applications as app
 import assembly as ass
-import input_functions_2D as iF
-import time as timer
+
+	#center = np.zeros(I*J) #(i,j)
+	#off1pi = np.zeros(I*J-2) #(i+1,j)
+	#off1mi = np.zeros(I*J-2) #(i-1,j)
+	#off1pj = np.zeros(I*J-2*I) #(i,j+1)
+	#off1mj = np.zeros(I*J-2*I) #(i,j+1)
+	#center = 1/lamb*np.ones(I*J) + dx*(f1_array+f2_array) + D12 - D11 - D22
+	#need some tricks for the others; this will do for now
+	#movement = f_global
+	#[D11 D12 D22] = sigma_stuff
+	#flatten out D12, D11, D22, f1_array, f2_array
 
 ##################
-# MATRIX GENERATION: HJB
+# MATRIX GENERATION
 ##################
 
-def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dt): #this works, at least for constant diffusion and without D12; CORNERS ARE BAD FOR D12
-	I,J = x.size,y.size
-	output = sparse.lil_matrix((I*J,I*J))
-	dx2 = dx**2
+def u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
+	output = np.zeros((I*J,I*J))
+	lamb = dt/(dx**2)
 	xbound1 = range(0,I)
 	ybound1 = range(0,I*J,I)
 	xbound2 = range(I*J-I,I*J)
 	ybound2 = range(I-1,I*J,I)
-	#
-	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m_tmp)
-	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m_tmp)
-	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m_tmp)
+	#flatten out D12, D11, D22, f1_array, f2_array
+	D12 = np.ravel(D12)
 	D11 = np.ravel(D11)
 	D22 = np.ravel(D22)
-	D12 = np.ravel(D12)
-	#generate the vectors
-	here = np.zeros(I*J) #[i,i]
-	north = np.zeros(I*J) #[i,i+I]
-	south = np.zeros(I*J) #[i,i-I]
-	west = np.zeros(I*J) #[i,i-1]
-	east = np.zeros(I*J) #[i,i+1]
-	south_east = np.zeros(I*J) #[i,i-I+1]
-	south_west = np.zeros(I*J) #[i,i-I-1]
-	north_west = np.zeros(I*J) #[i,i+I-1]
-	north_east = np.zeros(I*J) #[i,i+I+1]
+	f1_array = np.ravel(f1_array)
+	f2_array = np.ravel(f2_array)
 	for i in range(0,I*J):
-		#print i
 		d12 = D12[i]
 		d11 = D11[i]
 		d22 = D22[i]
-		here[i] += 1 - dt/dx2*(abs(d12) - d11 - d22)
-		#avoid segfaults
-		if not ismember_sorted(i,xbound1): #allows (i,j-1)
-			south[i] += -dt/dx2*(d22-abs(d12))/2
-		if not ismember_sorted(i,xbound2): #allows (i,j+1)
-			north[i] += -dt/dx2*(d22-abs(d12))/2
-		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
-			west[i] += -dt/dx2*(d11-abs(d12))/2
-		if not ismember_sorted(i,ybound2): #allows (i+1,j)
-			east[i] += -dt/dx2*(d11-abs(d12))/2
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound1): #allows (i-1,j-1)
-			south_west[i] += -dt/dx2*max(d12,0)/2
-		if not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound2): #allows (i+1,j+1)
-			north_east[i] += -dt/dx2*max(d12,0)/2
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound2): #allows (i+1,j-1)
-			north_west[i] += dt/dx2*min(d12,0)/2
-		if not ismember_sorted(i,ybound1) and not ismember_sorted(i,xbound2): #allows (i-1,j+1)
-			south_east[i] += dt/dx2*min(d12,0)/2
-		#then add boundary conditions
-		if ismember_sorted(i,xbound1): #allows (i,j-1)
-			north[i] += -dt/dx2*(d22-abs(d12))/2
-		if ismember_sorted(i,xbound2): #allows (i,j+1)
-			south[i] += -dt/dx2*(d22-abs(d12))/2
-		if ismember_sorted(i,ybound1): #allows (i-1,j) 
-			east[i] += -dt/dx2*(d11-abs(d12))/2
-		if ismember_sorted(i,ybound2): #allows (i+1,j)
-			west[i] += -dt/dx2*(d11-abs(d12))/2
-		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #allows (i-1,j-1)
-			north_east[i] += -dt/dx2*max(d12,0)/2
-		if ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #allows (i+1,j+1)
-			south_west[i] += -dt/dx2*max(d12,0)/2
-		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #allows (i+1,j-1)
-			north_west[i] += dt/dx2*min(d12,0)/2
-		if ismember_sorted(i,ybound1) and ismember_sorted(i,xbound2): #allows (i-1,j+1)
-			south_east[i] += dt/dx2*min(d12,0)/2
-	#set vectors
-	#output.setdiag(north_east,I+1)
-	#output.setdiag(south_west[(I+1):],-I-1)
-	#output.setdiag(north_west,I-1)
-	#output.setdiag(south_east[(I-1):],-I+1)
-	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1], north_east[0:-I-1], south_west[(I+1):], north_west[0:-I+1], south_east[(I-1):]],[0, I, -I, -1, 1,I+1,-I-1,I-1,-I+1])
-	return sparse.csr_matrix(output)
-
-def HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dt): #this should work, but also needs BC
-	I,J = x.size,y.size
-	#output = sparse.csc_matrix((I*J,I*J))
-	[f1_array, f2_array] = iF.f_global(time,x,y,a1,a2)
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
-	f1_array = np.ravel(f1_array)
-	f2_array = np.ravel(f2_array)
-	zero = np.zeros(f1_array.size)
-	here = np.zeros(I*J) #[i,i]
-	north = np.zeros(I*J) #[i,i+I]
-	south = np.zeros(I*J) #[i,i-I]
-	west = np.zeros(I*J) #[i,i-1]
-	east = np.zeros(I*J) #[i,i+1]
-	#finalise
-	#output.setdiag(1-dt/dx*(abs(f1)+abs(f2)),0) #here
-	#output.setdiag(dt/dx*f1max,1) #east
-	#output.setdiag(dt/dx*f1min[1:],-1) #west
-	#output.setdiag(dt/dx*f2max,I) #north
-	#output.setdiag(dt/dx*f2min[I:],-I) #south
-	for i in range(0,I*J):
 		f1 = f1_array[i]
 		f2 = f2_array[i]
-		here[i] += 1 - dt/dx*(abs(f1)+abs(f2))
+		output[i,i] += 1/lamb + dx*(abs(f1)+abs(f2)) - abs(d12) + d11 + d22
 		#avoid segfaults
 		if not ismember_sorted(i,xbound1): #allows (i,j-1)
-			south[i] += - dt/dx*min(f2,0)
+			output[i,i-I] += -(d22-abs(d12))/2 + dx*min(f2,0)
 		if not ismember_sorted(i,xbound2): #allows (i,j+1)
-			north[i] += dt/dx*max(f2,0)
+			output[i,i+I] += -(d22-abs(d12))/2 - dx*max(f2,0)
 		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
-			west[i] += - dt/dx*min(f1,0)
+			output[i,i-1] += -(d11-abs(d12))/2 + dx*min(f1,0)
 		if not ismember_sorted(i,ybound2): #allows (i+1,j)
-			east[i] += dt/dx*max(f1,0)
+			output[i,i+1] += -(d11-abs(d12))/2 - dx*max(f1,0)
+		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound1): #allows (i-1,j-1)
+			output[i,i-1-I] += -max(d12,0)/2
+		if not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound2): #allows (i+1,j+1)
+			output[i,i+1+I] += -max(d12,0)/2
+		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound2): #allows (i+1,j-1)
+			output[i,i+1-I] += min(d12,0)/2
+		if not ismember_sorted(i,ybound1) and not ismember_sorted(i,xbound2): #allows (i-1,j+1)
+			output[i,i-1+I] += min(d12,0)/2
 		#then add boundary conditions
 		if ismember_sorted(i,xbound1): #allows (i,j-1)
-			north[i] += - dt/dx*min(f2,0)
+			output[i,i+I] += -(d22-abs(d12))/2 + dx*min(f2,0)
 		if ismember_sorted(i,xbound2): #allows (i,j+1)
-			south[i] += dt/dx*max(f2,0)
+			output[i,i-I] += -(d22-abs(d12))/2 - dx*max(f2,0)
 		if ismember_sorted(i,ybound1): #allows (i-1,j) 
-			east[i] += - dt/dx*min(f1,0)
+			output[i,i+1] += -(d11-abs(d12))/2 + dx*min(f1,0)
 		if ismember_sorted(i,ybound2): #allows (i+1,j)
-			west[i] += dt/dx*max(f1,0)
-	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1]],[0, I, -I, -1, 1])
-	return sparse.csr_matrix(output)
+			output[i,i-1] += -(d11-abs(d12))/2 - dx*max(f1,0)
+		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #allows (i-1,j-1)
+			output[i,i+1+I] += -max(d12,0)/2
+		if ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #allows (i+1,j+1)
+			output[i,i-1-I] += -max(d12,0)/2
+		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #allows (i+1,j-1)
+			output[i,i-1+I] += min(d12,0)/2
+		if ismember_sorted(i,ybound1) and ismember_sorted(i,xbound2): #allows (i-1,j+1)
+			output[i,i+1-I] += min(d12,0)/2
+	return lamb*sparse.csr_matrix(output)
 
 #########################
 def u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
@@ -192,56 +137,6 @@ def u_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 	return lamb*sparse.csr_matrix(output)
 
 #####################
-#MATRIX GENERATION: FOKKER-PLANCK
-#####################
-
-def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt): #there is no quick-fix to fixing the signs
-	h = dx
-	dx2 = h**2
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
-	D11 = np.ravel(D11)
-	D12 = np.ravel(D12)
-	D22 = np.ravel(D22)
-	for i in range(0,I*J-I-1):
-		#make matrices
-		a1,a2,a3,a4 = D11[i],D11[i+1],D11[i+I],D11[i+I+1]
-		b1,b2,b3,b4 = D22[i],D22[i+1],D22[i+I],D22[i+I+1]
-		c1,c2,c3,c4 = D12[i],D12[i+1],D12[i+I],D12[i+I+1]
-		if ismember_sorted(i,xbound1): #south
-			a1,b1,c1 = a1*2,b1*2,c1*2
-			a2,b2,c2 = a2*2,b2*2,c2*2
-		if ismember_sorted(i,ybound1): #west
-			a1,b1,c1 = a1*2,b1*2,c1*2
-			a3,b3,c3 = a3*2,b3*2,c3*2
-		if ismember_sorted(i+I,xbound2): #north
-			a3,b3,c3 = a3*2,b3*2,c3*2
-			a4,b4,c4 = a4*2,b4*2,c4*2
-		if ismember_sorted(i+1,ybound2): #east
-			a2,b2,c2 = a2*2,b2*2,c2*2
-			a4,b4,c4 = a4*2,b4*2,c4*2
-		#as we believe it to be the diffusion tensor equation
-		A = np.array([[a1+a2,0,c1,-c2],[0,a3+a4,-c3,c4],[c1,-c3,b1+b3,0],[-c2,c4,0,b2+b4]])
-		B = np.array([[a1+c2,a2-c2,0,0],[0,0,a3-c3,a4+c4],[b1+c1,0,b3-c3,0],[0,b2-c2,0,b4+c4]])
-		C = -np.array([[-a1,0,-c1,0],[0,a4,0,c4],[0,-c3,b3,0],[c2,0,0,-b2]])
-		F = -np.array([[a1+c1,0,0,0],[0	,0,0,-a4-c4],[0,0,c3-b3,0],[0,-c2+b2,0,0]])
-		#finish up
-		tmp = np.dot(np.linalg.inv(A),B)
-		T = np.dot(C,tmp)+F #transmission coefficient matrix
-		R = np.array([[1,0,1,0],[-1,0,0,1],[0,1,-1,0],[0,-1,0,-1]]) #the contribution mapping extravaganza
-#		if ismember_sorted(i,xbound1): #SOUTH
-#			R += np.array([[],[],[],[]])
-#		if ismember_sorted(i,ybound1): #WEST
-#			R += np.array([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])
-#		if ismember_sorted(i,xbound2): #NORTH
-#			R += np.array([[],[],[],[]])
-#		if ismember_sorted(i,ybound2): #EAST
-#			R += np.array([[],[],[],[]])
-		output = ass.FVL2G(np.dot(R,T),output,i,I,J)
-	return output
-
 def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 	LHS = np.zeros((I*J,I*J)) #for the implicit stuff
 	RHS = np.zeros((I*J,I*J)) #for the explicit stuff
@@ -636,6 +531,78 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			output[i,i-1+I] += nw
 			#Quoth The Hound, "Fuck the boundary!"
 	return lamb*sparse.csr_matrix(output)
+
+####
+#### CONVECTION
+####
+
+def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
+	output = np.zeros((I*J,I*J))
+	lamb = dt/(dx**2)
+	h = dx
+	xbound1 = range(0,I)
+	ybound1 = range(0,I*J,I)
+	xbound2 = range(I*J-I,I*J)
+	ybound2 = range(I-1,I*J,I)
+	#flatten out D12, D11, D22, f1_array, f2_array
+	D11 = np.ravel(D11)
+	D12 = np.ravel(D12)
+	D22 = np.ravel(D22)
+	f1 = np.ravel(f1_array)
+	f2 = np.ravel(f2_array)
+	return lamb*sparse.csr_matrix(output)
+
+###
+### DIFFUSION
+###
+def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt): #there is no quick-fix to fixing the signs
+	h = dx
+	dx2 = h**2
+	xbound1 = range(0,I)
+	ybound1 = range(0,I*J,I)
+	xbound2 = range(I*J-I,I*J)
+	ybound2 = range(I-1,I*J,I)
+	D11 = np.ravel(D11)
+	D12 = np.ravel(D12)
+	D22 = np.ravel(D22)
+	for i in range(0,I*J-I-1):
+		#make matrices
+		a1,a2,a3,a4 = D11[i],D11[i+1],D11[i+I],D11[i+I+1]
+		b1,b2,b3,b4 = D22[i],D22[i+1],D22[i+I],D22[i+I+1]
+		c1,c2,c3,c4 = D12[i],D12[i+1],D12[i+I],D12[i+I+1]
+		if ismember_sorted(i,xbound1): #south
+			a1,b1,c1 = a1*2,b1*2,c1*2
+			a2,b2,c2 = a2*2,b2*2,c2*2
+		if ismember_sorted(i,ybound1): #west
+			a1,b1,c1 = a1*2,b1*2,c1*2
+			a3,b3,c3 = a3*2,b3*2,c3*2
+		if ismember_sorted(i+I,xbound2): #north
+			a3,b3,c3 = a3*2,b3*2,c3*2
+			a4,b4,c4 = a4*2,b4*2,c4*2
+		if ismember_sorted(i+1,ybound2): #east
+			a2,b2,c2 = a2*2,b2*2,c2*2
+			a4,b4,c4 = a4*2,b4*2,c4*2
+		#as we believe it to be the diffusion tensor equation
+		A = np.array([[a1+a2,0,c1,-c2],[0,a3+a4,-c3,c4],[c1,-c3,b1+b3,0],[-c2,c4,0,b2+b4]])
+		B = np.array([[a1+c2,a2-c2,0,0],[0,0,a3-c3,a4+c4],[b1+c1,0,b3-c3,0],[0,b2-c2,0,b4+c4]])
+		C = -np.array([[-a1,0,-c1,0],[0,a4,0,c4],[0,-c3,b3,0],[c2,0,0,-b2]])
+		F = -np.array([[a1+c1,0,0,0],[0	,0,0,-a4-c4],[0,0,c3-b3,0],[0,-c2+b2,0,0]])
+		#finish up
+		tmp = np.dot(np.linalg.inv(A),B)
+		T = np.dot(C,tmp)+F #transmission coefficient matrix
+		R = np.array([[1,0,1,0],[-1,0,0,1],[0,1,-1,0],[0,-1,0,-1]]) #the contribution mapping extravaganza
+#		if ismember_sorted(i,xbound1): #SOUTH
+#			R += np.array([[],[],[],[]])
+#		if ismember_sorted(i,ybound1): #WEST
+#			R += np.array([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])
+#		if ismember_sorted(i,xbound2): #NORTH
+#			R += np.array([[],[],[],[]])
+#		if ismember_sorted(i,ybound2): #EAST
+#			R += np.array([[],[],[],[]])
+
+
+		output = ass.FVL2G(np.dot(R,T),output,i,I,J) #assembly
+	return output
 
 def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bueno
 	#output = np.zeros((I*J,I*J))

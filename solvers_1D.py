@@ -91,7 +91,7 @@ def fp_fd_upwind_visc(x,time,m_tmp,a_tmp,dt,dx):
 	m_update[-1] = m_tmp[-1]*( 1-dt/dx2*sigma2[-1] - dt/(2*dx)*(-movement[-2]) - dt/dx *abs(3*movement[-1]) ) + m_tmp[-2]*dt/dx2*( sigma2[-2]/2)
 	return m_update
 
-def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
+def fp_fv_mod(x,time,m_tmp,a_tmp,dt,dx):
 	I = x.size
 	LHS = mg.fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx)
 	RHS = mg.fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx)
@@ -101,6 +101,55 @@ def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
 	#LHS = sparse.csr(sparse.eye(I)-mg.fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx))
 	#RHS = sparse.csr(sparse.eye(I)+mg.fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx))
 	return sparse.linalg.spsolve(LHS,RHS*m_tmp)
+def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
+	I = x.size
+	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
+	sigma2 = sigma**2
+	movement = iF.f_global(time,x,a_tmp) #the function f
+	dx2 = dx**2
+	#the fluxes
+	Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
+	Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
+	Fi = np.insert(Fi,0,(dx*movement[0]-sigma[0]*sigma[1])/dx)
+	D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2
+	D_down = iF.hmean(sigma2[1:-1],sigma2[0:-2])/2
+	D_west = iF.hmean_scalar(sigma2[0],sigma2[1])
+	D_east = iF.hmean_scalar(sigma2[-1],sigma2[-2])
+	#the actual computation
+	m_update = np.empty(m_tmp.size)
+	zero = np.zeros(movement[1:-1].size)
+	m_update[1:-1] = m_tmp[1:-1]*( 1-dt/dx2*(D_up+D_down + dx*(abs(Fi[1:-1]))))
+	m_update[1:-1] += m_tmp[2:]*dt/dx2*(D_up-dx*np.minimum(Fi[2:],zero))
+	m_update[1:-1] += m_tmp[0:-2]*dt/dx2*(D_down+dx*np.maximum(Fi[0:-2],zero))
+	#reflective
+	m_update[0] = m_tmp[0]*( 1-dt/dx2*(D_west + dx*abs(Fi[0]))) + m_tmp[1]*dt/dx2*( D_west - dx*min(Fi[1],0))
+	m_update[-1] = m_tmp[-1]*( 1-dt/dx2*(D_east + dx*abs(Fi[-1]))) + m_tmp[-2]*dt/dx2*( D_east + dx*max(0,Fi[-2]))
+	return m_update
+
+#def fp_fv(x,time,m_tmp,a_tmp,dt,dx): #dug up from the time before time
+#	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
+#	sigma2 = sigma**2
+#	movement = iF.f_global(time,x,a_tmp) #the function f
+#	dx2 = dx**2
+#	#the actual computation
+#	m_update = np.empty(m_tmp.size)
+#	zero = np.zeros(movement[1:-1].size)
+#	#generate the flux vectors
+#	Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
+#	Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
+#	Fi = np.insert(Fi,0,(dx*movement[0]-sigma[0]*sigma[1])/dx)
+#	D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2
+#	D_down = iF.hmean(sigma2[1:-1],sigma2[0:-2])/2
+#	#regular upwinding
+#	m_update[1:-1] = m_tmp[1:-1]*(1 - dt/dx2*(D_up+D_down+dx*abs(Fi[1:-1])) )  
+#	m_update[1:-1] += m_tmp[2:]*dt/dx2*(  D_up - dx*np.minimum(Fi[2:],zero)  )
+#	m_update[1:-1] += m_tmp[0:-2]*dt/dx2*( D_down + dx*np.maximum(Fi[0:-2],zero) )
+#	D_w = iF.hmean_scalar(sigma2[0],sigma2[1])/2 #west boundary diffusion
+#	D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])/2#east boundary diffusion
+#	#reflective
+#	m_update[0] = (m_tmp[0]*(1-dt/dx2*(D_w+dx*abs(Fi[0]))) + m_tmp[1]*dt/dx2*(D_w-dx*np.min(Fi[1],0)))
+#	m_update[-1]= (m_tmp[-1]*(1-dt/dx2*(D_e+dx*abs(Fi[-1]))) + m_tmp[-2]*dt/dx2*(D_e+dx*np.max(Fi[-2],0)))
+#	return m_update
 
 ###################
 #POLICY ITERATION FUNCTIONS

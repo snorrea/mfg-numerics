@@ -12,14 +12,12 @@ def hjb_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
 	movement = iF.f_global(time,x,a_tmp) #the function f
 	I = x.size
 	zerohero = np.zeros(I)
-	output = sparse.lil_matrix((I,I))
 	m_east = np.maximum(movement,zerohero)*dt/dx
 	m_east[0] = abs(movement[0])*dt/dx #reflective
-	m_west = -np.minimum(movement[1:],zerohero[1:])*dt/dx
+	m_west = -np.minimum(movement,zerohero)*dt/dx
 	m_west[-1] = abs(movement[-1])*dt/dx #reflective
-	output.setdiag(1-dt/dx*abs(movement),0) #here
-	output.setdiag(m_east,1)
-	output.setdiag(m_west,-1)
+	here = 1-dt/dx*abs(movement)
+	output = sparse.diags([here, m_east[0:-1], m_west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
 def hjb_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
@@ -30,12 +28,10 @@ def hjb_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
 	I = x.size
 	s_east = -sigma2*dt/(2*dx2)
 	s_east[0] = 2*s_east[0] #reflective
-	s_west = -sigma2[1:]*dt/(2*dx2)
+	s_west = -sigma2*dt/(2*dx2)
 	s_west[-1] = 2*s_west[-1] #reflective
-	output = sparse.lil_matrix((I,I))
-	output.setdiag(1+sigma2*dt/dx2,0)
-	output.setdiag(s_east,1)
-	output.setdiag(s_west,-1)
+	here = 1+sigma2*dt/dx2
+	output = sparse.diags([here, s_east[0:-1], s_west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 ##################
 # MATRIX GENERATION: FINITE VOLUME
@@ -50,11 +46,11 @@ def fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
 	Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
 	Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
 	Fi = np.insert(Fi,0,(dx*movement[0]-sigma[0]*sigma[1])/dx)
-	zerohero = np.zeros(x.size-1)
-	output = sparse.lil_matrix((I,I))
-	output.setdiag(1-dt/dx*abs(Fi),0)
-	output.setdiag(-dt/dx*np.minimum(Fi[1:],zerohero),1)
-	output.setdiag(dt/dx*np.maximum(Fi[0:-1],zerohero),-1)
+	zerohero = np.zeros(x.size)
+	here = 1-dt/dx*abs(Fi)
+	east = -dt/dx*np.minimum(Fi,zerohero)
+	west = dt/dx*np.maximum(Fi,zerohero)
+	output = sparse.diags([here, east[0:-1], west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
 def fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
@@ -72,10 +68,11 @@ def fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
 	D_down = np.append(D_down,D_w)
 	D_down = np.insert(D_down,0,0)
 	#make the matrix
-	output = sparse.lil_matrix((I,I))
-	output.setdiag(1+dt/dx2*(D_up+D_down),0)
-	output.setdiag(-dt/dx2*D_up[1:],1)
-	output.setdiag(-dt/dx2*D_down[0:-1],-1)
+	#output = sparse.lil_matrix((I,I))
+	here = 1+dt/dx2*(D_up+D_down)
+	east = -dt/dx2*D_up
+	west = -dt/dx2*D_down
+	output = sparse.diags([here, east[0:-1], west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 	
 #helpful stuff

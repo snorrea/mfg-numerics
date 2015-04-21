@@ -102,7 +102,7 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 ###################
 def F_global(x_array,m_array,sigma,time): #more effective running cost function
 	#return (x_array-0.2)**2 #Carlini's no-game
-	omega = 10
+	omega = 5
 	tau = 5
 	return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
 	#ONE = np.ones(m_array.size)
@@ -133,16 +133,14 @@ def L_global(time,x_array,a_array,m_array): #general cost
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
-	#return -0.3*np.ones(x_array.size) #FP test, constant coefficients
+	#return -2*np.ones(x_array.size) #FP test, constant coefficients
 	#return 2*x_array #Ornstein FP test
 	return a_array #standard MFG, HJB test
 
 def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJB test
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
-	#return 0.01*time*np.exp(1)*np.ones(x_array.size) #exact FP test
 	return 1*np.ones(x_array.size)
-	#return np.sqrt(0.1*time*np.exp(1)*2)*np.ones(x_array.size) #exact FP test, Ornstein
 	#return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
 
 def Sigma_local(time,x,a,m):

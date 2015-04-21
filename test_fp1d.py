@@ -14,10 +14,10 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #INPUTS
 dx0 = 2*0.1
-REFINEMENTS = 4
+REFINEMENTS = 6
 X_NAUGHT = 0.0
 #constant coefficient test
-DT = 1#0.125/2
+DT = .8#0.125/2
 velocity = -2
 D = 0.1 #diffusion
 #for the initial condition
@@ -83,7 +83,7 @@ dexes = np.zeros(REFINEMENTS)
 for N in range(0,REFINEMENTS):
 	dx = dx/2 #starts at dx=0.25
 	dexes[N] = dx
-	dt = DT*dx
+	dt = DT*dx**2
 	#CRUNCH
 	print "(",dx,",",dt,")"
 	dx2 = dx**2
@@ -113,16 +113,16 @@ for N in range(0,REFINEMENTS):
 	#SOLVE STUFF
 	t0 = time.time()
 	for k in range(0,K-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-		#m1 = solve.fp_fd_centered(x,(k)*dt,m1,m0,dt,dx)
-		#m2 = solve.fp_fd_upwind(x,(k)*dt,m2,m0,dt,dx)
-		#m3 = solve.fp_fd_upwind_visc(x,(k)*dt,m2,m0,dt,dx)
+		m1 = solve.fp_fd_centered(x,(k)*dt,m1,m0,dt,dx)
+		m2 = solve.fp_fd_upwind(x,(k)*dt,m2,m0,dt,dx)
+		m3 = solve.fp_fd_upwind_visc(x,(k)*dt,m2,m0,dt,dx)
 		m4 = solve.fp_fv(x,(k)*dt,m4,m0,dt,dx)
 	print "Time spent:",time.time()-t0
 	#compute error in 2-norm
 	#m_exact = convolution(x-velocity*T,T) #CONSTANT COEFFICIENT TEST
-	#m_exact = heat_kernel(x-velocity*T,T) #the other one
-	#m_exact = ornstein_kernel(x,T) #the other one
-	m_exact = convolution(x,T)
+	####m_exact = heat_kernel(x-velocity*T,T) #the other one
+	m_exact = ornstein_kernel(x,T) #the other one
+	#m_exact = convolution(x,T)
 	e1[N] = np.linalg.norm(m1-m_exact)*dx
 	e2[N] = np.linalg.norm(m2-m_exact)*dx
 	e3[N] = np.linalg.norm(m3-m_exact)*dx
@@ -162,7 +162,7 @@ str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3
 str4 = "Finite volume, slope:", "%.2f" %slope4
 plt.loglog(dexes,e1,'o-',label=str1)
 plt.loglog(dexes,e2,'o-',label=str2)
-plt.loglog(dexes,e3,'o-',label=str3)
+#plt.loglog(dexes,e3,'o-',label=str3)
 plt.loglog(dexes,e4,'o-',label=str4)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 ax4 = fig4.add_subplot(111)
@@ -176,7 +176,7 @@ fig4.suptitle('Convergence of m(x,t) in 2-norm', fontsize=14)
 fig3 = plt.figure(2)
 plt.plot(x,(m1-m_exact),label="Centered FD")
 plt.plot(x,(m2-m_exact),label="Upwind FD")
-plt.plot(x,(m3-m_exact),label="Upwind FD with viscosity")
+#plt.plot(x,(m3-m_exact),label="Upwind FD with viscosity")
 plt.plot(x,(m4-m_exact),label="Finite volume")
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 fig3.suptitle('Deviation from true solution', fontsize=14)
@@ -184,7 +184,7 @@ fig3.suptitle('Deviation from true solution', fontsize=14)
 fig2 = plt.figure(3)
 plt.plot(x,m1,label="Centered FD")
 plt.plot(x,m2,label="Upwind FD")
-plt.plot(x,m3,label="Upwind FD with viscosity")
+#plt.plot(x,m3,label="Upwind FD with viscosity")
 plt.plot(x,m4,label="Finite volume")
 plt.plot(x,m_exact,label="Exact solution")
 fig2.suptitle('Solutions', fontsize=14)
@@ -194,7 +194,7 @@ legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 fig5 = plt.figure(5)
 str1 = "Centered FD, slope:", "%.2f" %slope1_1
 str2 = "Upwind FD, slope:", "%.2f" %slope2_1
-str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3_1
+#str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3_1
 str4 = "Finite volume, slope:", "%.2f" %slope4_1
 plt.loglog(dexes,e1_1,'o-',label=str1)
 plt.loglog(dexes,e2_1,'o-',label=str2)
@@ -211,7 +211,7 @@ fig5.suptitle('Convergence of m(x,t) in 1-norm', fontsize=14)
 fig6 = plt.figure(7)
 str1 = "Centered FD, slope:", "%.2f" %slope1_inf
 str2 = "Upwind FD, slope:", "%.2f" %slope2_inf
-str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3_inf
+#str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3_inf
 str4 = "Finite volume, slope:", "%.2f" %slope4_inf
 plt.loglog(dexes,e1_inf,'o-',label=str1)
 plt.loglog(dexes,e2_inf,'o-',label=str2)
