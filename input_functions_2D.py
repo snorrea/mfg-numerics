@@ -73,9 +73,9 @@ def F_global(x,y,m_array,time): #more effective running cost function
 	#return (x-0.2)**2 + (y-0.2)**2
 	#return 0.1*m_array #shyness game
 	#return (powerbill(time)*(1-0.8*x_array) + x_array/(0.1+m_array))
-	tau = 0
-	alpha = 1
-	beta = 1
+	tau = 1
+	alpha = 2
+	beta = 2
 	D11 = Sigma_D11_test(time,x,y,x,x,x)
 	D22 = Sigma_D22_test(time,x,y,x,x,x)
 	D12 = Sigma_D12_test(time,x,y,x,x,x)
@@ -85,12 +85,9 @@ def F_global(x,y,m_array,time): #more effective running cost function
 	#return 0*x_array#no-game
 
 def L_global(time,x,y,a1,a2,m_array): #general cost
-	#x,y = np.meshgrid(x,y)
 	FUCK = F_global(x,y,x,time)
-	#print FUCK
-	#print FUCK.shape
-	#print a1.shape
-	#print x.shape,y.shape
+	#print a1
+	#print a2
 	return 0.5*(a1**2 + a2**2) + FUCK#np.transpose(FUCK)
 	#output = np.empty(x_array.size,y_array.size)
 	#for i in range (0,y_array.size):
@@ -123,7 +120,7 @@ def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
 	return .5**2*np.ones(x.shape)
 def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
 	x,y = np.meshgrid(x,y)
-	return .0**2*np.ones(x.shape)
+	return .2**2*np.ones(x.shape)
 
 def Sigma_D11(time,x,y,ax,ay,m):
 	return 0.3**2

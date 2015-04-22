@@ -16,7 +16,7 @@ def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this works, at least
 	dx2 = dx**2
 	dy2 = dy**2
 	dxy = dx*dy
-	xbound1 = range(0,I)
+	xbound1 = range(0,I) 
 	ybound1 = range(0,I*J,I)
 	xbound2 = range(I*J-I,I*J)
 	ybound2 = range(I-1,I*J,I)
@@ -42,50 +42,66 @@ def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this works, at least
 		d11 = D11[i]
 		d22 = D22[i]
 		#avoid segfaults
-		if not ismember_sorted(i,xbound1): #allows (i,j-1)
+		if not ismember(i,xbound1): #allows (i,j-1)
 			south[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-		if not ismember_sorted(i,xbound2): #allows (i,j+1)
+		if not ismember(i,xbound2): #allows (i,j+1)
 			north[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
+		if not ismember(i,ybound1): #allows (i-1,j) 
 			west[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-		if not ismember_sorted(i,ybound2): #allows (i+1,j)
+		if not ismember(i,ybound2): #allows (i+1,j)
 			east[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound1): #allows (i-1,j-1)
+		if not ismember(i,xbound1) and not ismember(i,ybound1): #allows (i-1,j-1)
 			south_west[i] += -dt/dxy*max(d12,0)/2
-		if not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound2): #allows (i+1,j+1)
+		if not ismember(i,xbound2) and not ismember(i,ybound2): #allows (i+1,j+1)
 			north_east[i] += -dt/dxy*max(d12,0)/2
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,ybound2): #allows (i+1,j-1)
+		if not ismember(i,xbound1) and not ismember(i,ybound2): #allows (i+1,j-1)
 			north_west[i] += dt/dxy*min(d12,0)/2
-		if not ismember_sorted(i,ybound1) and not ismember_sorted(i,xbound2): #allows (i-1,j+1)
+		if not ismember(i,ybound1) and not ismember(i,xbound2): #allows (i-1,j+1)
 			south_east[i] += dt/dxy*min(d12,0)/2
 		#then add boundary conditions
-		if ismember_sorted(i,xbound1): #allows (i,j-1)
+		if ismember(i,xbound1): #allows (i,j-1)
 			north[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-		if ismember_sorted(i,xbound2): #allows (i,j+1)
+			if not ismember(i,ybound2):
+				north_east[i] += dt/dxy*min(d12,0)/2
+			if not ismember(i,ybound1):
+				north_west[i] += -dt/dxy*max(d12,0)/2
+		if ismember(i,xbound2): #allows (i,j+1)
 			south[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-		if ismember_sorted(i,ybound1): #allows (i-1,j) 
+			if not ismember(i,ybound1):
+				south_west[i] += dt/dxy*min(d12,0)/2
+			if not ismember(i,ybound2):
+				south_east[i] = -dt/dxy*max(d12,0)/2
+		if ismember(i,ybound1): #allows (i-1,j) 
 			east[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-		if ismember_sorted(i,ybound2): #allows (i+1,j)
+			if not ismember(i,xbound2):
+				north_east[i] += dt/dxy*min(d12,0)/2
+			if not ismember(i,xbound1):
+				south_east[i] += -dt/dxy*max(d12,0)/2
+		if ismember(i,ybound2): #allows (i+1,j)
 			west[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #allows (i-1,j-1)
-			#north_east[i] += -dt/dx2*max(d12,0)/2
-			north_east[i] += dt/dxy*min(d12,0)/2
-		if ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #allows (i+1,j+1)
-			#south_west[i] += -dt/dx2*max(d12,0)/2
-			south_west[i] += dt/dxy*min(d12,0)/2
-		if ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #allows (i+1,j-1)
-			#south_east[i] += dt/dx2*min(d12,0)/2
-			south_east[i] += -dt/dxy*max(d12,0)/2
-		if ismember_sorted(i,ybound1) and ismember_sorted(i,xbound2): #allows (i-1,j+1)
-			#north_west[i] += dt/dx2*min(d12,0)/2
-			north_west[i] += -dt/dxy*max(d12,0)/2
+			if not ismember(i,xbound2):
+				north_west[i] += -dt/dxy*max(d12,0)/2
+			if not ismember(i,xbound1):
+				south_west[i] += dt/dxy*min(d12,0)/2
+		if ismember(i,xbound1) and ismember(i,ybound1): #allows (i-1,j-1)
+			north_east[i] += -dt/dxy*max(d12,0)/2
+			#north_east[i] += dt/dxy*min(d12,0)/2
+		if ismember(i,xbound2) and ismember(i,ybound2): #allows (i+1,j+1)
+			south_west[i] += -dt/dxy*max(d12,0)/2
+			#south_west[i] += dt/dxy*min(d12,0)/2
+		if ismember(i,xbound1) and ismember(i,ybound2): #allows (i+1,j-1)
+			south_east[i] += dt/dxy*min(d12,0)/2
+			#south_east[i] += -dt/dxy*max(d12,0)/2
+		if ismember(i,ybound1) and ismember(i,xbound2): #allows (i-1,j+1)
+			north_west[i] += dt/dxy*min(d12,0)/2
+			#north_west[i] += -dt/dxy*max(d12,0)/2
 	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1], north_east[0:-I-1], south_west[(I+1):], north_west[0:-I+1], south_east[(I-1):]],[0, I, -I, -1, 1,I+1,-I-1,I-1,-I+1])
 	return sparse.csr_matrix(output)
 
 def HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this should work, but also needs BC
 	I,J = x.size,y.size
 	[f1_array, f2_array] = iF.f_global(time,x,y,a1,a2)
-	xbound1 = range(0,I)
+	xbound1 = range(0,I) 
 	ybound1 = range(0,I*J,I)
 	xbound2 = range(I*J-I,I*J)
 	ybound2 = range(I-1,I*J,I)
@@ -104,22 +120,22 @@ def HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this should work, b
 	#finalise
 	for i in range(0,I*J):
 		#avoid segfaults
-		if not ismember_sorted(i,xbound1): #allows (i,j-1)
+		if not ismember(i,xbound1): #allows (i,j-1)
 			south[i] += - dt/dy*f2min[i]
-		if not ismember_sorted(i,xbound2): #allows (i,j+1)
+		if not ismember(i,xbound2): #allows (i,j+1)
 			north[i] += dt/dy*f2max[i]
-		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
+		if not ismember(i,ybound1): #allows (i-1,j) 
 			west[i] += - dt/dx*f1min[i]
-		if not ismember_sorted(i,ybound2): #allows (i+1,j)
+		if not ismember(i,ybound2): #allows (i+1,j)
 			east[i] += dt/dx*f1max[i]
 		#then add boundary conditions
-		if ismember_sorted(i,xbound1): #allows (i,j-1)
+		if ismember(i,xbound1): #allows (i,j-1)
 			north[i] += - dt/dy*f2min[i]
-		if ismember_sorted(i,xbound2): #allows (i,j+1)
+		if ismember(i,xbound2): #allows (i,j+1)
 			south[i] += dt/dy*f2max[i]
-		if ismember_sorted(i,ybound1): #allows (i-1,j) 
+		if ismember(i,ybound1): #allows (i-1,j) 
 			east[i] += - dt/dx*f1min[i]
-		if ismember_sorted(i,ybound2): #allows (i+1,j)
+		if ismember(i,ybound2): #allows (i+1,j)
 			west[i] += dt/dx*f1max[i]
 	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1]],[0, I, -I, -1, 1])
 	return sparse.csr_matrix(output)
@@ -152,22 +168,22 @@ def FP_convection_explicit(time,x,y,a1,a2,m,dx,dt):
 	F2min = np.minimum(F2,zero)
 	F2max = np.maximum(F2,zero)
 	for i in range(0,I*J):
-		if not ismember_sorted(i,xbound1): #allows (i,j-1)
+		if not ismember(i,xbound1): #allows (i,j-1)
 			south[i] += - dt/dx*F2min[i-I]
-		if not ismember_sorted(i,xbound2): #allows (i,j+1)
+		if not ismember(i,xbound2): #allows (i,j+1)
 			north[i] += dt/dx*F2max[i+I]
-		if not ismember_sorted(i,ybound1): #allows (i-1,j) 
+		if not ismember(i,ybound1): #allows (i-1,j) 
 			west[i] += - dt/dx*F1min[i-1]
-		if not ismember_sorted(i,ybound2): #allows (i+1,j)
+		if not ismember(i,ybound2): #allows (i+1,j)
 			east[i] += dt/dx*F1max[i+1]
 		#then add boundary conditions #NO SUCH THINGS HERE, NO SIR
-		#if ismember_sorted(i,xbound1): #allows (i,j-1)
+		#if ismember(i,xbound1): #allows (i,j-1)
 		#	north[i] += - dt/dx*F2min[i]
-		#if ismember_sorted(i,xbound2): #allows (i,j+1)
+		#if ismember(i,xbound2): #allows (i,j+1)
 		#	south[i] += dt/dx*F2max[i]
-		#if ismember_sorted(i,ybound1): #allows (i-1,j) 
+		#if ismember(i,ybound1): #allows (i-1,j) 
 		#	east[i] += - dt/dx*F1min[i]
-		#if ismember_sorted(i,ybound2): #allows (i+1,j)
+		#if ismember(i,ybound2): #allows (i+1,j)
 		#	west[i] += dt/dx*F1max[i]
 	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1]],[0, I, -I, -1, 1])
 	return sparse.csr_matrix(output)
@@ -188,16 +204,16 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt): #there is no quick-f
 		a1,a2,a3,a4 = D11[i],D11[i+1],D11[i+I],D11[i+I+1]
 		b1,b2,b3,b4 = D22[i],D22[i+1],D22[i+I],D22[i+I+1]
 		c1,c2,c3,c4 = D12[i],D12[i+1],D12[i+I],D12[i+I+1]
-		if ismember_sorted(i,xbound1): #south
+		if ismember(i,xbound1): #south
 			a1,b1,c1 = a1*2,b1*2,c1*2
 			a2,b2,c2 = a2*2,b2*2,c2*2
-		if ismember_sorted(i,ybound1): #west
+		if ismember(i,ybound1): #west
 			a1,b1,c1 = a1*2,b1*2,c1*2
 			a3,b3,c3 = a3*2,b3*2,c3*2
-		if ismember_sorted(i+I,xbound2): #north
+		if ismember(i+I,xbound2): #north
 			a3,b3,c3 = a3*2,b3*2,c3*2
 			a4,b4,c4 = a4*2,b4*2,c4*2
-		if ismember_sorted(i+1,ybound2): #east
+		if ismember(i+1,ybound2): #east
 			a2,b2,c2 = a2*2,b2*2,c2*2
 			a4,b4,c4 = a4*2,b4*2,c4*2
 		#as we believe it to be the diffusion tensor equation
@@ -209,13 +225,13 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt): #there is no quick-f
 		tmp = np.dot(np.linalg.inv(A),B)
 		T = np.dot(C,tmp)+F #transmission coefficient matrix
 		R = np.array([[1,0,1,0],[-1,0,0,1],[0,1,-1,0],[0,-1,0,-1]]) #the contribution mapping extravaganza
-#		if ismember_sorted(i,xbound1): #SOUTH
+#		if ismember(i,xbound1): #SOUTH
 #			R += np.array([[],[],[],[]])
-#		if ismember_sorted(i,ybound1): #WEST
+#		if ismember(i,ybound1): #WEST
 #			R += np.array([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])
-#		if ismember_sorted(i,xbound2): #NORTH
+#		if ismember(i,xbound2): #NORTH
 #			R += np.array([[],[],[],[]])
-#		if ismember_sorted(i,ybound2): #EAST
+#		if ismember(i,ybound2): #EAST
 #			R += np.array([[],[],[],[]])
 		output = ass.FVL2G(np.dot(R,T),output,i,I,J)
 	return output
@@ -238,7 +254,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 	for i in range (0,I*J):
 		LHS[i,i] += 1/lamb
 		RHS[i,i] += 1/lamb
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound1) and not ismember_sorted(i,ybound2):
+		if not ismember(i,xbound1) and not ismember(i,xbound2) and not ismember(i,ybound1) and not ismember(i,ybound2):
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i+I] + D12[i-I] )
 			RHS[i,i+1-I] += -0.125*( D12[i+1] + D12[i-I] )
@@ -265,7 +281,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i-I] += -ps
 			LHS[i,i+I+1] += -0.125*(D12[i+1]+D12[i+I])
 			LHS[i,i-I-1] += -0.125*(D12[i-1]+D12[i-I])
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #SOUTH-WEST
+		elif ismember(i,xbound1) and ismember(i,ybound1): #SOUTH-WEST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i+I])
 			#LHS convection
@@ -281,7 +297,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i+1] += -pe
 			LHS[i,i+I] += -pn
 			LHS[i,i+I+1] += -0.125*(D12[i+1]+D12[i+I])
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #NORTH-EAST
+		elif ismember(i,xbound2) and ismember(i,ybound2): #NORTH-EAST
 			#RHS
 			RHS[i,i] += 0.125*(D12[i-1] + D12[i-I] )
 			#LHS convection
@@ -297,7 +313,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i-1] += -pw
 			LHS[i,i-I] += -ps
 			LHS[i,i-I-1] += -0.125*(D12[i-1]+D12[i-I])
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #SOUTH-EAST
+		elif ismember(i,xbound1) and ismember(i,ybound2): #SOUTH-EAST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i-1] + D12[i+I] )
 			#LHS convection
@@ -312,7 +328,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i] += (pn+pw) + 0.125*(D12[i-1]+D12[i+I])
 			LHS[i,i+I] += -pn
 			LHS[i,i-1] += -pw
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound1): #NORTH-WEST
+		elif ismember(i,xbound2) and ismember(i,ybound1): #NORTH-WEST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-I] )
 			#LHS convection
@@ -327,7 +343,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i] += (pe+ps) + 0.125*(D12[i+1]+D12[i-I])
 			LHS[i,i+1] += -pe
 			LHS[i,i-I] += -ps
-		elif ismember_sorted(i,xbound1): #SOUTH
+		elif ismember(i,xbound1): #SOUTH
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i+I])
 			RHS[i,i-1+I] += -0.125*( D12[i-1] + D12[i+I] )
@@ -348,7 +364,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i+I] += -pn
 			LHS[i,i-1] += -pw
 			LHS[i,i+I+1] += -0.125*(D12[i+1]+D12[i+I])
-		elif ismember_sorted(i,xbound2): #NORTH
+		elif ismember(i,xbound2): #NORTH
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i-I] )
 			RHS[i,i+1-I] += -0.125*( D12[i+1] + D12[i-I] )
@@ -369,7 +385,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i-1] += -pw
 			LHS[i,i-I] += -ps
 			LHS[i,i-I-1] += -0.125*(D12[i-1]+D12[i-I])
-		elif ismember_sorted(i,ybound1): #WEST
+		elif ismember(i,ybound1): #WEST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i+I] + D12[i-I] )
 			RHS[i,i+1-I] += -0.125*( D12[i+1] + D12[i-I] )
@@ -390,7 +406,7 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i+I] += -pn
 			LHS[i,i-I] += -ps
 			LHS[i,i-I-1] += -0.125*(D12[i-I])
-		elif ismember_sorted(i,ybound2): #EAST
+		elif ismember(i,ybound2): #EAST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i-I] )
 			RHS[i,i-1+I] += -0.125*( D12[i-1] + D12[i+I] )
@@ -429,7 +445,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 	f2 = np.ravel(f2_array)
 	for i in range (0,I*J):
 		output[i,i] += 1/lamb
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound1) and not ismember_sorted(i,ybound2):
+		if not ismember(i,xbound1) and not ismember(i,xbound2) and not ismember(i,ybound1) and not ismember(i,ybound2):
 			#convection terms
 			#north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
 			#south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
@@ -460,7 +476,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			output[i,i+1-I] += se
 			output[i,i-I-1] += sw
 			output[i,i-1+I] += nw
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #SOUTH-WEST
+		elif ismember(i,xbound1) and ismember(i,ybound1): #SOUTH-WEST
 			#convection terms
 			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
 			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
@@ -476,7 +492,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			#cross diffusion terms #these guys are coefficients for the respective things
 			ne = 0.25*(D12[i+1]+D12[i+I])/2
 			output[i,i+1+I] += ne
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #NORTH-EAST
+		elif ismember(i,xbound2) and ismember(i,ybound2): #NORTH-EAST
 			#convection terms
 			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
 			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
@@ -492,7 +508,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			#cross diffusion terms #these guys are coefficients for the respective things
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
 			output[i,i-I-1] += sw
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #SOUTH-EAST
+		elif ismember(i,xbound1) and ismember(i,ybound2): #SOUTH-EAST
 			#convection terms
 			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
 			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
@@ -508,7 +524,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			#cross diffusion terms #these guys are coefficients for the respective things
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
 			output[i,i-1+I] += nw
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound1): #NORTH-WEST
+		elif ismember(i,xbound2) and ismember(i,ybound1): #NORTH-WEST
 			#convection terms
 			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
 			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
@@ -524,7 +540,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			#cross diffusion terms #these guys are coefficients for the respective things
 			se = -0.25*(D12[i-I]+D12[i+1])/2
 			output[i,i+1-I] += se
-		elif ismember_sorted(i,xbound1): #SOUTH
+		elif ismember(i,xbound1): #SOUTH
 			#convection terms
 			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
 			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
@@ -546,7 +562,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
 			output[i,i+1+I] += ne
 			output[i,i-1+I] += nw
-		elif ismember_sorted(i,xbound2): #NORTH
+		elif ismember(i,xbound2): #NORTH
 			#convection terms
 			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
 			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
@@ -568,7 +584,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
 			output[i,i+1-I] += se
 			output[i,i-I-1] += sw
-		elif ismember_sorted(i,ybound1): #WEST
+		elif ismember(i,ybound1): #WEST
 			#convection terms
 			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
 			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
@@ -590,7 +606,7 @@ def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
 			se = -0.25*(D12[i-I]+D12[i+1])/2
 			output[i,i+1+I] += ne
 			output[i,i+1-I] += se
-		elif ismember_sorted(i,ybound2): #EAST
+		elif ismember(i,ybound2): #EAST
 			#convection terms
 			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
 			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
@@ -627,7 +643,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 	D12 = np.ravel(D12)
 	D22 = np.ravel(D22)
 	for i in range (0,I*J):
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound1) and not ismember_sorted(i,ybound2):
+		if not ismember(i,xbound1) and not ismember(i,xbound2) and not ismember(i,ybound1) and not ismember(i,ybound2):
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pn = app.hmean(D22[i],D22[i+I])/2
@@ -647,7 +663,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			output[i,i+1-I] += se
 			output[i,i-I-1] += sw
 			output[i,i-1+I] += nw
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #SOUTH-WEST
+		elif ismember(i,xbound1) and ismember(i,ybound1): #SOUTH-WEST
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pn = app.hmean(D22[i],D22[i+I])/2
@@ -657,7 +673,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			#cross diffusion terms #these guys are coefficients for the respective things
 			ne = 0.25*(D12[i+1]+D12[i+I])/2
 			output[i,i+1+I] += ne
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #NORTH-EAST
+		elif ismember(i,xbound2) and ismember(i,ybound2): #NORTH-EAST
 			#diffusion terms
 			pw = app.hmean(D11[i],D11[i-1])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
@@ -667,7 +683,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			#cross diffusion terms #these guys are coefficients for the respective things
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
 			output[i,i-I-1] += sw
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #SOUTH-EAST
+		elif ismember(i,xbound1) and ismember(i,ybound2): #SOUTH-EAST
 			#diffusion terms
 			pn = app.hmean(D22[i],D22[i+I])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
@@ -677,7 +693,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			#cross diffusion terms #these guys are coefficients for the respective things
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
 			output[i,i-1+I] += nw
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound1): #NORTH-WEST
+		elif ismember(i,xbound2) and ismember(i,ybound1): #NORTH-WEST
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
@@ -687,7 +703,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			#cross diffusion terms #these guys are coefficients for the respective things
 			se = -0.25*(D12[i-I]+D12[i+1])/2
 			output[i,i+1-I] += se
-		elif ismember_sorted(i,xbound1): #SOUTH
+		elif ismember(i,xbound1): #SOUTH
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pn = app.hmean(D22[i],D22[i+I])/2
@@ -701,7 +717,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
 			output[i,i+1+I] += ne
 			output[i,i-1+I] += nw
-		elif ismember_sorted(i,xbound2): #NORTH
+		elif ismember(i,xbound2): #NORTH
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
@@ -715,7 +731,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
 			output[i,i+1-I] += se
 			output[i,i-I-1] += sw
-		elif ismember_sorted(i,ybound1): #WEST
+		elif ismember(i,ybound1): #WEST
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pn = app.hmean(D22[i],D22[i+I])/2
@@ -729,7 +745,7 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			se = -0.25*(D12[i-I]+D12[i+1])/2
 			output[i,i+1+I] += ne
 			output[i,i+1-I] += se
-		elif ismember_sorted(i,ybound2): #EAST
+		elif ismember(i,ybound2): #EAST
 			#diffusion terms
 			pn = app.hmean(D22[i],D22[i+I])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
@@ -762,7 +778,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 	for i in range (0,I*J):
 		LHS[i,i] += 1/lamb
 		RHS[i,i] += 1/lamb
-		if not ismember_sorted(i,xbound1) and not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound1) and not ismember_sorted(i,ybound2):
+		if not ismember(i,xbound1) and not ismember(i,xbound2) and not ismember(i,ybound1) and not ismember(i,ybound2):
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i+I] + D12[i-I] )
 			RHS[i,i+1-I] += -0.125*( D12[i+1] + D12[i-I] )
@@ -779,7 +795,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i-I] += -ps
 			LHS[i,i+I+1] += -0.125*(D12[i+1]+D12[i+I])
 			LHS[i,i-I-1] += -0.125*(D12[i-1]+D12[i-I])
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #SOUTH-WEST
+		elif ismember(i,xbound1) and ismember(i,ybound1): #SOUTH-WEST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i+I])
 			#LHS diffusion
@@ -789,7 +805,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i+1] += -pe
 			LHS[i,i+I] += -pn
 			LHS[i,i+I+1] += -0.125*(D12[i+1]+D12[i+I])
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #NORTH-EAST
+		elif ismember(i,xbound2) and ismember(i,ybound2): #NORTH-EAST
 			#RHS
 			RHS[i,i] += 0.125*(D12[i-1] + D12[i-I] )
 			#LHS diffusion
@@ -799,7 +815,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i-1] += -pw
 			LHS[i,i-I] += -ps
 			LHS[i,i-I-1] += -0.125*(D12[i-1]+D12[i-I])
-		elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #SOUTH-EAST
+		elif ismember(i,xbound1) and ismember(i,ybound2): #SOUTH-EAST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i-1] + D12[i+I] )
 			#LHS diffusion
@@ -808,7 +824,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i] += (pn+pw) + 0.125*(D12[i-1]+D12[i+I])
 			LHS[i,i+I] += -pn
 			LHS[i,i-1] += -pw
-		elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound1): #NORTH-WEST
+		elif ismember(i,xbound2) and ismember(i,ybound1): #NORTH-WEST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-I] )
 			#LHS diffusion
@@ -817,7 +833,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i] += (pe+ps) + 0.125*(D12[i+1]+D12[i-I])
 			LHS[i,i+1] += -pe
 			LHS[i,i-I] += -ps
-		elif ismember_sorted(i,xbound1): #SOUTH
+		elif ismember(i,xbound1): #SOUTH
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i+I])
 			RHS[i,i-1+I] += -0.125*( D12[i-1] + D12[i+I] )
@@ -830,7 +846,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i+I] += -pn
 			LHS[i,i-1] += -pw
 			LHS[i,i+I+1] += -0.125*(D12[i+1]+D12[i+I])
-		elif ismember_sorted(i,xbound2): #NORTH
+		elif ismember(i,xbound2): #NORTH
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i-I] )
 			RHS[i,i+1-I] += -0.125*( D12[i+1] + D12[i-I] )
@@ -843,7 +859,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i-1] += -pw
 			LHS[i,i-I] += -ps
 			LHS[i,i-I-1] += -0.125*(D12[i-1]+D12[i-I])
-		elif ismember_sorted(i,ybound1): #WEST
+		elif ismember(i,ybound1): #WEST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i+I] + D12[i-I] )
 			RHS[i,i+1-I] += -0.125*( D12[i+1] + D12[i-I] )
@@ -856,7 +872,7 @@ def diffusion_flux_iioe(D11,D22,D12,I,J,dx,dt):
 			LHS[i,i+I] += -pn
 			LHS[i,i-I] += -ps
 			LHS[i,i-I-1] += -0.125*(D12[i-I])
-		elif ismember_sorted(i,ybound2): #EAST
+		elif ismember(i,ybound2): #EAST
 			#RHS
 			RHS[i,i] += 0.125*( D12[i+1] + D12[i-1] + D12[i-I] )
 			RHS[i,i-1+I] += -0.125*( D12[i-1] + D12[i+I] )
@@ -877,7 +893,7 @@ def add_direchlet_boundary(output,sol_vector,I,J,lamb,val):
 	xbound2 = range(I*J-I,I*J)
 	ybound2 = range(I-1,I*J,I)
 	for i in range(0,I*J):
-		if ismember_sorted(i,xbound1) or ismember_sorted(i,ybound1) or ismember_sorted(i,xbound2) or ismember_sorted(i,ybound2):
+		if ismember(i,xbound1) or ismember(i,ybound1) or ismember(i,xbound2) or ismember(i,ybound2):
 			#set output to exactly one
 			output[i,:] = unit(i,I*J)/lamb
 			sol_vector[i] = val
@@ -888,7 +904,7 @@ def unit(index,length):
 	output[index] = 1
 	return output
 
-def ismember_sorted(a,array):
+def ismember(a,array):
 	for i in range(0,len(array)):
 		if array[i]==a:
 			return True
@@ -897,12 +913,12 @@ def ismember_sorted(a,array):
 	return False
 
 
-#if not ismember_sorted(i,xbound1) and not ismember_sorted(i,xbound2) and not ismember_sorted(i,ybound1) and not ismember_sorted(i,ybound2):
-#elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound1): #SOUTH-WEST
-#elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound2): #NORTH-EAST
-#elif ismember_sorted(i,xbound1) and ismember_sorted(i,ybound2): #SOUTH-EAST
-#elif ismember_sorted(i,xbound2) and ismember_sorted(i,ybound1): #NORTH-WEST
-#elif ismember_sorted(i,xbound1): #SOUTH
-#elif ismember_sorted(i,xbound2): #NORTH
-#elif ismember_sorted(i,ybound1): #WEST	
-#elif ismember_sorted(i,ybound2): #EAST		
+#if not ismember(i,xbound1) and not ismember(i,xbound2) and not ismember(i,ybound1) and not ismember(i,ybound2):
+#elif ismember(i,xbound1) and ismember(i,ybound1): #SOUTH-WEST
+#elif ismember(i,xbound2) and ismember(i,ybound2): #NORTH-EAST
+#elif ismember(i,xbound1) and ismember(i,ybound2): #SOUTH-EAST
+#elif ismember(i,xbound2) and ismember(i,ybound1): #NORTH-WEST
+#elif ismember(i,xbound1): #SOUTH
+#elif ismember(i,xbound2): #NORTH
+#elif ismember(i,ybound1): #WEST	
+#elif ismember(i,ybound2): #EAST		

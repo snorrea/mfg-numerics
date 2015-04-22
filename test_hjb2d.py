@@ -12,16 +12,16 @@ import scipy.sparse as sparse
 import matrix_gen as mg
 
 #INPUTS
-POINTSx = 20 #points in x-direction
+POINTSx = 10 #points in x-direction
 POINTSy = 20 #points in y-direction
 REFINEMENTS = 2
 X_NAUGHT = 0.0
-tau = 0
-alpha = 1
-beta = 1
+tau = 1
+alpha = 2
+beta = 2
 DT = 0.5#ratio as in dt = DT*dx(**2)
 NICE_DIFFUSION = 1
-n = 1 #must be integer greater than 0
+n = 2 #must be integer greater than 0
 cutoff = 0 #for convergence slope
 xmax = np.pi/alpha * (n-0.5)
 xmin = -xmax
@@ -62,20 +62,19 @@ for N in range(0,REFINEMENTS):
 	t = np.linspace(0,T,Nt)
 	I = x.size #space
 	J = y.size
-	u = np.zeros((I,J))
-	u_exact = np.zeros((I,J))
 	u = exact_solution(x,y,T)
 	#SOLVE STUFF
 	t0 = time.time()
 	for k in range(Nt-1,-1,-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-		ush = np.reshape(u,(I,J))
+		ush = np.reshape(u,(J,I))
+		#print u-ush
+		#print ss
 		a1,a2 = np.gradient(ush,dx,dy) #this ought to do it
 		a1 = -a1
 		a2 = -a2
 		t1_tmp = time.time()
 		#print u_rsh.shape,a1.shape,a2.shape
 		#print ss
-
 		if NICE_DIFFUSION==0:
 			u = solve.hjb_kushner_mod(k*dt,x,y,a1_tmp,a2_tmp,m_tmp,dx,dy,dt)
 		else:
@@ -84,11 +83,16 @@ for N in range(0,REFINEMENTS):
 				#print LHS_HJB
 				#print ss
 			RHS_HJB = mg.HJB_convection_explicit(k*dt,x,y,a1,a2,u,dx,dy,dt)
+			#print LHS_HJB.sum(1) 
+			#print RHS_HJB.sum(1) 
+			#print ss
 			#print RHS_HJB
+			#print u
 			#print ss
 			t1 += time.time() - t1_tmp
 			Ltmp = iF.L_global(k*dt,x,y,a1,a2,u)
 			#print Ltmp
+			#print ss
 			t2_tmp = time.time()
 			u = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*np.ravel(u)+dt*np.ravel(Ltmp))
 			t2 += time.time()-t2_tmp
@@ -96,7 +100,7 @@ for N in range(0,REFINEMENTS):
 	print "Time spent:",t0
 	print "\tGenerating matrices:",t1/t0*100
 	print "\tSolving linear systems:",t2/t0*100
-	u = np.reshape(u,(I,J))
+	u = np.reshape(u,(J,I))
 	u_exact = exact_solution(x,y,0)
 	e1[N] = np.linalg.norm(u-u_exact)*max(dx,dy)
 	e1_1[N] = np.linalg.norm(u-u_exact,ord=1)*max(dx,dy)
