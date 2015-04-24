@@ -58,7 +58,12 @@ def fp_fd_centered(x,time,m_tmp,a_tmp,dt,dx):
 	#zero boundary
 	#m_update[0] = m_tmp[0]*(1-sigma2[0]*dt/dx2) + m_tmp[1]*(dt/(2*dx))*(sigma2[1]/dx - movement[1])
 	#m_update[-1]= m_tmp[-1]*(1-sigma2[1:-1]*dt/dx2) + m_tmp[-2]*(dt/(2*dx))*(sigma2[-2]/dx + movement[-2])
-	return m_update 
+	return m_update
+
+def fp_fd_centered_mod(x,time,m_tmp,a_tmp,dt,dx):
+	LHS = mg.fp_fd_centered_diffusion(time,x,m_tmp,a_tmp,dt,dx)
+	RHS = mg.fp_fd_centered_convection(time,x,m_tmp,a_tmp,dt,dx)
+	return sparse.linalg.spsolve(LHS,RHS*m_tmp)
 
 def fp_fd_upwind(x,time,m_tmp,a_tmp,dt,dx):
 	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
@@ -75,6 +80,14 @@ def fp_fd_upwind(x,time,m_tmp,a_tmp,dt,dx):
 	m_update[0] = m_tmp[0]*( 1-dt/dx2*sigma2[0] - dt/(2*dx)*(movement[1]) - dt/dx *abs(movement[0]) ) + m_tmp[1]*dt/dx2*( sigma2[1]/2 + dx*abs(movement[0]) )
 	m_update[-1] = m_tmp[-1]*( 1-dt/dx2*sigma2[-1] - dt/(2*dx)*(-movement[-2]) - dt/dx *abs(movement[-1]) ) + m_tmp[-2]*dt/dx2*( sigma2[-2]/2 + dx*abs(movement[-1]) )
 	return m_update
+
+def fp_fd_upwind_mod(x,time,m_tmp,a_tmp,dt,dx):
+	LHS = mg.fp_fd_centered_diffusion(time,x,m_tmp,a_tmp,dt,dx)
+	RHS = mg.fp_fd_upwind_convection(time,x,m_tmp,a_tmp,dt,dx)
+	#print RHS
+	#print ss
+	return sparse.linalg.spsolve(LHS,RHS*m_tmp)
+
 def fp_fd_upwind_visc(x,time,m_tmp,a_tmp,dt,dx):
 	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
 	sigma2 = sigma**2
@@ -92,14 +105,11 @@ def fp_fd_upwind_visc(x,time,m_tmp,a_tmp,dt,dx):
 	return m_update
 
 def fp_fv_mod(x,time,m_tmp,a_tmp,dt,dx):
-	I = x.size
 	LHS = mg.fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx)
 	RHS = mg.fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx)
-	#print LHS
 	#print RHS
+	#print LHS.sum(1)
 	#print ss
-	#LHS = sparse.csr(sparse.eye(I)-mg.fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx))
-	#RHS = sparse.csr(sparse.eye(I)+mg.fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx))
 	return sparse.linalg.spsolve(LHS,RHS*m_tmp)
 def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
 	I = x.size
@@ -163,6 +173,8 @@ def control_general(x,time,u_last,m_last,dt,dx,xpts_search,N,scatters):
 		tmp,tmpval = iF.scatter_search(iF.hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,N,scatters) 
 		a_tmp[i] = tmp
 	return a_tmp
+
+
 
 ###################
 #TAU FUNCTION

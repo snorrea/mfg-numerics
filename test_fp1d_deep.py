@@ -8,27 +8,25 @@ from matplotlib import cm
 import quadrature_nodes as qn
 import input_functions as iF
 import solvers_1D as solve
-import matrix_gen1d as mg
-from scipy import sparse
 quad_order = 500
 gll_x = qn.GLL_points(quad_order) #quadrature nodes
 gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #INPUTS
 dx0 = 2*0.1
-REFINEMENTS = 8
+REFINEMENTS = 5
 X0 = -0.5
 cutoff = 0
 #constant coefficient test
-DT = .05
-velocity = -2.5
+DT = .7#0.125/2
+velocity = -1
 D = 0.1 #diffusion
 #for the initial condition
 epsilon = 0.3
 C = 1/0.00000224497
 ########
-xmin = 0-10
-xmax = 10
+xmin = 0-4
+xmax = 4
 T = 1
 #set dx
 dx = dx0
@@ -86,7 +84,7 @@ dexes = np.zeros(REFINEMENTS)
 for N in range(0,REFINEMENTS):
 	dx = dx/2 #starts at dx=0.25
 	dexes[N] = dx
-	dt = DT*dx
+	dt = DT*dx**2
 	#CRUNCH
 	print "(",dx,",",dt,")"
 	dx2 = dx**2
@@ -111,27 +109,17 @@ for N in range(0,REFINEMENTS):
 	m2 = np.copy(m0)
 	m3 = np.copy(m0)
 	m4 = np.copy(m0)
+	m_exact = np.copy(m0)
 	
 	#SOLVE STUFF
 	t0 = time.time()
 	for k in range(0,K-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-		#m1 = solve.fp_fd_centered_mod(x,(k)*dt,m1,m0,dt,dx)
-		#m2 = solve.fp_fd_upwind_mod(x,(k)*dt,m2,m0,dt,dx)
+		m1 = solve.fp_fd_centered(x,(k)*dt,m1,m0,dt,dx)
+		m2 = solve.fp_fd_upwind(x,(k)*dt,m2,m0,dt,dx)
 		#m3 = solve.fp_fd_upwind_visc(x,(k)*dt,m2,m0,dt,dx)
-		#m4 = solve.fp_fv_mod(x,(k)*dt,m4,m0,dt,dx)
-		if k==0:
-			LHS_centered = mg.fp_fd_centered_diffusion(k*dt,x,m0,m1,dt,dx)
-			RHS_centered = mg.fp_fd_centered_convection(k*dt,x,m0,m1,dt,dx)
-			RHS_upwind = mg.fp_fd_upwind_convection(k*dt,x,m0,m2,dt,dx)
-			LHS_fv = mg.fp_fv_diffusion(k*dt,x,m0,m4,dt,dx)
-			RHS_fv = mg.fp_fv_convection(k*dt,x,m0,m4,dt,dx)
-		m1 = sparse.linalg.spsolve(LHS_centered,RHS_centered*np.ravel(m1))
-		m2 = sparse.linalg.spsolve(LHS_centered,RHS_upwind*np.ravel(m2))
-		m4 = sparse.linalg.spsolve(LHS_fv,RHS_fv*np.ravel(m4))
-		#print m4
+		m4 = solve.fp_fv(x,(k)*dt,m4,m0,dt,dx)
 	print "Time spent:",time.time()-t0
 	#compute error in 2-norm
-	#print ss
 	#m_exact = convolution(x-velocity*T,T) #CONSTANT COEFFICIENT TEST
 	m_exact = convolution(x,T) #Ornstein test
 	e1[N] = np.linalg.norm(m1-m_exact)*np.sqrt(dx)
@@ -151,9 +139,7 @@ for N in range(0,REFINEMENTS):
 #print e2
 #print e3
 #crunch the slopes and put in the figures
-print e4
-print e4_1
-print e4_inf
+
 slope1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1[cutoff:]), 1)
 slope2, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2[cutoff:]), 1)
 #slope3, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3[cutoff:]), 1)
@@ -166,8 +152,6 @@ slope1_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_inf[cutoff:
 slope2_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2_inf[cutoff:]), 1)
 #slope3_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3_inf[cutoff:]), 1)
 slope4_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4_inf[cutoff:]), 1)
-
-
 
 fig4 = plt.figure(6)
 str1 = "Centered FD, slope:", "%.2f" %slope1

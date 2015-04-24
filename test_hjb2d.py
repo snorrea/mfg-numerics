@@ -16,9 +16,9 @@ POINTSx = 10 #points in x-direction
 POINTSy = 20 #points in y-direction
 REFINEMENTS = 2
 X_NAUGHT = 0.0
-tau = 1
-alpha = 2
-beta = 2
+tau = 0
+alpha = 1
+beta = 1
 DT = 0.5#ratio as in dt = DT*dx(**2)
 NICE_DIFFUSION = 1
 n = 2 #must be integer greater than 0
@@ -82,7 +82,7 @@ for N in range(0,REFINEMENTS):
 				LHS_HJB = mg.HJB_diffusion_implicit(k*dt,x,y,a1,a2,u,dx,dy,dt)
 				#print LHS_HJB
 				#print ss
-			RHS_HJB = mg.HJB_convection_explicit(k*dt,x,y,a1,a2,u,dx,dy,dt)
+			RHS_HJB = mg.HJB_convection_explicit(k*dt,x,y,a1,a2,dx,dy,dt)
 			#print LHS_HJB.sum(1) 
 			#print RHS_HJB.sum(1) 
 			#print ss
@@ -102,8 +102,8 @@ for N in range(0,REFINEMENTS):
 	print "\tSolving linear systems:",t2/t0*100
 	u = np.reshape(u,(J,I))
 	u_exact = exact_solution(x,y,0)
-	e1[N] = np.linalg.norm(u-u_exact)*max(dx,dy)
-	e1_1[N] = np.linalg.norm(u-u_exact,ord=1)*max(dx,dy)
+	e1[N] = np.linalg.norm(u-u_exact)*np.sqrt(dx*dy)
+	e1_1[N] = np.linalg.norm(u-u_exact,ord=1)*dx*dy
 	e1_inf[N] = np.linalg.norm(u-u_exact,ord=np.inf)
 
 #print e1

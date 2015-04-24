@@ -72,7 +72,7 @@ for N in range(0,REFINEMENTS):
 	print "Time spent:",time.time()-t0
 	#compute error in 2-norm
 	u_exact = exact_solution(x,0)
-	e1[N] = np.linalg.norm(u-u_exact)*dx
+	e1[N] = np.linalg.norm(u-u_exact)*np.sqrt(dx)
 	e1_1[N] = np.linalg.norm(u-u_exact,ord=1)*dx
 	e1_inf[N] = np.linalg.norm(u-u_exact,ord=np.inf)
 

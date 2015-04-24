@@ -85,20 +85,16 @@ def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this works, at least
 				south_west[i] += dt/dxy*min(d12,0)/2
 		if ismember(i,xbound1) and ismember(i,ybound1): #allows (i-1,j-1)
 			north_east[i] += -dt/dxy*max(d12,0)/2
-			#north_east[i] += dt/dxy*min(d12,0)/2
 		if ismember(i,xbound2) and ismember(i,ybound2): #allows (i+1,j+1)
 			south_west[i] += -dt/dxy*max(d12,0)/2
-			#south_west[i] += dt/dxy*min(d12,0)/2
 		if ismember(i,xbound1) and ismember(i,ybound2): #allows (i+1,j-1)
 			south_east[i] += dt/dxy*min(d12,0)/2
-			#south_east[i] += -dt/dxy*max(d12,0)/2
 		if ismember(i,ybound1) and ismember(i,xbound2): #allows (i-1,j+1)
 			north_west[i] += dt/dxy*min(d12,0)/2
-			#north_west[i] += -dt/dxy*max(d12,0)/2
 	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1], north_east[0:-I-1], south_west[(I+1):], north_west[0:-I+1], south_east[(I-1):]],[0, I, -I, -1, 1,I+1,-I-1,I-1,-I+1])
 	return sparse.csr_matrix(output)
 
-def HJB_convection_explicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this should work, but also needs BC
+def HJB_convection_explicit(time,x,y,a1,a2,dx,dy,dt): #this should work, but also needs BC
 	I,J = x.size,y.size
 	[f1_array, f2_array] = iF.f_global(time,x,y,a1,a2)
 	xbound1 = range(0,I) 

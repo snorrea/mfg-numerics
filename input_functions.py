@@ -68,6 +68,8 @@ def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of 
 			N = alpha*N
 	return min(fpts)
 
+
+
 ###################
 #POLICY ITERATION FUNCTIONS
 ###################
@@ -101,10 +103,8 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 #RUNNING COST
 ###################
 def F_global(x_array,m_array,sigma,time): #more effective running cost function
-	#return (x_array-0.2)**2 #Carlini's no-game
-	tau = 10
-	omega = 20
-	return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
+	return (x_array-0.2)**2 #Carlini's no-game
+	#return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
 	#ONE = np.ones(m_array.size)
 	#return (x_array-0.2)**2 + np.minimum(4*ONE,np.maximum(m_array,ONE))
 	#return np.minimum(1.4*np.ones(x_array.size),np.maximum(m_array,0.7*np.ones(x_array.size))) #Gueant's game
@@ -133,18 +133,34 @@ def L_global(time,x_array,a_array,m_array): #general cost
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
-	#return -.5*np.ones(x_array.size) #FP test, constant coefficients
-	#return 2*x_array #Ornstein FP test
+	#return -1*np.ones(x_array.size) #FP test, constant coefficients
+	#return 2.5*x_array #Ornstein FP test
 	return a_array #standard MFG, HJB test
 
 def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJB test
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
-	return 1*np.ones(x_array.size)
+	return .1*np.ones(x_array.size)
 	#return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
 
 def Sigma_local(time,x,a,m):
 	return 0*x
+	
+#def Hamiltonian_Derivative(t,x,a,u,m,i):
+#	x = x[(i-1):(i+2)]
+#	sigma = Sigma_global(t,x,a,m)
+#	Ldir = L_global(t,x,a,m)
+#	fdir = f_global(t,x,a)
+#	dx = x[1]-x[0]
+#	#derivatives and coefficients
+#	if i!=0 and i!=x.size:
+#		Ldir = (Ldir[2]-Ldir[0])/(2*dx)
+#		fdir = (fdir[2]-fdir[0])/(2*dx)
+#		sdir = (sigma[2]-sigma[0])/(2*dx)
+#		u1 = (u[1]+u[0]-2*u[1])/dx**2
+#		u2 = (u[1]-u[0])/dx #tied to fplus
+#		u3 = (u[2]-u[1])/dx
+
 
 ##################
 #TERMINAL COST

@@ -15,14 +15,14 @@ import scipy.sparse as sparse
 FINITE_VOLUME = 1 #0 if FD, 1 if FV
 NICE_DIFFUSION = 1 #1 if diffusion indep of t,m,alpha
 #dx = 0.1**2/2
-dx = 0.05
+dx = 0.01
 #dx = 0.1*dx
 #print 
 dt = dx#**2
 #dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
 xmin = 0#-2
-xmax = 1+.2
+xmax = 1#+.2
 T = 1
 Niter = 1 #maximum number of iterations
 tolerance = 1e-4
