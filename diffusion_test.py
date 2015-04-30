@@ -13,16 +13,17 @@ import matrix_gen as mg
 from scipy import sparse
 
 animate = False
-dx = 0.01
-dt = 0.1*dx #0.25*dx2 this is the finest CFL we can find for (D11,D22,D12)=(1,1,0); but not necessarily enough for monotonicity
+EXPLICIT = 1
+dx = 0.05
+dt = 0.1*dx**2 #this is the finest CFL we can find for (D11,D22,D12)=(1,1,0); but not necessarily enough for monotonicity
 xmin = 0
 xmax = 1
 ymin = 0
 ymax = 1
-T = 0.1
+T = .01
 Niter = 1 #maximum number of iterations
 D11 = 1
-D12 = 0
+D12 = .9#0.5
 D22 = 1
 #CRUNCH
 dx2 = dx**2
@@ -42,6 +43,11 @@ u = np.zeros((I*J)) #potential
 def index(i,j): 
 	return int(i+I*j)
 
+def hmean(a,b):
+	return a*b/(a+b)
+
+#a = D11*dt/dx2
+#print a
 
 #INITIAL/TERMINAL CONDITIONS, INITIAL GUESS and COPYING
 #u0 = iF.known_diffusion2(x,y,D11,D12,D22,1)
@@ -60,14 +66,16 @@ lamb = dt/dx2
 #M = np.identity(I*J)/lamb
 M = sparse.eye(I*J)/lamb
 M = sparse.lil_matrix(M)
-M = mg.add_diffusion_flux_Ometh(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt)
-M,u = mg.add_direchlet_boundary(M,u,I,J,dt/dx2,0)
+M = mg.add_diffusion_flux_Ometh(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt,EXPLICIT)
+#M,u = mg.add_direchlet_boundary(M,u,I,J,dt/dx2,0)
 M = sparse.csr_matrix(M)*lamb
 print M
 #print ss
 #plt.spy(M)
 #plt.show()
-
+#print M.sum(1)
+#print ss
+mass0 = sum(u)*dx**2
 ######################################################################################
 ######################################################################################
 #################################ANIMATION STUFF######################################
@@ -99,8 +107,12 @@ if animate:
 #ACTUALLY SOLVE
 for k in range(0,K-1):
 	#u = spsolve(LHS,RHS*np.ravel(u)) #IIOE
-	#u = M*np.ravel(u) #O-method
-	u = spsolve(M,u) #implicit O-method
+	if EXPLICIT==1:
+		u = M*np.ravel(u) #O-method
+	else:
+		u = spsolve(M,u) #implicit O-method
+	print "Mass deviation:", (mass0-sum(u)*dx**2)
+	print "Max vs min:", abs(max(u)-min(u))
 print "Time spent:", time.time()-time_total
 
 #PLOT STUFF

@@ -185,7 +185,7 @@ def FP_convection_explicit(time,x,y,a1,a2,m,dx,dt):
 	return sparse.csr_matrix(output)
 
 
-def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt): #there is no quick-fix to fixing the signs
+def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
 	h = dx
 	dx2 = h**2
 	xbound1 = range(0,I)
@@ -214,21 +214,16 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt): #there is no quick-f
 			a4,b4,c4 = a4*2,b4*2,c4*2
 		#as we believe it to be the diffusion tensor equation
 		A = np.array([[a1+a2,0,c1,-c2],[0,a3+a4,-c3,c4],[c1,-c3,b1+b3,0],[-c2,c4,0,b2+b4]])
-		B = np.array([[a1+c2,a2-c2,0,0],[0,0,a3-c3,a4+c4],[b1+c1,0,b3-c3,0],[0,b2-c2,0,b4+c4]])
-		C = -np.array([[-a1,0,-c1,0],[0,a4,0,c4],[0,-c3,b3,0],[c2,0,0,-b2]])
-		F = -np.array([[a1+c1,0,0,0],[0	,0,0,-a4-c4],[0,0,c3-b3,0],[0,-c2+b2,0,0]])
+		B = np.array([[a1+c1,a2-c2,0,0],[0,0,a3-c3,a4+c4],[b1+c1,0,b3-c3,0],[0,b2-c2,0,b4+c4]])
+		if EXPLICIT==1:
+			C = -np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]])
+			F = -np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]])
+		else:
+			C = np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]])
+			F = np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]])
 		#finish up
-		tmp = np.dot(np.linalg.inv(A),B)
-		T = np.dot(C,tmp)+F #transmission coefficient matrix
-		R = np.array([[1,0,1,0],[-1,0,0,1],[0,1,-1,0],[0,-1,0,-1]]) #the contribution mapping extravaganza
-#		if ismember(i,xbound1): #SOUTH
-#			R += np.array([[],[],[],[]])
-#		if ismember(i,ybound1): #WEST
-#			R += np.array([[0,1,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,0]])
-#		if ismember(i,xbound2): #NORTH
-#			R += np.array([[],[],[],[]])
-#		if ismember(i,ybound2): #EAST
-#			R += np.array([[],[],[],[]])
+		T = np.dot(C,np.dot(np.linalg.inv(A),B))+F #transmission coefficient matrix
+		R = np.array([[1,0,1,0],[-1,0,0,1],[0,1,-1,0],[0,-1,0,-1]]) #contribution matrix
 		output = ass.FVL2G(np.dot(R,T),output,i,I,J)
 	return output
 

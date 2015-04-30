@@ -14,19 +14,16 @@ import matrix_gen as mg
 #INPUTS
 POINTSx = 10 #points in x-direction
 POINTSy = 20 #points in y-direction
-REFINEMENTS = 2
+REFINEMENTS = 3
 X_NAUGHT = 0.0
-tau = 0
-alpha = 1
-beta = 1
 DT = 0.5#ratio as in dt = DT*dx(**2)
 NICE_DIFFUSION = 1
 n = 2 #must be integer greater than 0
 cutoff = 0 #for convergence slope
-xmax = np.pi/alpha * (n-0.5)
-xmin = -xmax
-ymax = np.pi/beta*n
-ymin = -ymax
+xmax = np.pi*n
+xmin = 0
+ymax = np.pi*n
+ymin = 0
 T = 1
 #set dx
 dx0 = abs(xmax-xmin)/POINTSx
@@ -36,7 +33,7 @@ dy = dy0
 
 def exact_solution(x,y,t):
 	x,y=np.meshgrid(x,y)
-	return np.exp(-tau*t)*np.sin(alpha*x)*np.cos(beta*y)
+	return np.exp(-t)*np.cos(x)*np.cos(y)
 e1 = np.zeros(REFINEMENTS)
 e1_1 = np.zeros(REFINEMENTS)
 e1_inf = np.zeros(REFINEMENTS)
@@ -70,29 +67,22 @@ for N in range(0,REFINEMENTS):
 		#print u-ush
 		#print ss
 		a1,a2 = np.gradient(ush,dx,dy) #this ought to do it
-		a1 = -a1
-		a2 = -a2
+		#x,y = np.meshgrid(x,y)
+		#print x.shape,a1.shape
+		#print ss
+		a1 = -np.transpose(a1) #is this seriously enough
+		a2 = -np.transpose(a2)
 		t1_tmp = time.time()
 		#print u_rsh.shape,a1.shape,a2.shape
 		#print ss
 		if NICE_DIFFUSION==0:
-			u = solve.hjb_kushner_mod(k*dt,x,y,a1_tmp,a2_tmp,m_tmp,dx,dy,dt)
+			u = solve.hjb_kushner_mod(k*dt,x,y,a1,a2,m_tmp,dx,dy,dt)
 		else:
 			if k==Nt-1:
 				LHS_HJB = mg.HJB_diffusion_implicit(k*dt,x,y,a1,a2,u,dx,dy,dt)
-				#print LHS_HJB
-				#print ss
 			RHS_HJB = mg.HJB_convection_explicit(k*dt,x,y,a1,a2,dx,dy,dt)
-			#print LHS_HJB.sum(1) 
-			#print RHS_HJB.sum(1) 
-			#print ss
-			#print RHS_HJB
-			#print u
-			#print ss
 			t1 += time.time() - t1_tmp
 			Ltmp = iF.L_global(k*dt,x,y,a1,a2,u)
-			#print Ltmp
-			#print ss
 			t2_tmp = time.time()
 			u = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*np.ravel(u)+dt*np.ravel(Ltmp))
 			t2 += time.time()-t2_tmp

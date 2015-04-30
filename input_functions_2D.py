@@ -73,19 +73,17 @@ def F_global(x,y,m_array,time): #more effective running cost function
 	#return (x-0.2)**2 + (y-0.2)**2
 	#return 0.1*m_array #shyness game
 	#return (powerbill(time)*(1-0.8*x_array) + x_array/(0.1+m_array))
-	tau = 0
-	alpha = 1
-	beta = 1
 	D11 = Sigma_D11_test(time,x,y,x,x,x)
 	D22 = Sigma_D22_test(time,x,y,x,x,x)
 	D12 = Sigma_D12_test(time,x,y,x,x,x)
 	x,y = np.meshgrid(x,y)
-	return 0*x
-	sinx = np.sin(alpha*x)
-	cosx = np.cos(alpha*x)
-	siny = np.sin(beta*y)
-	cosy = np.cos(beta*y)
-	return np.exp(-tau*time)*(tau + 0.5*D11*alpha**2 + 0.5*D22*beta**2)*sinx*cosy + np.exp(-tau*time)*alpha*beta*cosx*siny*D12 + 0.5*np.exp(-2*tau*time)*((alpha*cosx*cosy)**2+(beta*sinx*siny)**2) #Exact HJB test
+	#return 0*x
+	sinx = np.sin(x)
+	cosx = np.cos(x)
+	siny = np.sin(y)
+	cosy = np.cos(y)
+	et = np.exp(-time)
+	return (1+D11/2+D22/2)*et*cosx*cosy + 0.5*et**2 * ( (sinx*cosy)**2 + (cosx*siny)**2) - D12*et*sinx*siny
 	#return 0*x_array#no-game
 
 def L_global(time,x,y,a1,a2,m_array): #general cost
@@ -95,9 +93,9 @@ def L_global(time,x,y,a1,a2,m_array): #general cost
 def L_test(time,x,y,a1,a2,m): #only dof is alphas
 	return 0.5*(a1**2+a2**2) + (x-0.0)**2 + (y-0.0)**2
 	
-def f_test(time,x,y,ax_array,ay_array):
-	a1,a2 = np.meshgrid(ax_array,ay_array)
-	return a1,a2
+#def f_test(time,x,y,ax_array,ay_array):
+#	a1,a2 = np.meshgrid(ax_array,ay_array)
+#	return a1,a2
 	#output1 = np.empty((ax_array.size,ay_array.size))
 	#output2 = np.empty((ay_array.size,ax_array.size))
 	#for i in range (0,ay_array.size):
@@ -117,14 +115,14 @@ def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
 	return .5**2*np.ones(x.shape)
 def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
 	x,y = np.meshgrid(x,y)
-	return .2**2*np.ones(x.shape)
+	return 0**2*np.ones(x.shape)
 
-def Sigma_D11(time,x,y,ax,ay,m):
-	return 0.3**2
-def Sigma_D22(time,x,y,ax,ay,m):
-	return 0.3**2
-def Sigma_D12(time,x,y,ax,ay,m):
-	return 0.00**2
+#def Sigma_D11(time,x,y,ax,ay,m):
+#	return 0.3**2
+#def Sigma_D22(time,x,y,ax,ay,m):
+#	return 0.3**2
+#def Sigma_D12(time,x,y,ax,ay,m):
+#	return 0.00**2
 ##################
 #TERMINAL COST
 ##################

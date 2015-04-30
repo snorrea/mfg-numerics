@@ -15,31 +15,35 @@ import scipy.sparse as sparse
 FINITE_VOLUME = 1 #0 if FD, 1 if FV
 NICE_DIFFUSION = 1 #1 if diffusion indep of t,m,alpha
 #dx = 0.1**2/2
-dx = 0.01
-#dx = 0.1*dx
-#print 
-dt = dx#**2
+dx = 0.1
+dt = .1*dx#**2
 #dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
-xmin = 0#-2
-xmax = 1#+.2
+xmin = -2#-2
+xmax = 2#+.2
 T = 1
 Niter = 1 #maximum number of iterations
 tolerance = 1e-4
-alpha_upper = 1
-alpha_lower = -1
+alpha_upper = 2
+alpha_lower = -2
 
 #STUFF TO MINIMIZE
-N = 60 #searchpoints
+N = 200 #searchpoints
+Nr = 10
 min_tol = 1e-6#tolerance#1e-5 #tolerance for minimum
 min_left = alpha_lower #search region left
 min_right = alpha_upper #search region right
 relation = 2
-scatters = int(np.ceil(np.log((min_right-min_left)/min_tol)/np.log(N)))
+#scatters = int(np.ceil(np.log((min_right-min_left)/min_tol)/np.log(N)))
+#scatters = np.ceil( np.log(min_tol*N/(min_right-min_left))/np.log(2/N) )
+scatters = int(np.ceil( np.log((min_right-min_left)/(min_tol*N))/np.log(N/2) ))
 #scatters2 = int(1 + np.ceil(np.log((min_right-min_left)/(N*min_tol))/np.log(relation)))
-xpts_search = np.linspace(min_left,min_right,N)
-fpts = np.empty((xpts_search.size,1))
-
+xpts_scatter = np.linspace(min_left,min_right,N)
+xpts_newton = np.linspace(min_left,min_right,N*Nr)
+dx_scatter = xpts_scatter[1]-xpts_scatter[0]
+dx_newton = xpts_newton[1]-xpts_newton[0]
+print scatters
+#print ss
 #CRUNCH
 dx2 = dx**2
 Nx = int(abs(xmax-xmin)/dx)+1
@@ -67,7 +71,7 @@ al2 = -1*np.ones((Niter,1))
 alinfty = -1*np.ones((Niter,1))
 def index(i,k): 
 	return int(i+(I)*k)
-
+Xplot, Tplot = np.meshgrid(x,t)
 #INITIAL/TERMINAL CONDITIONS, INITIAL GUESS and COPYING
 m0 = iF.initial_distribution(x)
 m0 = m0/(sum(m0)*dx) #normalise
@@ -93,8 +97,9 @@ for n in range (0,Niter):
 	for k in range (K-2,-1,-1): 
 		u_last = np.copy(u[((k+1)*I):((k+1)*I+I)]) #this one to keep
 		m_last = np.copy(m[((k)*I):((k)*I+I)]) #only actually need this, amirite?
-		a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_search,N,scatters)
-		#u_tmp = solve.hjb_kushner(x,k*dt,u_last,m_last,a_tmp,dt,dx) #explicit
+		#a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,N,scatters) #scatter
+		a_tmp = solve.control_newton(x,k*dt,u_last,m_last,dt,dx,xpts_newton,min_tol) #newton
+		#a_tmp = solve.control_bisect(x,k*dt,u_last,m_last,dt,dx,xpts_newton,N,min_tol) #bisection
 		#implicit
 		if NICE_DIFFUSION==0:
 			u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,m_last,a_tmp,dt,dx) #implicit
@@ -117,6 +122,18 @@ for n in range (0,Niter):
 	al1[n] = np.sum(abs(achange))
 	al2[n] = np.sqrt(np.sum(abs(achange)**2))
 	alinfty[n] = max(abs(achange) )
+	
+#	fig3 = plt.figure(3)
+#	ax3 = fig3.add_subplot(111, projection='3d')
+#	asoln = a.reshape((K,I))
+#	#asoln = np.transpose(a.reshape((I,K)))
+#	print Xplot.shape,Tplot.shape,asoln.shape
+#	ax3.plot_surface(Xplot,Tplot,asoln,rstride=10,cstride=10,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+#	ax3.set_xlabel('x')
+#	ax3.set_ylabel('t')
+#	ax3.set_zlabel('a(x,t)')
+#	fig3.suptitle('Solution of the control a(x,t)', fontsize=14)
+#	plt.show()
 	#GET GOING WITH M
 	print "Computing iteration", n+1, "of m..."
 	m[0:I] = np.copy(m0)
@@ -139,6 +156,8 @@ for n in range (0,Niter):
 					LHS_FP = mg.fp_fv_diffusion(0,x,a_tmp,m_tmp,dt,dx)
 				RHS_FP = mg.fp_fv_convection(0,x,a_tmp,m_tmp,dt,dx)
 				m_update = sparse.linalg.spsolve(LHS_FP,RHS_FP*m_tmp)
+				#print RHS_FP
+				#print ss
 		m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
 		#if sum(m_update)*dx is not 1:
 		#	print sum(m_update)*dx-1
@@ -183,7 +202,6 @@ al1 = al1[:kMax]
 al2 = al2[:kMax]
 alinfty = alinfty[:kMax]
 #init plotstuff
-Xplot, Tplot = np.meshgrid(x,t)
 #print Xplot.shape,Tplot.shape,msoln.shape,vsoln.shape,gradsoln.shape,mollgrad.shape
 #plot solution of m(x,t)
 fig1 = plt.figure(1)

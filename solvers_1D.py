@@ -3,6 +3,7 @@ import numpy as np
 import input_functions as iF
 import matrix_gen1d as mg
 import scipy.sparse as sparse
+import scipy.optimize as optimize
 #these functions complete 1 iteration of the explicit schemes
 
 ###################
@@ -107,9 +108,6 @@ def fp_fd_upwind_visc(x,time,m_tmp,a_tmp,dt,dx):
 def fp_fv_mod(x,time,m_tmp,a_tmp,dt,dx):
 	LHS = mg.fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx)
 	RHS = mg.fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx)
-	#print RHS
-	#print LHS.sum(1)
-	#print ss
 	return sparse.linalg.spsolve(LHS,RHS*m_tmp)
 def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
 	I = x.size
@@ -136,31 +134,6 @@ def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
 	m_update[-1] = m_tmp[-1]*( 1-dt/dx2*(D_east + dx*abs(Fi[-1]))) + m_tmp[-2]*dt/dx2*( D_east + dx*max(0,Fi[-2]))
 	return m_update
 
-#def fp_fv(x,time,m_tmp,a_tmp,dt,dx): #dug up from the time before time
-#	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
-#	sigma2 = sigma**2
-#	movement = iF.f_global(time,x,a_tmp) #the function f
-#	dx2 = dx**2
-#	#the actual computation
-#	m_update = np.empty(m_tmp.size)
-#	zero = np.zeros(movement[1:-1].size)
-#	#generate the flux vectors
-#	Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
-#	Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
-#	Fi = np.insert(Fi,0,(dx*movement[0]-sigma[0]*sigma[1])/dx)
-#	D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2
-#	D_down = iF.hmean(sigma2[1:-1],sigma2[0:-2])/2
-#	#regular upwinding
-#	m_update[1:-1] = m_tmp[1:-1]*(1 - dt/dx2*(D_up+D_down+dx*abs(Fi[1:-1])) )  
-#	m_update[1:-1] += m_tmp[2:]*dt/dx2*(  D_up - dx*np.minimum(Fi[2:],zero)  )
-#	m_update[1:-1] += m_tmp[0:-2]*dt/dx2*( D_down + dx*np.maximum(Fi[0:-2],zero) )
-#	D_w = iF.hmean_scalar(sigma2[0],sigma2[1])/2 #west boundary diffusion
-#	D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])/2#east boundary diffusion
-#	#reflective
-#	m_update[0] = (m_tmp[0]*(1-dt/dx2*(D_w+dx*abs(Fi[0]))) + m_tmp[1]*dt/dx2*(D_w-dx*np.min(Fi[1],0)))
-#	m_update[-1]= (m_tmp[-1]*(1-dt/dx2*(D_e+dx*abs(Fi[-1]))) + m_tmp[-2]*dt/dx2*(D_e+dx*np.max(Fi[-2],0)))
-#	return m_update
-
 ###################
 #POLICY ITERATION FUNCTIONS
 ###################
@@ -170,11 +143,30 @@ def control_general(x,time,u_last,m_last,dt,dx,xpts_search,N,scatters):
 	for i in range (0,x.size):
 		fpts = iF.hamiltonian(xpts_search,x,u_last,m_last,dt,dx,time,i)
 		x0 = xpts_search[np.argmin(fpts)]
-		tmp,tmpval = iF.scatter_search(iF.hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,N,scatters) 
+		tmp,tmpval = iF.scatter_search(iF.hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,N,scatters,xpts_search[0],xpts_search[-1])
 		a_tmp[i] = tmp
 	return a_tmp
 
+def control_newton(x,time,u_last,m_last,dt,dx,xpts_search,tol):
+	a_tmp = np.empty(x.size)
+	for i in range (0,x.size):
+		fpts = iF.hamiltonian(xpts_search,x,u_last,m_last,dt,dx,time,i)
+		x0 = xpts_search[np.argmin(fpts)]
+		zero = iF.newton_search(iF.Hamiltonian_Derivative,iF.Hamiltonian_Derivative2,(time,x[i],u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],xpts_search[0],xpts_search[-1])
+		a_tmp[i] = zero
+	return a_tmp	
 
+def control_bisect(x,time,u_last,m_last,dt,dx,xpts_search,N,tol):
+	a_tmp = np.empty(x.size)
+	dx
+	for i in range (0,x.size):
+		fpts = iF.hamiltonian(xpts_search,x,u_last,m_last,dt,dx,time,i)
+		x0 = xpts_search[np.argmin(fpts)]
+		tmp,tmpval = iF.bisection_search(iF.hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,tol) 
+		a_tmp[i] = tmp
+	return a_tmp
+
+	
 
 ###################
 #TAU FUNCTION

@@ -2,29 +2,12 @@ from __future__ import division
 import numpy as np
 import quadrature_nodes as qn
 from scipy.optimize import minimize as minimize
+import matplotlib.pyplot as plt
+import random
 quad_order = 15
 gll_x = qn.GLL_points(quad_order) #quadrature nodes
 gll_w = qn.GLL_weights(quad_order,gll_x)
 
-
-###################
-#MONOTONE FLUX STUFF
-###################
-def gminus(theta):
-	return 1-2*theta
-
-def gplus(theta):
-	return 1+2*theta
-
-def roe_solver(f_left,f_right,m_left,m_right):
-	gr = m_left.size
-	output = np.zeros(m_left.size)
-	alpha = (f_left*m_left-f_right*m_right)/(m_left-m_right)
-	output = 0.5*( (np.sign(alpha)+1)*f_left*m_left - (np.sign(alpha)-1)*f_right*m_right )
-	for i in range(0,gr):
-		if (m_left[i]-m_right[i])==0:
-			output[i] = 0
-	return output
 
 def hmean(a,b):
 	#output = 2*a*b/(a+b)
@@ -45,15 +28,22 @@ def hmean_scalar(a,b):
 ###################
 #MINIMISING FUNCTIONS
 ###################
-def scatter_search(function, (args),dx,x0,N,k): #here k is the number of laps going
+def scatter_search(function, (args),dx,x0,N,k,left,right): #here k is the number of laps going
 	x_naught = x0
 	dex = dx
 	for i in range (0,k):
-		xpts = np.linspace(x_naught-dex,x_naught+dex,N)
+		#define searchspace
+		if x_naught+dex > right:
+			xpts = np.linspace(x_naught-dex,right,N)
+		elif x_naught-dex < left:
+			xpts = np.linspace(left,x_naught+dex,N)
+		else:
+			xpts = np.linspace(x_naught-dex,x_naught+dex,N)
+		#evaluate and cherry pick
+		dex = xpts[2]-xpts[1]
 		fpts = function(xpts,*args)
-		if i!=k-1:
+		if i!=k-1: #this if is here just to save an extra evaluation
 			x_naught = xpts[np.argmin(fpts)]
-			dex = xpts[2]-xpts[1]
 	return xpts[np.argmin(fpts)],min(fpts)
 
 def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of laps going, also this is bad
@@ -68,7 +58,42 @@ def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of 
 			N = alpha*N
 	return min(fpts)
 
+def newton_search(func,funcprime,(args),tolerance,max_iter,x0,dx,left,right):
+	x = x0
+	for i in range(0,max_iter):
+		x_old = x
+		dd = funcprime(x_old,*args)
+		x = x_old - func(x_old,*args)/dd
+		if abs(x-x_old) < tolerance and dd>0:
+			#print "Found:",i
+			return x
+		elif x<x0-dx:
+			return x0-dx
+		elif x>x0+dx: 
+			return x0+dx
+	return x
 
+def bisection_search(function, (args),dx,x0,tol):
+	c,a,b = x0,x0-dx,x0+dx
+	err = dx/2
+	i = 0
+	while err>tol:
+		L = function((c+a)/2,*args)
+		R = function((c+b)/2,*args)
+		c_old = c
+		a_old = a
+		b_old = b
+		if L<R:
+			c = (c_old+a_old)/2
+			b = c_old
+		elif R<L:
+			c = (c_old+b_old)/2
+			a = c_old
+		err = err/2
+		i = i+1
+	xpts = np.array([a,c,b])
+	fpts = function(xpts,*args)
+	return xpts[np.argmin(fpts)],min(fpts)
 
 ###################
 #POLICY ITERATION FUNCTIONS
@@ -76,7 +101,7 @@ def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of 
 
 def hamiltonian(alphas,x_array,u_array,m_array,dt,dx,time,index):
 	BIGZERO = np.zeros(alphas.size)
-	sigma2 = Sigma_local(time,x_array[index],alphas,m_array[index])**2
+	sigma2 = Sigma_global(time,x_array[index],alphas,m_array[index])**2
 	movement = f_global(time,x_array[index],alphas)
 	L_var = L_global(time,x_array[index],alphas,m_array[index])
 	dx2 = dx**2
@@ -88,6 +113,9 @@ def hamiltonian(alphas,x_array,u_array,m_array,dt,dx,time,index):
 	else:
 		tmp = u_array[index]*(-abs(movement)/dx - sigma2/dx2) + u_array[index+1]*(sigma2/(2*dx2) + np.maximum(movement,BIGZERO)/dx) + u_array[index-1]*(sigma2/(2*dx2) - np.minimum(movement,BIGZERO)/dx) + L_var
 	#print "Returning..."
+	#plt.plot(alphas,tmp)
+	#plt.show()
+	#print tmp
 	return tmp
 
 ###################
@@ -129,47 +157,67 @@ def powerbill(time):
 
 def L_global(time,x_array,a_array,m_array): #general cost
 	#return a_array + np.sqrt(x_array) + a_array**2 #Classic Robstad
-	return 0.5*a_array**2 + F_global(x_array,m_array,0,time) #HJB test and "nice" MFG
+	one = np.ones(x_array.size)
+	xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
+	return np.exp(-time)*abs(x_array+.5)*.1 + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
+	#return 0.5*a_array**2 + F_global(x_array,m_array,0,time) #HJB test and "nice" MFG
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#return -1*np.ones(x_array.size) #FP test, constant coefficients
 	#return 2.5*x_array #Ornstein FP test
-	return a_array #standard MFG, HJB test
+	return x_array*np.sin(a_array) #brutal test
+	#return a_array #standard MFG, HJB test
 
 def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJB test
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
-	return .1*np.ones(x_array.size)
+	one = np.ones(m_array.size)
+	xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
+	return 0.5*a_array**2# + xenophobia #brutal test
+	#return .1*np.ones(x_array.size)
 	#return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
-
-def Sigma_local(time,x,a,m):
-	return 0*x
 	
-#def Hamiltonian_Derivative(t,x,a,u,m,i):
-#	x = x[(i-1):(i+2)]
-#	sigma = Sigma_global(t,x,a,m)
-#	Ldir = L_global(t,x,a,m)
-#	fdir = f_global(t,x,a)
-#	dx = x[1]-x[0]
-#	#derivatives and coefficients
-#	if i!=0 and i!=x.size:
-#		Ldir = (Ldir[2]-Ldir[0])/(2*dx)
-#		fdir = (fdir[2]-fdir[0])/(2*dx)
-#		sdir = (sigma[2]-sigma[0])/(2*dx)
-#		u1 = (u[1]+u[0]-2*u[1])/dx**2
-#		u2 = (u[1]-u[0])/dx #tied to fplus
-#		u3 = (u[2]-u[1])/dx
-
+def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
+	if i!=0 and i!=m.size-1:
+		u1 = (u[i]-u[i-1])/dx
+		u2 = (u[i+1]-u[i])/dx
+		u3 = (u[i+1]+u[i-1]-2*u[i])/(dx**2)	
+	elif i==0:
+		u1 = (u[i]-u[i+1])/dx
+		u2 = (u[i+1]-u[i])/dx
+		u3 = (u[i+1]+u[i+1]-2*u[i])/(dx**2)
+	elif i==m.size-1:
+		u1 = (u[i]-u[i-1])/dx
+		u2 = (u[i-1]-u[i])/dx
+		u3 = (u[i-1]+u[i-1]-2*u[i])/(dx**2)
+	#tmp = a - 0.2 + a**3/2 * u3 + max_or_if(x*np.cos(a)*u1,x*np.sin(a))+min_or_if(x*np.cos(a)*u2,x*np.sin(a))
+	#print tmp
+	return a - 0.2 + a**3/2 * u3 + max_or_if(x*np.cos(a)*u1,x*np.sin(a))+min_or_if(x*np.cos(a)*u2,x*np.sin(a))
+def Hamiltonian_Derivative2(a,t,x,u,m,i,dx):
+	if i!=0 and i!=m.size-1:
+		u1 = (u[i]-u[i-1])/dx
+		u2 = (u[i+1]-u[i])/dx
+		u3 = (u[i+1]+u[i-1]-2*u[i])/(dx**2)	
+	elif i==0:
+		u1 = (u[i]-u[i+1])/dx
+		u2 = (u[i+1]-u[i])/dx
+		u3 = (u[i+1]+u[i+1]-2*u[i])/(dx**2)
+	elif i==m.size-1:
+		u1 = (u[i]-u[i-1])/dx
+		u2 = (u[i-1]-u[i])/dx
+		u3 = (u[i-1]+u[i-1]-2*u[i])/(dx**2)
+	return 1 + 1.5*a**2 * u3 - max_or_if(x*np.sin(a)*u1,x*np.sin(a))-min_or_if(x*np.sin(a)*u2,x*np.sin(a))
 
 ##################
 #TERMINAL COST
 ##################
 def G(x_array,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
-	#return -0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
+	return -(x_array+2)**2 * (x_array-2)**2 + 4
+	#return 0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
 	#return 0.1*(x_array*(1-x_array))**2 #Gueant's game
 	#return -((x_array+0.2)*(1.2-x_array))**4 #Shyness game
-	return np.zeros(x_array.size) #Carlini's no-game & Isolation game
+	#return np.zeros(x_array.size) #Carlini's no-game & Isolation game
 	#return 0.001*m_array
 
 
@@ -178,7 +226,11 @@ def G(x_array,m_array): #this is the final cost, and is a function of the entire
 ##################
 def initial_distribution(x):
 	#return 1-0.2*np.cos(np.pi*x) #gueant's original
-	return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+	#return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+	m0 = 0.33*np.exp(-(x-0.00)**2/0.1**2)
+	m0 += 0.33*np.exp(-(x-1)**2/0.1**2)
+	m0 += 0.33*np.exp(-(x+1)**2/0.1**2)
+	return m0
 	#return np.exp(-(x-0.5)**2/0.1**2) #shyness game
 	#return np.exp(-(x-0.3)**2/0.1**2) #isolation game
 	#return 1/(3*x+1)**3 #isolation game 2
@@ -202,6 +254,19 @@ def restrain(trajectory,x_array):
 	return trajectory
 def restrain4isolation(trajectory,x_array):
 	return np.maximum(restrain(trajectory),x_array)
+
+def max_or_if(val,valif):
+	if valif>0:
+		return val
+	else:
+		return 0
+
+def min_or_if(val,valif):
+	if valif<=0:
+		return val
+	else:
+		return 0
+
 
 ###############THIS SHOULD GO AWAY
 def beta(x_val,i,x_array):

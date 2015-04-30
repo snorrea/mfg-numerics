@@ -41,7 +41,11 @@ def fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
 	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
 	movement = iF.f_global(time,x,a_tmp) #the function f
 	#generate the flux vectors
-	Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
+	sigmad = np.gradient(sigma,dx)
+	#print sigmad
+	#print movement
+	#Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
+	Fi = movement[1:-1]-sigma[1:-1]*sigmad[1:-1]	
 	Fi = np.append(Fi,(dx*movement[-1])/dx )
 	Fi = np.insert(Fi,0,(dx*movement[0])/dx)
 	#Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
