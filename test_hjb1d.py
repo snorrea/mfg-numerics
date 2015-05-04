@@ -15,11 +15,11 @@ gll_x = qn.GLL_points(quad_order) #quadrature nodes
 gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #INPUTS
-REFINEMENTS = 8
+REFINEMENTS = 5
 X_NAUGHT = 0.0
 n = 2
-tau = 10
-omega = 20
+tau = 1
+omega = 1
 DT = 1 #ratio as in dt = DT*dx(**2)
 POINTS = 20
 NICE_DIFFUSION = 1
@@ -47,8 +47,10 @@ for N in range(0,REFINEMENTS):
 	#CRUNCH
 	print "(",dx,",",dt,")"
 	dx2 = dx**2
+	tol = 10*dx#1e-16#dx**2
 	Nx = int(abs(xmax-xmin)/dx)
 	Nt = int(np.ceil(T/dt))
+	search_space = np.linspace(-1,1,200)
 	x = np.linspace(xmin,xmax,Nx)
 	I = x.size #space
 	#INITIALISE STORAGE
@@ -60,7 +62,11 @@ for N in range(0,REFINEMENTS):
 	#SOLVE STUFF
 	t0 = time.time()
 	for k in range(Nt-1,-1,-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-		a_tmp = -np.gradient(u,dx)
+		#a_tmp = -np.gradient(u,dx)
+		a_tmp = solve.control_hybrid(x,k*dt,u,u,dt,dx,search_space,tol,5)
+		#if k==Nt-1:
+		#	print a_tmp
+		#	print ss
 		if NICE_DIFFUSION==0:
 			u = solve.hjb_kushner_mod(x,k*dt,u,u,a_tmp,dt,dx) #implicit
 		else:

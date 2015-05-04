@@ -207,8 +207,10 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 #RUNNING COST
 ###################
 def F_global(x_array,m_array,sigma,time): #more effective running cost function
-	return (x_array-0.2)**2 #Carlini's no-game
-	#return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
+	#return (x_array-0.2)**2 #Carlini's no-game
+	tau = 1
+	omega = 1
+	return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
 	#ONE = np.ones(m_array.size)
 	#return (x_array-0.2)**2 + np.minimum(4*ONE,np.maximum(m_array,ONE))
 	#return np.minimum(1.4*np.ones(x_array.size),np.maximum(m_array,0.7*np.ones(x_array.size))) #Gueant's game
@@ -233,26 +235,26 @@ def powerbill(time):
 
 def L_global(time,x_array,a_array,m_array): #general cost
 	#return a_array + np.sqrt(x_array) + a_array**2 #Classic Robstad
-	one = np.ones(x_array.size)
-	xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
-	return np.exp(-time)*abs(x_array) + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
-	#return 0.5*a_array**2 + F_global(x_array,m_array,0,time) #HJB test and "nice" MFG
+	#one = np.ones(x_array.size)
+	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
+	#return np.exp(-time)*abs(x_array) + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
+	return 0.5*a_array**2 + F_global(x_array,m_array,0,time) #HJB test and "nice" MFG
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#return -1*np.ones(x_array.size) #FP test, constant coefficients
 	#return 2.5*x_array #Ornstein FP test
-	return x_array*np.sin(a_array) #brutal test
-	#return a_array #standard MFG, HJB test
+	#return x_array*np.sin(a_array) #brutal test
+	return a_array #standard MFG, HJB test
 
 def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJB test
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
-	one = np.ones(m_array.size)
-	xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
-	return 0.5*a_array**2# + xenophobia #brutal test
+	#one = np.ones(m_array.size)
+	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
+	#return 0.5*a_array**2# + xenophobia #brutal test
 	#return .1*np.ones(x_array.size)
-	#return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
+	return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
 	
 def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 	#print x
@@ -272,7 +274,15 @@ def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 	#print tmp
 	#print "Inputs:",a,t,x[i],u,m,i,dx
 	#print a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
-	return a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
+	return a + u1*max_or_if(1,a) + u2*min_or_if(1,a) #HJB exact test
+	#return a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
+#def max_or_if(val,valif):
+#	if valif>0:
+#		return val
+#	else:
+#		return 0
+
+
 def Hamiltonian_Derivative2(a,t,x,u,m,i,dx):
 	if i!=0 and i!=m.size-1:
 		u1 = (u[i]-u[i-1])/dx

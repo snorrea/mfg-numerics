@@ -88,6 +88,7 @@ def F_global(x,y,m_array,time): #more effective running cost function
 	D11 = Sigma_D11_test(time,x,y,x,x,x)
 	D22 = Sigma_D22_test(time,x,y,x,x,x)
 	D12 = Sigma_D12_test(time,x,y,x,x,x)
+	[f1, f2] = f_global(time,x,y,x,y)
 	x,y = np.meshgrid(x,y)
 	#return 0*x
 	sinx = np.sin(x)
@@ -95,7 +96,8 @@ def F_global(x,y,m_array,time): #more effective running cost function
 	siny = np.sin(y)
 	cosy = np.cos(y)
 	et = np.exp(-time)
-	return (1+D11/2+D22/2)*et*cosx*cosy + 0.5*et**2 * ( (sinx*cosy)**2 + (cosx*siny)**2) - D12*et*sinx*siny
+	#return (1+D11/2+D22/2)*et*cosx*cosy + 0.5*et**2 * ( (sinx*cosy)**2 + (cosx*siny)**2) - D12*et*sinx*siny #HJB exact test
+	return et*cosx*cosy*(-1-.5*D11-.5*D22 + .1*x+.1*y ) - et*sinx*cosy*f1 - et*cosx*siny*f2 + D12*et*sinx*siny
 	#return 0*x_array#no-game
 
 def L_global(time,x,y,a1,a2,m_array): #general cost
@@ -105,17 +107,19 @@ def L_global(time,x,y,a1,a2,m_array): #general cost
 
 def f_global(time,x_array,y_array,ax_array,ay_array):
 	#return 0.1*a_array*x_array #Classic Robstad
-	return [ax_array, ay_array] #standard MFG
+	x,y = np.meshgrid(x_array,y_array)
+	return [.1*x_array*y_array,.1*x_array*y_array] #FP test
+	#return [ax_array, ay_array] #standard MFG
 
 def Sigma_D11_test(time,x,y,ax_array,ay_array,m_array):
-	#x,y = np.meshgrid(x,y)
-	return .5**2*np.ones(ax_array.shape)
+	x,y = np.meshgrid(x,y)
+	return .5**2*np.ones(x.shape)
 def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
-	#x,y = np.meshgrid(x,y)
-	return .5**2*np.ones(ax_array.shape)
+	x,y = np.meshgrid(x,y)
+	return .5**2*np.ones(x.shape)
 def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
-	#x,y = np.meshgrid(x,y)
-	return .0**2*np.ones(ax_array.shape)
+	x,y = np.meshgrid(x,y)
+	return .0**2*np.ones(x.shape)
 
 ##################
 #TERMINAL COST

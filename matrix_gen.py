@@ -143,9 +143,13 @@ def HJB_convection_explicit(time,x,y,a1,a2,dx,dy,dt): #this should work, but als
 def FP_convection_explicit(time,x,y,a1,a2,m,dx,dt):
 	I,J = x.size,y.size
 	[f1, f2] = iF.f_global(time,x,y,a1,a2)
-	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m_tmp)
-	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m_tmp)
-	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m_tmp)
+	xbound1 = range(0,I) 
+	ybound1 = range(0,I*J,I)
+	xbound2 = range(I*J-I,I*J)
+	ybound2 = range(I-1,I*J,I)
+	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m)
+	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m)
+	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m)
 	D11x,D11y = np.gradient(D11,dx,dx)
 	D22x,D22y = np.gradient(D22,dx,dx)
 	D12x,D12y = np.gradient(D12,dx,dx)
@@ -153,6 +157,8 @@ def FP_convection_explicit(time,x,y,a1,a2,m,dx,dt):
 	F1 = np.ravel(f1 - 0.5*D11x-0.5*D12y) #may be too simple... but it sure feels delish
 	F2 = np.ravel(f2 - 0.5*D12x-0.5*D22y)
 	#make vectors
+	#print f1
+	#print ss
 	zero = np.zeros(F1.size)
 	here = 1-dt/dx*(abs(F1)+abs(F2)) #[i,i]
 	north = np.zeros(I*J) #[i,i+I]
@@ -184,6 +190,27 @@ def FP_convection_explicit(time,x,y,a1,a2,m,dx,dt):
 	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1]],[0, I, -I, -1, 1])
 	return sparse.csr_matrix(output)
 
+def FP_diffusion_implicit_Ometh(time,x,y,a1,a2,m,dx,dt):
+	I,J = x.size,y.size
+	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m)
+	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m)
+	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m)
+	lamb = dt/(dx**2)
+	LHS = sparse.eye(I*J)/lamb
+	LHS = sparse.lil_matrix(LHS)
+	LHS = add_diffusion_flux_Ometh(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt,0)
+	return sparse.csr_matrix(LHS)*lamb
+
+def FP_diffusion_implicit_Diamond(time,x,y,a1,a2,m,dx,dt):
+	I,J = x.size,y.size
+	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m)
+	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m)
+	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m)
+	lamb = dt/(dx**2)
+	LHS = sparse.eye(I*J)/lamb
+	LHS = sparse.lil_matrix(LHS)
+	LHS = add_diffusion_flux_DIAMOND(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt)
+	return sparse.csr_matrix(LHS)*lamb
 
 def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
 	h = dx
@@ -197,6 +224,7 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
 	D22 = np.ravel(D22)
 	for i in range(0,I*J-I-1):
 		#make matrices
+		#print i,I*J-I-1-1
 		a1,a2,a3,a4 = D11[i],D11[i+1],D11[i+I],D11[i+I+1]
 		b1,b2,b3,b4 = D22[i],D22[i+1],D22[i+I],D22[i+I+1]
 		c1,c2,c3,c4 = D12[i],D12[i+1],D12[i+I],D12[i+I+1]
@@ -423,209 +451,8 @@ def m_matrix_iioe(f1_array,f2_array,D11,D22,D12,I,J,dx,dt):
 			LHS[i,i-I-1] += -0.125*(D12[i-1]+D12[i-I])
 	return lamb*sparse.csr_matrix(LHS),lamb*sparse.csr_matrix(RHS)
 	
-def m_matrix_explicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt): #THIS JUST WORKS
-	output = np.zeros((I*J,I*J))
-	lamb = dt/(dx**2)
-	h = dx
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
-	#flatten out D12, D11, D22, f1_array, f2_array
-	D11 = np.ravel(D11)
-	D12 = np.ravel(D12)
-	D22 = np.ravel(D22)
-	f1 = np.ravel(f1_array)
-	f2 = np.ravel(f2_array)
-	for i in range (0,I*J):
-		output[i,i] += 1/lamb
-		if not ismember(i,xbound1) and not ismember(i,xbound2) and not ismember(i,ybound1) and not ismember(i,ybound2):
-			#convection terms
-			#north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
-			#south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
-			#west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
-			#east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
-			#here1 = 0.5*(2*f1[index]-
-			output[i,i] += max(0,east)+max(0,north)-min(0,west)-min(0,south)
-			output[i,i+1] += min(0,east)
-			output[i,i-1] += -max(0,west)
-			output[i,i+I] += min(0,north)
-			output[i,i-I] += -max(0,south)
-			#diffusion terms
-			pe = app.hmean(D11[i],D11[i+1])/2
-			pn = app.hmean(D22[i],D22[i+I])/2
-			pw = app.hmean(D11[i],D11[i-1])/2
-			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pn-pw-ps)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
-			output[i,i-1] += pw
-			output[i,i-I] += ps
-			#cross diffusion terms #these guys are coefficients for the respective things
-			ne = 0.25*(D12[i+1]+D12[i+I])/2
-			se = -0.25*(D12[i-I]+D12[i+1])/2
-			sw = 0.25*(D12[i-1]+D12[i-I])/2
-			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i+1+I] += ne
-			output[i,i+1-I] += se
-			output[i,i-I-1] += sw
-			output[i,i-1+I] += nw
-		elif ismember(i,xbound1) and ismember(i,ybound1): #SOUTH-WEST
-			#convection terms
-			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
-			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
-			output[i,i] += max(0,east)+max(0,north)
-			output[i,i+1] += min(0,east)
-			output[i,i+I] += min(0,north)
-			#diffusion terms
-			pe = app.hmean(D11[i],D11[i+1])/2
-			pn = app.hmean(D22[i],D22[i+I])/2
-			output[i,i] += (-pe-pn)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
-			#cross diffusion terms #these guys are coefficients for the respective things
-			ne = 0.25*(D12[i+1]+D12[i+I])/2
-			output[i,i+1+I] += ne
-		elif ismember(i,xbound2) and ismember(i,ybound2): #NORTH-EAST
-			#convection terms
-			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
-			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
-			output[i,i] += -min(0,west)-min(0,south)
-			output[i,i-1] += -max(0,west)
-			output[i,i-I] += -max(0,south)
-			#diffusion terms
-			pw = app.hmean(D11[i],D11[i-1])/2
-			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pw-ps)
-			output[i,i-1] += pw
-			output[i,i-I] += ps
-			#cross diffusion terms #these guys are coefficients for the respective things
-			sw = 0.25*(D12[i-1]+D12[i-I])/2
-			output[i,i-I-1] += sw
-		elif ismember(i,xbound1) and ismember(i,ybound2): #SOUTH-EAST
-			#convection terms
-			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
-			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
-			output[i,i] += max(0,north)-min(0,west)
-			output[i,i-1] += -max(0,west)
-			output[i,i+I] += min(0,north)
-			#diffusion terms
-			pn = app.hmean(D22[i],D22[i+I])/2
-			pw = app.hmean(D11[i],D11[i-1])/2
-			output[i,i] += (-pn-pw)
-			output[i,i+I] += pn
-			output[i,i-1] += pw
-			#cross diffusion terms #these guys are coefficients for the respective things
-			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i-1+I] += nw
-		elif ismember(i,xbound2) and ismember(i,ybound1): #NORTH-WEST
-			#convection terms
-			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
-			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
-			output[i,i] += max(0,east)-min(0,south)
-			output[i,i+1] += min(0,east)
-			output[i,i-I] += -max(0,south)
-			#diffusion terms
-			pe = app.hmean(D11[i],D11[i+1])/2
-			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pn-pw-ps)
-			output[i,i+1] += pe
-			output[i,i-I] += ps
-			#cross diffusion terms #these guys are coefficients for the respective things
-			se = -0.25*(D12[i-I]+D12[i+1])/2
-			output[i,i+1-I] += se
-		elif ismember(i,xbound1): #SOUTH
-			#convection terms
-			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
-			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
-			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
-			output[i,i] += max(0,east)+max(0,north)-min(0,west)
-			output[i,i+1] += min(0,east)
-			output[i,i-1] += -max(0,west)
-			output[i,i+I] += min(0,north)
-			#diffusion terms
-			pe = app.hmean(D11[i],D11[i+1])/2
-			pn = app.hmean(D22[i],D22[i+I])/2
-			pw = app.hmean(D11[i],D11[i-1])/2
-			output[i,i] += (-pe-pn-pw)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
-			output[i,i-1] += pw
-			#cross diffusion terms #these guys are coefficients for the respective things
-			ne = 0.25*(D12[i+1]+D12[i+I])/2
-			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i+1+I] += ne
-			output[i,i-1+I] += nw
-		elif ismember(i,xbound2): #NORTH
-			#convection terms
-			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
-			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
-			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
-			output[i,i] += max(0,east)-min(0,west)-min(0,south)
-			output[i,i+1] += min(0,east)
-			output[i,i-1] += -max(0,west)
-			output[i,i-I] += -max(0,south)
-			#diffusion terms
-			pe = app.hmean(D11[i],D11[i+1])/2
-			pw = app.hmean(D11[i],D11[i-1])/2
-			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pw-ps)
-			output[i,i+1] += pe
-			output[i,i-1] += pw
-			output[i,i-I] += ps
-			#cross diffusion terms #these guys are coefficients for the respective things
-			se = -0.25*(D12[i-I]+D12[i+1])/2
-			sw = 0.25*(D12[i-1]+D12[i-I])/2
-			output[i,i+1-I] += se
-			output[i,i-I-1] += sw
-		elif ismember(i,ybound1): #WEST
-			#convection terms
-			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
-			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
-			east = 0.125*(4*(D11[i+1]-D11[i]) - 4*dx*(f1[i]+f1[i+1] - (D12[i+I]+D12[i+I+1]-D12[i-I]-D12[i-I+1]))) #okay ito signs
-			output[i,i] += max(0,east)+max(0,north)-min(0,south)
-			output[i,i+1] += min(0,east)
-			output[i,i+I] += min(0,north)
-			output[i,i-I] += -max(0,south)
-			#diffusion terms
-			pe = app.hmean(D11[i],D11[i+1])/2
-			pn = app.hmean(D22[i],D22[i+I])/2
-			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pn-pw-ps)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
-			output[i,i-I] += ps
-			#cross diffusion terms #these guys are coefficients for the respective things
-			ne = 0.25*(D12[i+1]+D12[i+I])/2
-			se = -0.25*(D12[i-I]+D12[i+1])/2
-			output[i,i+1+I] += ne
-			output[i,i+1-I] += se
-		elif ismember(i,ybound2): #EAST
-			#convection terms
-			north = 0.125*(4*(D22[i+I]-D22[i]) - 4*dx*(f2[i]+f2[i+I]) + (D12[i+1+I]+D12[i+I]-D12[i-I]-D12[i-1-I]) ) #okay ito signs
-			south = 0.125*(4*(D22[i-I]-D22[i]) - 4*dx*(f2[i]+f2[i-I]) - (D12[i+1-I]+D12[i+1]-D12[i-1]-D12[i-1-I]) ) #okay ito signs
-			west = 0.125*(4*(D11[i-1]-D11[i]) - 4*dx*(f1[i]+f1[i-1]) - (D12[i+I]+D12[i+I-1]-D12[i-I]-D12[i-I-1])) #okay ito signs
-			output[i,i] += max(0,north)-min(0,west)-min(0,south)
-			output[i,i-1] += -max(0,west)
-			output[i,i+I] += min(0,north)
-			output[i,i-I] += -max(0,south)
-			#diffusion terms
-			pn = app.hmean(D22[i],D22[i+I])/2
-			pw = app.hmean(D11[i],D11[i-1])/2
-			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-ps-pn-pw)
-			output[i,i-I] += ps
-			output[i,i+I] += pn
-			output[i,i-1] += pw
-			#cross diffusion terms #these guys are coefficients for the respective things
-			sw = 0.25*(D12[i-1]+D12[i-I])/2
-			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i-I-1] += sw
-			output[i,i-1+I] += nw
-			#Quoth The Hound, "Fuck the boundary!"
-	return lamb*sparse.csr_matrix(output)
 
-def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bueno
+def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bueno, also this is implicit
 	#output = np.zeros((I*J,I*J))
 	h = dx
 	xbound1 = range(0,I)
@@ -643,116 +470,116 @@ def add_diffusion_flux_DIAMOND(output,D11,D22,D12,I,J,dx,dt): #boundary is no bu
 			pn = app.hmean(D22[i],D22[i+I])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pn-pw-ps)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
-			output[i,i-1] += pw
-			output[i,i-I] += ps
+			output[i,i] += -(-pe-pn-pw-ps)
+			output[i,i+1] += -pe
+			output[i,i+I] += -pn
+			output[i,i-1] += -pw
+			output[i,i-I] += -ps
 			#cross diffusion terms #these guys are coefficients for the respective things
 			ne = 0.25*(D12[i+1]+D12[i+I])/2
 			se = -0.25*(D12[i-I]+D12[i+1])/2
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i+1+I] += ne
-			output[i,i+1-I] += se
-			output[i,i-I-1] += sw
-			output[i,i-1+I] += nw
+			output[i,i+1+I] += -ne
+			output[i,i+1-I] += -se
+			output[i,i-I-1] += -sw
+			output[i,i-1+I] += -nw
 		elif ismember(i,xbound1) and ismember(i,ybound1): #SOUTH-WEST
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pn = app.hmean(D22[i],D22[i+I])/2
-			output[i,i] += (-pe-pn)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
+			output[i,i] += -(-pe-pn)
+			output[i,i+1] += -pe
+			output[i,i+I] += -pn
 			#cross diffusion terms #these guys are coefficients for the respective things
 			ne = 0.25*(D12[i+1]+D12[i+I])/2
-			output[i,i+1+I] += ne
+			output[i,i+1+I] += -ne
 		elif ismember(i,xbound2) and ismember(i,ybound2): #NORTH-EAST
 			#diffusion terms
 			pw = app.hmean(D11[i],D11[i-1])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pw-ps)
-			output[i,i-1] += pw
-			output[i,i-I] += ps
+			output[i,i] += -(-pw-ps)
+			output[i,i-1] += -pw
+			output[i,i-I] += -ps
 			#cross diffusion terms #these guys are coefficients for the respective things
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
-			output[i,i-I-1] += sw
+			output[i,i-I-1] += -sw
 		elif ismember(i,xbound1) and ismember(i,ybound2): #SOUTH-EAST
 			#diffusion terms
 			pn = app.hmean(D22[i],D22[i+I])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
-			output[i,i] += (-pn-pw)
-			output[i,i+I] += pn
-			output[i,i-1] += pw
+			output[i,i] += -(-pn-pw)
+			output[i,i+I] += -pn
+			output[i,i-1] += -pw
 			#cross diffusion terms #these guys are coefficients for the respective things
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i-1+I] += nw
+			output[i,i-1+I] += -nw
 		elif ismember(i,xbound2) and ismember(i,ybound1): #NORTH-WEST
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pn-pw-ps)
-			output[i,i+1] += pe
-			output[i,i-I] += ps
+			output[i,i] += -(-pe-pn-pw-ps)
+			output[i,i+1] += -pe
+			output[i,i-I] += -ps
 			#cross diffusion terms #these guys are coefficients for the respective things
 			se = -0.25*(D12[i-I]+D12[i+1])/2
-			output[i,i+1-I] += se
+			output[i,i+1-I] += -se
 		elif ismember(i,xbound1): #SOUTH
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pn = app.hmean(D22[i],D22[i+I])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
-			output[i,i] += (-pe-pn-pw)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
-			output[i,i-1] += pw
+			output[i,i] += -(-pe-pn-pw)
+			output[i,i+1] += -pe
+			output[i,i+I] += -pn
+			output[i,i-1] += -pw
 			#cross diffusion terms #these guys are coefficients for the respective things
 			ne = 0.25*(D12[i+1]+D12[i+I])/2
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i+1+I] += ne
-			output[i,i-1+I] += nw
+			output[i,i+1+I] += -ne
+			output[i,i-1+I] += -nw
 		elif ismember(i,xbound2): #NORTH
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pw-ps)
-			output[i,i+1] += pe
-			output[i,i-1] += pw
-			output[i,i-I] += ps
+			output[i,i] += -(-pe-pw-ps)
+			output[i,i+1] += -pe
+			output[i,i-1] += -pw
+			output[i,i-I] += -ps
 			#cross diffusion terms #these guys are coefficients for the respective things
 			se = -0.25*(D12[i-I]+D12[i+1])/2
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
-			output[i,i+1-I] += se
-			output[i,i-I-1] += sw
+			output[i,i+1-I] += -se
+			output[i,i-I-1] += -sw
 		elif ismember(i,ybound1): #WEST
 			#diffusion terms
 			pe = app.hmean(D11[i],D11[i+1])/2
 			pn = app.hmean(D22[i],D22[i+I])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-pe-pn-pw-ps)
-			output[i,i+1] += pe
-			output[i,i+I] += pn
-			output[i,i-I] += ps
+			output[i,i] += -(-pe-pn-pw-ps)
+			output[i,i+1] += -pe
+			output[i,i+I] += -pn
+			output[i,i-I] += -ps
 			#cross diffusion terms #these guys are coefficients for the respective things
 			ne = 0.25*(D12[i+1]+D12[i+I])/2
 			se = -0.25*(D12[i-I]+D12[i+1])/2
-			output[i,i+1+I] += ne
-			output[i,i+1-I] += se
+			output[i,i+1+I] += -ne
+			output[i,i+1-I] += -se
 		elif ismember(i,ybound2): #EAST
 			#diffusion terms
 			pn = app.hmean(D22[i],D22[i+I])/2
 			pw = app.hmean(D11[i],D11[i-1])/2
 			ps = app.hmean(D22[i],D22[i-I])/2
-			output[i,i] += (-ps-pn-pw)
-			output[i,i-I] += ps
-			output[i,i+I] += pn
-			output[i,i-1] += pw
+			output[i,i] += -(-ps-pn-pw)
+			output[i,i-I] += -ps
+			output[i,i+I] += -pn
+			output[i,i-1] += -pw
 			#cross diffusion terms #these guys are coefficients for the respective things
 			sw = 0.25*(D12[i-1]+D12[i-I])/2
 			nw = -0.25*(D12[i+I]+D12[i-1])/2
-			output[i,i-I-1] += sw
-			output[i,i-1+I] += nw
+			output[i,i-I-1] += -sw
+			output[i,i-1+I] += -nw
 			#Quoth The Hound, "Fuck the boundary!"
 	return sparse.csr_matrix(output)
 

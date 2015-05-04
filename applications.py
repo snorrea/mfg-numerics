@@ -51,6 +51,72 @@ def scatter_search(function, (args),dx,dy,x0,y0,N,k,xmin,xmax,ymin,ymax): #here 
 	#print "Storage:",xpts.shape,ypts.shape
 	return xpts[xi,yi],ypts[xi,yi]
 
+def hybrid_search(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,xmax,ymin,ymax): 
+	x_naught = x0
+	y_naught = y0
+	dex_x = dx
+	dex_y = dy
+	for i in range (0,max_iterations):
+		[p1,p2] = funcprime(x_naught,y_naught,*args)
+		psign1 = np.sign(p1)
+		psign2 = np.sign(p2)
+		if (psign1 > 0 and x_naught==xmin) or (psign1<0 and x_naught==xmax) or (psign1==0): #x0 is found
+			if (psign2 > 0 and y_naught==ymin) or (psign2 <0 and y_naught==ymax) or (psign2==0):
+				return x_naught,y_naught
+			else: #search in y
+				if y_naught+dex_y > ymax:
+					ypts = np.linspace(y_naught-dex_y,ymax,N)
+				elif y_naught-dex_y < ymin:
+					ypts = np.linspace(ymin,y_naught+dex_y,N)
+				else:
+					ypts = np.linspace(y_naught-dex_y,y_naught+dex_y,N)
+			#NEEDS TO EVAL AND ALL THAT
+		elif (psign2 > 0 and y_naught==ymin) or (psign2<0 and y_naught==ymax) or (psign2==0): #y0 is found
+			if (psign1 > 0 and x_naught==xmin) or (psign1 <0 and x_naught==xmax) or (psign1==0):
+				return x_naught,y_naught
+			else: #search in x
+				if x_naught+dex_x > xmax:
+					xpts = np.linspace(x_naught-dex_x,xmax,N)
+				elif x_naught-dex_y < ymin:
+					xpts = np.linspace(xmin,x_naught+dex_x,N)
+				else:
+					xpts = np.linspace(x_naught-dex_x,x_naught+dex_x,N)
+			#NEEDS TO EVAL AND ALL THAT
+		else:
+			if x_naught+dex_x > xmax:
+				xpts = np.linspace(x_naught-dex_x,xmax,N)
+			elif x_naught-dex_x < xmin:
+				xpts = np.linspace(xmin,x_naught+dex_x,N)
+			else:
+				xpts = np.linspace(x_naught-dex_x,x_naught+dex_x,N)
+			if y_naught+dex_y > ymax:
+				ypts = np.linspace(y_naught-dex_y,ymax,N)
+			elif y_naught-dex_y < ymin:
+				ypts = np.linspace(ymin,y_naught+dex_y,N)
+			else:
+				ypts = np.linspace(y_naught-dex_y,y_naught+dex_y,N)
+		xpts,ypts = np.meshgrid(xpts,ypts)
+		fpts = function(xpts,ypts,*args)
+		if i!=k-1:
+			key = xpts.shape
+			crit_ind = np.argmin(fpts)
+			xi,yi = recover_index(crit_ind,key[0])
+			x_naught = xpts[xi,yi]
+			y_naught = ypts[xi,yi]
+			dex_x = xpts[0,1]-xpts[0,0]
+			dex_y = ypts[1,0]-ypts[0,0]
+			if max(abs(dex_x),abs(dex_y)) < tolerance:
+				return x_naught,y_naught
+			#print dex_x,dex_y
+			#print ss
+	crit_ind = np.argmin(fpts)
+	#print crit_ind
+	xi,yi = recover_index(crit_ind,key[0])
+	#print xi,yi
+	#print "Indices:",xi,yi
+	#print "Storage:",xpts.shape,ypts.shape
+	return xpts[xi,yi],ypts[xi,yi]
+
 
 ###################
 #AUXILIARY FUNCTIONS
