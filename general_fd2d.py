@@ -10,6 +10,7 @@ from numpy.linalg import cond
 import input_functions_2D as iF
 import applications as app
 import matrix_gen as mg
+import solvers_2D as solve
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial import Delaunay
 
@@ -126,7 +127,7 @@ for n in range (0,Niter):
 		a1_tmp = np.empty((x.size,y.size))
 		a2_tmp = np.empty((x.size,y.size))
 		#find the bestest controls for the entire grid...
-		a1_tmp, a2_tmp = app.policy_implicit(xpts_search,x,y,u_last,m_tmp,dt,dx,k*dt,I,J,1e-4,scatters,N)
+		a1_tmp, a2_tmp = solve.control_general(xpts_search,x,y,u_last,m_tmp,dt,dx,k*dt,I,J,1e-4,scatters,N)
 		L_var = np.ravel(iF.L_global(k*dt,x,y,a1_tmp,a2_tmp,m_tmp)) #this has been vetted
 		[f1_array, f2_array] = iF.f_global(k*dt,x,y,a1_tmp,a2_tmp)
 		D11 = iF.Sigma_D11_test(time,x,y,a1_tmp,a2_tmp,m_tmp)

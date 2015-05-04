@@ -6,64 +6,76 @@ from scipy import sparse
 ###################
 #POLICY ITERATION FUNCTIONS
 ###################
-
-def hamiltonian(ax_array,ay_array,x_array,y_array,u_array,m_array,dt,dx,time,index_x,index_y,I,J): #spits out a 2D array of Hamiltonian values given arrays of inputs ax_array \times ay_array
+def hamiltonian(ax_array,ay_array,x_array,y_array,u_array,m_array,dt,dx,dy,time,index_x,index_y,I,J): #spits out a 2D array of Hamiltonian values given arrays of inputs ax_array \times ay_array
 	ind = index_x+index_y*I
-	#print ax_array.size,ay_array.size
-	zero = np.zeros((ax_array.size,ay_array.size))
-	d11 = Sigma_D11(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array[ind]) #all these bitches return matrices now
-	d12 = Sigma_D12(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array[ind]) #all these bitches
-	d22 = Sigma_D22(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array[ind])
-	f1,f2 = f_test(time,x_array[index_x],y_array[index_y],ax_array,ay_array) #and these also
-	L = L_test(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array)
+	#print "Hamiltonian:", ax_array.shape,ay_array.shape
+	#print ss
+	zero = np.zeros(ax_array.shape)
+	d11 = Sigma_D11_test(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array[ind]) #all these bitches return matrices now
+	d12 = Sigma_D12_test(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array[ind]) #all these bitches
+	d22 = Sigma_D22_test(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array[ind])
+	f1,f2 = f_global(time,x_array[index_x],y_array[index_y],ax_array,ay_array) #and these also
+	L = L_global(time,x_array[index_x],y_array[index_y],ax_array,ay_array,m_array)
+	#print "Stuff:", d11.shape,d22.shape,f1.shape,L.shape,zero.shape,u_array.shape
+	#print ss
 	dx2 = dx**2
+	dy2 = dy**2
+	dxy = dx*dy
 	xbound1 = range(0,I)
 	ybound1 = range(0,I*J,I)
 	xbound2 = range(I*J-I,I*J)
 	ybound2 = range(I-1,I*J,I)
-	tmp = u_array[ind]*( -(abs(f1)+abs(f2))/dx + ( abs(d12)-d11-d22 )/dx2 ) + L
+	tmp = u_array[ind]*( -(abs(f1)/dx+abs(f2)/dy) + ( abs(d12)/dxy-d11/dx2-d22/dy2 ) ) + L
 	#avoid segfaults
-	if not ismember_sorted(ind,xbound1): #allows (i,j-1)
-		tmp += u_array[ind-I]*( -np.minimum(f2,zero)/dx + (d22-abs(d12))/(2*dx2) )
-	if not ismember_sorted(ind,xbound2): #allows (i,j+1)
-		tmp += u_array[ind+I]*( np.maximum(f2,zero)/dx + (d22-abs(d12))/(2*dx2) )
-	if not ismember_sorted(ind,ybound1): #allows (i-1,j)
-		tmp += u_array[ind-1]*( -np.minimum(f1,zero)/dx + (d11-abs(d12))/(2*dx2) )
-	if not ismember_sorted(ind,ybound2): #allows (i+1,j)
-		tmp += u_array[ind+1]*( np.maximum(f1,zero)/dx + (d11-abs(d12))/(2*dx2) )
-	if not ismember_sorted(ind,xbound1) and not ismember_sorted(ind,ybound1): #allows (i-1,j-1)
-		tmp += u_array[ind-1-I]*np.maximum(d12,0)/(2*dx2)
-	if not ismember_sorted(ind,xbound2) and not ismember_sorted(ind,ybound2): #allows (i+1,j+1)
-		tmp += u_array[ind+1+I]*np.maximum(d12,0)/(2*dx2)
-	if not ismember_sorted(ind,xbound1) and not ismember_sorted(ind,ybound2): #allows (i+1,j-1)
-		tmp += -u_array[ind+1-I]*np.minimum(d12,0)/(2*dx2)
-	if not ismember_sorted(ind,ybound1) and not ismember_sorted(ind,xbound2): #allows (i-1,j+1)
-		tmp += -u_array[ind-1+I]*np.minimum(d12,0)/(2*dx2)
+	if not ismember(ind,xbound1): #allows (i,j-1)
+		tmp += u_array[ind-I]*( -np.minimum(f2,zero)/dy + (d22/dy2-abs(d12)/dxy)/(2) )
+	if not ismember(ind,xbound2): #allows (i,j+1)
+		tmp += u_array[ind+I]*( np.maximum(f2,zero)/dy + (d22/dy2-abs(d12)/dxy)/(2) )
+	if not ismember(ind,ybound1): #allows (i-1,j)
+		tmp += u_array[ind-1]*( -np.minimum(f1,zero)/dx + (d11/dx2-abs(d12)/dxy)/(2) )
+	if not ismember(ind,ybound2): #allows (i+1,j)
+		tmp += u_array[ind+1]*( np.maximum(f1,zero)/dx + (d11/dx2-abs(d12)/dxy)/(2) )
+	if not ismember(ind,xbound1) and not ismember(ind,ybound1): #allows (i-1,j-1)
+		tmp += u_array[ind-1-I]*np.maximum(d12,0)/(2*dxy)
+	if not ismember(ind,xbound2) and not ismember(ind,ybound2): #allows (i+1,j+1)
+		tmp += u_array[ind+1+I]*np.maximum(d12,0)/(2*dxy)
+	if not ismember(ind,xbound1) and not ismember(ind,ybound2): #allows (i+1,j-1)
+		tmp += -u_array[ind+1-I]*np.minimum(d12,0)/(2*dxy)
+	if not ismember(ind,ybound1) and not ismember(ind,xbound2): #allows (i-1,j+1)
+		tmp += -u_array[ind-1+I]*np.minimum(d12,0)/(2*dxy)
 	#then add boundary conditions
-	if ismember_sorted(ind,xbound1): 
-		tmp += u_array[ind+I]*( -np.minimum(f2,zero)/dx + (d22-d12)/(2*dx2) )
-	if ismember_sorted(ind,xbound2):
-		tmp += u_array[ind-I]*( np.maximum(f2,zero)/dx + (d22-d12)/(2*dx2) )
-	if ismember_sorted(ind,ybound1):
-		tmp += u_array[ind+1]*( -np.minimum(f1,zero)/dx + (d11-d12)/(2*dx2) )
-	if ismember_sorted(ind,ybound2):	
-		tmp += u_array[ind-1]*( np.maximum(f1,zero)/dx + (d11-d12)/(2*dx2) )
-	if ismember_sorted(ind,xbound1) and ismember_sorted(ind,ybound1): #allows (i-1,j-1)
-		tmp += u_array[ind+1+I]*np.maximum(d12,0)/(2*dx2)
-	if ismember_sorted(ind,xbound2) and ismember_sorted(ind,ybound2): #allows (i+1,j+1)
-		tmp += u_array[ind-1-I]*np.maximum(d12,0)/(2*dx2)
-	if ismember_sorted(ind,xbound1) and ismember_sorted(ind,ybound2): #allows (i+1,j-1)
-		tmp += -u_array[ind-1+I]*np.minimum(d12,0)/(2*dx2)
-	if ismember_sorted(ind,ybound1) and ismember_sorted(ind,xbound2): #allows (i-1,j+1)
-		tmp += -u_array[ind+1-I]*np.minimum(d12,0)/(2*dx2)
-	#print tmp
-	#print ss
-	#if np.amax(tmp) > 100:
-	#	print "(i,j,k)=(",index_x,index_y,time/dt,")"
-	#	print "u_array",u_array
-	#	print "L",L
-	#	print "Tmp",tmp
-	#	print ss
+	if ismember(ind,xbound1): 
+		tmp += u_array[ind+I]*( -np.minimum(f2,zero)/dy + (d22/dy2-d12/dxy)/(2) )
+		if not ismember(ind,ybound1):
+			tmp += np.maximum(d12,0)/(2*dxy)*u_array[ind+I-1]
+		if not ismember(ind,ybound2):
+			tmp += -np.minimum(d12,0)/(2*dxy)*u_array[ind+I+1]
+	if ismember(ind,xbound2):
+		tmp += u_array[ind-I]*( np.maximum(f2,zero)/dy + (d22/dy2-d12/dxy)/(2) )
+		if not ismember(ind,ybound1):
+			tmp += -np.minimum(d12,0)/(2*dxy)*u_array[ind-I-1]
+		if not ismember(ind,ybound2):
+			tmp += np.maximum(d12,0)/(2*dxy)*u_array[ind-I+1]
+	if ismember(ind,ybound1):
+		tmp += u_array[ind+1]*( -np.minimum(f1,zero)/dx + (d11/dx2-d12/dxy)/(2) )
+		if not ismember(ind,xbound1):
+			tmp+= np.maximum(d12,0)/(2*dxy)*u_array[ind-I+1] 
+		if not ismember(ind,xbound2):
+			tmp += -np.minimum(d12,0)/(2*dxy)*u_array[ind+I+1]
+	if ismember(ind,ybound2):	
+		tmp += u_array[ind-1]*( np.maximum(f1,zero)/dx + (d11/dx2-d12/dxy)/(2) )
+		if not ismember(ind,xbound1):
+			 tmp+= -np.minimum(d12,0)/(2*dxy)*u_array[ind-I-1]
+		if not ismember(ind,xbound2):
+			tmp+= np.maximum(d12,0)/(2*dxy)*u_array[ind+I-1]
+	if ismember(ind,xbound1) and ismember(ind,ybound1): #allows (i-1,j-1)
+		tmp += u_array[ind+1+I]*np.maximum(d12,0)/(2*dxy)
+	if ismember(ind,xbound2) and ismember(ind,ybound2): #allows (i+1,j+1)
+		tmp += u_array[ind-1-I]*np.maximum(d12,0)/(2*dxy)
+	if ismember(ind,xbound1) and ismember(ind,ybound2): #allows (i+1,j-1)
+		tmp += -u_array[ind-1+I]*np.minimum(d12,0)/(2*dxy)
+	if ismember(ind,ybound1) and ismember(ind,xbound2): #allows (i-1,j+1)
+		tmp += -u_array[ind+1-I]*np.minimum(d12,0)/(2*dxy)
 	return tmp
 
 ###################
@@ -90,39 +102,21 @@ def L_global(time,x,y,a1,a2,m_array): #general cost
 	return 0.5*(a1**2 + a2**2) + F_global(x,y,x,time)
 	#return 0.5*(ax_array+ay_array)**2 + F_global(x_array,y_array,m_array,time)
 
-def L_test(time,x,y,a1,a2,m): #only dof is alphas
-	return 0.5*(a1**2+a2**2) + (x-0.0)**2 + (y-0.0)**2
-	
-#def f_test(time,x,y,ax_array,ay_array):
-#	a1,a2 = np.meshgrid(ax_array,ay_array)
-#	return a1,a2
-	#output1 = np.empty((ax_array.size,ay_array.size))
-	#output2 = np.empty((ay_array.size,ax_array.size))
-	#for i in range (0,ay_array.size):
-	#	output1[:,i] = ax_array #location bias
-	#	output2[i,:] = ay_array #location bias
-	#return output1, output2
 
 def f_global(time,x_array,y_array,ax_array,ay_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	return [ax_array, ay_array] #standard MFG
 
 def Sigma_D11_test(time,x,y,ax_array,ay_array,m_array):
-	x,y = np.meshgrid(x,y)
-	return .5**2*np.ones(x.shape)
+	#x,y = np.meshgrid(x,y)
+	return .5**2*np.ones(ax_array.shape)
 def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
-	x,y = np.meshgrid(x,y)
-	return .5**2*np.ones(x.shape)
+	#x,y = np.meshgrid(x,y)
+	return .5**2*np.ones(ax_array.shape)
 def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
-	x,y = np.meshgrid(x,y)
-	return 0**2*np.ones(x.shape)
+	#x,y = np.meshgrid(x,y)
+	return .0**2*np.ones(ax_array.shape)
 
-#def Sigma_D11(time,x,y,ax,ay,m):
-#	return 0.3**2
-#def Sigma_D22(time,x,y,ax,ay,m):
-#	return 0.3**2
-#def Sigma_D12(time,x,y,ax,ay,m):
-#	return 0.00**2
 ##################
 #TERMINAL COST
 ##################
@@ -168,14 +162,14 @@ def known_diffusion2(x,y,D11,D12,D22,time):
 	return output
 
 #OTHER STUFF
-def ismember(a, b):
-    bind = {}
-    for i, elt in enumerate(b):
-        if elt not in bind:
-            bind[elt] = i
-    return [bind.get(itm, None) for itm in a]  # None can be replaced by any other "not in b" value
+#def ismember(a, b):
+#   bind = {}
+#    for i, elt in enumerate(b):
+#        if elt not in bind:
+#            bind[elt] = i
+#    return [bind.get(itm, None) for itm in a]  # None can be replaced by any other "not in b" value
 
-def ismember_sorted(a,array):
+def ismember(a,array): #assumes array is sorted
 	for i in range(0,len(array)):
 		if array[i]==a:
 			return True

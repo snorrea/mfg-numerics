@@ -58,6 +58,49 @@ def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of 
 			N = alpha*N
 	return min(fpts)
 
+def crafty_jew_search(funcprime,(args),tolerance,max_iter,x0,dx,left,right):
+	x = x0
+	for i in range(0,max_iter):
+		x_old = x
+		p = funcprime(x_old,*args)
+		psign = np.sign(p)
+		if i==0: 
+			if psign>0 and x0==left:
+				break
+			if psign<0 and x0==right:
+				break
+		dex = -(.5)**(i+1)*dx*psign
+		x = x_old + dex
+		if abs(dex) < tolerance:
+			return x
+	return x
+
+def hybrid_search(func,funcprime,(args),tolerance,max_iter,x0,dx,N,left,right):
+	x = x0
+	dex = dx
+	p = funcprime(x,*args)
+	psign = np.sign(p)
+	if psign>0 and x0==left:
+		return x0
+	elif psign<0 and x0==right:
+		return x0
+	elif psign==0:
+		return x0
+	for i in range(0,max_iter):
+		if psign>0: #go left
+			xt = np.linspace(x-dex,x,N)
+		elif psign<0: #go right
+			xt = np.linspace(x,x+dex,N)
+		else:
+			return x0
+		dex = xt[1]-xt[0]
+		fpts = func(xt,*args)
+		x = xt[np.argmin(fpts)]
+		if abs(dex) < tolerance:
+			return x
+	print "Fuckup"
+	return 0
+
 def newton_search(func,funcprime,(args),tolerance,max_iter,x0,dx,left,right):
 	x = x0
 	for i in range(0,max_iter):
@@ -65,12 +108,45 @@ def newton_search(func,funcprime,(args),tolerance,max_iter,x0,dx,left,right):
 		dd = funcprime(x_old,*args)
 		x = x_old - func(x_old,*args)/dd
 		if abs(x-x_old) < tolerance and dd>0:
+			#print i
+			return x,1
+		elif x<x0-dx:
+		#	print "Left,x0-dx:",x0-dx
+		#	print "\tSuggested:",x
+			return max(left,x0-dx),0
+		elif x>x0+dx:
+		#	print "Right,x0+dx:",x0+dx
+		#	print "\tSuggested:",x
+			return min(right,x0+dx),0
+	return x,-1
+
+
+def newton_search_wolfe(func,funcprime,(args),tolerance,max_iter,x0,dx,left,right):
+	x = x0
+	step = 1
+	for i in range(0,max_iter):
+		x_old = x
+		d = func(x_old,*args)
+		dd = funcprime(x_old,*args)
+		direction = -d/dd
+		for j in range(0,max_iter-i):
+			wolfe1 = func(x_old + step*direction,*args)
+			wolfe2 = d + 1e-4*step*direction*dd
+			wolfe3 = direction*funcprime(x_old+step*direction,*args)
+			wolfe4 = .9*direction*dd
+			if wolfe1 <= wolfe2 and wolfe3 >= wolfe4:
+				#print "Wolfe success at:", j,step
+				break
+			else:
+				step = .1*step
+		x = x_old + step*direction
+		if abs(x-x_old) < tolerance and dd>0:
 			#print "Found:",i
 			return x
-		elif x<x0-dx:
-			return x0-dx
-		elif x>x0+dx: 
-			return x0+dx
+		#elif x<x0-dx:
+		#	return x0-dx
+		#elif x>x0+dx: 
+		#	return x0+dx
 	return x
 
 def bisection_search(function, (args),dx,x0,tol):
@@ -98,9 +174,9 @@ def bisection_search(function, (args),dx,x0,tol):
 ###################
 #POLICY ITERATION FUNCTIONS
 ###################
-
-def hamiltonian(alphas,x_array,u_array,m_array,dt,dx,time,index):
+def Hamiltonian(alphas,time,x_array,u_array,m_array,index,dx):
 	BIGZERO = np.zeros(alphas.size)
+	#print alphas,time,x_array,u_array,m_array,index,dx
 	sigma2 = Sigma_global(time,x_array[index],alphas,m_array[index])**2
 	movement = f_global(time,x_array[index],alphas)
 	L_var = L_global(time,x_array[index],alphas,m_array[index])
@@ -159,7 +235,7 @@ def L_global(time,x_array,a_array,m_array): #general cost
 	#return a_array + np.sqrt(x_array) + a_array**2 #Classic Robstad
 	one = np.ones(x_array.size)
 	xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
-	return np.exp(-time)*abs(x_array+.5)*.1 + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
+	return np.exp(-time)*abs(x_array) + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
 	#return 0.5*a_array**2 + F_global(x_array,m_array,0,time) #HJB test and "nice" MFG
 
 def f_global(time,x_array,a_array):
@@ -179,6 +255,7 @@ def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJ
 	#return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
 	
 def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
+	#print x
 	if i!=0 and i!=m.size-1:
 		u1 = (u[i]-u[i-1])/dx
 		u2 = (u[i+1]-u[i])/dx
@@ -193,7 +270,9 @@ def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 		u3 = (u[i-1]+u[i-1]-2*u[i])/(dx**2)
 	#tmp = a - 0.2 + a**3/2 * u3 + max_or_if(x*np.cos(a)*u1,x*np.sin(a))+min_or_if(x*np.cos(a)*u2,x*np.sin(a))
 	#print tmp
-	return a - 0.2 + a**3/2 * u3 + max_or_if(x*np.cos(a)*u1,x*np.sin(a))+min_or_if(x*np.cos(a)*u2,x*np.sin(a))
+	#print "Inputs:",a,t,x[i],u,m,i,dx
+	#print a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
+	return a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
 def Hamiltonian_Derivative2(a,t,x,u,m,i,dx):
 	if i!=0 and i!=m.size-1:
 		u1 = (u[i]-u[i-1])/dx
@@ -207,7 +286,7 @@ def Hamiltonian_Derivative2(a,t,x,u,m,i,dx):
 		u1 = (u[i]-u[i-1])/dx
 		u2 = (u[i-1]-u[i])/dx
 		u3 = (u[i-1]+u[i-1]-2*u[i])/(dx**2)
-	return 1 + 1.5*a**2 * u3 - max_or_if(x*np.sin(a)*u1,x*np.sin(a))-min_or_if(x*np.sin(a)*u2,x*np.sin(a))
+	return 1 + 1.5*a**2 * u3 - max_or_if(x[i]*np.sin(a)*u1,x[i]*np.sin(a))-min_or_if(x[i]*np.sin(a)*u2,x[i]*np.sin(a))
 
 ##################
 #TERMINAL COST

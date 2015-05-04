@@ -1,8 +1,9 @@
 from __future__ import division
 import numpy as np
-import input_functions as iF
+import input_functions_2D as iF
 import matrix_gen as mg
 import scipy.sparse as sparse
+import applications as app
 #these functions complete 1 iteration of the explicit schemes
 
 ###################
@@ -67,12 +68,30 @@ def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
 #POLICY ITERATION FUNCTIONS
 ###################
 
-def control_general(x,time,u_last,m_last,dt,dx,xpts_search,N,scatters):
-	a_tmp = np.empty(x.size)
-	for i in range (0,x.size):
-		fpts = iF.hamiltonian(xpts_search,x,u_last,m_last,dt,dx,time,i)
-		x0 = xpts_search[np.argmin(fpts)]
-		tmp,tmpval = iF.scatter_search(iF.hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,N,scatters) 
-		a_tmp[i] = tmp
-	return a_tmp
+def control_general(search_x,search_y,x,y,u0,m,dt,dx,dy,time,I,J,tol,scatters,N):
+	u = u0
+	a1 = np.zeros((I,J))
+	a2 = np.zeros((I,J))
+	a1old = np.zeros((I,J))
+	a2old = np.zeros((I,J))
+	#print "Search",search
+	key = search_x.size
+	dxs = search_x[1]-search_x[0]
+	dys = search_y[1]-search_y[0]
+	xmin = search_x[0]
+	xmax = search_x[-1]
+	ymin = search_y[0]
+	ymax = search_y[-1]
+	search_x,search_y = np.meshgrid(search_x,search_y)
+	for i in range (0,I):
+		for j in range (0,J):
+			fpts = iF.hamiltonian(search_x,search_y,x,y,np.ravel(u),np.ravel(m),dt,dx,dy,time,i,j,I,J)
+			xi,yi = app.recover_index(np.argmin(fpts),key)
+			tmp_x,tmp_y = app.scatter_search(iF.hamiltonian,(x,y,np.ravel(u),np.ravel(m),dt,dx,dy,time,i,j,I,J),dxs,dys,search_x[xi,yi],search_y[xi,yi],N,scatters,xmin,xmax,ymin,ymax)
+			#print tmp_x,tmp_y
+			#print ss
+			a1[i,j] = tmp_x
+			a2[i,j] = tmp_y
+	print "Found optimal control!"
+	return a1,a2
 

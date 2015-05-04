@@ -7,18 +7,18 @@ from scipy.optimize import minimize as minimize
 from matplotlib import cm
 import quadrature_nodes as qn
 import input_functions_2D as iF
-import solvers_1D as solve
+import solvers_2D as solve
 import scipy.sparse as sparse
 import matrix_gen as mg
 
 #INPUTS
 POINTSx = 10 #points in x-direction
-POINTSy = 20 #points in y-direction
-REFINEMENTS = 3
+POINTSy = 10 #points in y-direction
+REFINEMENTS = 5
 X_NAUGHT = 0.0
-DT = 0.5#ratio as in dt = DT*dx(**2)
+DT = 1#ratio as in dt = DT*dx(**2)
 NICE_DIFFUSION = 1
-n = 2 #must be integer greater than 0
+n = 1 #must be integer greater than 0
 cutoff = 0 #for convergence slope
 xmax = np.pi*n
 xmin = 0
@@ -39,6 +39,15 @@ e1_1 = np.zeros(REFINEMENTS)
 e1_inf = np.zeros(REFINEMENTS)
 dexes = np.zeros(REFINEMENTS)
 
+#STUFF TO MINIMIZE
+Ns = 60 #searchpoints
+min_tol = 1e-5#tolerance#1e-5 #tolerance for minimum
+min_left = -2 #search region left
+min_right = 2 #search region right
+scatters = int(np.ceil( np.log((min_right-min_left)/(min_tol*Ns))/np.log(Ns/2) ))
+xpts_search = np.linspace(min_left,min_right,Ns)
+ypts_search = xpts_search
+print scatters
 
 ################################
 #THIS IS WHERE WE NEED THE LOOP#
@@ -63,15 +72,18 @@ for N in range(0,REFINEMENTS):
 	#SOLVE STUFF
 	t0 = time.time()
 	for k in range(Nt-1,-1,-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-		ush = np.reshape(u,(J,I))
+		ush = np.reshape(u,(I,J))
 		#print u-ush
 		#print ss
-		a1,a2 = np.gradient(ush,dx,dy) #this ought to do it
+		a1,a2 = np.gradient(ush,dx,dy) #this ought to doit
+		#a1, a2 = solve.control_general(xpts_search,ypts_search,x,y,ush,ush,dt,dx,dy,k*dt,I,J,1e-4,scatters,Ns)
+		a1 = -np.transpose(a1)
+		a2 = -np.transpose(a2)
 		#x,y = np.meshgrid(x,y)
 		#print x.shape,a1.shape
 		#print ss
-		a1 = -np.transpose(a1) #is this seriously enough
-		a2 = -np.transpose(a2)
+		#a1 = -np.transpose(a1) #is this seriously enough
+		#a2 = -np.transpose(a2)
 		t1_tmp = time.time()
 		#print u_rsh.shape,a1.shape,a2.shape
 		#print ss
@@ -90,15 +102,19 @@ for N in range(0,REFINEMENTS):
 	print "Time spent:",t0
 	print "\tGenerating matrices:",t1/t0*100
 	print "\tSolving linear systems:",t2/t0*100
-	u = np.reshape(u,(J,I))
-	u_exact = exact_solution(x,y,0)
+	#u = np.reshape(u,(J,I))
+	u_exact = np.ravel(exact_solution(x,y,0))
 	e1[N] = np.linalg.norm(u-u_exact)*np.sqrt(dx*dy)
 	e1_1[N] = np.linalg.norm(u-u_exact,ord=1)*dx*dy
 	e1_inf[N] = np.linalg.norm(u-u_exact,ord=np.inf)
 
-#print e1
-#print e2
-#print e3
+u = np.reshape(u,(J,I))
+u_exact = exact_solution(x,y,0)
+
+#print u-u_exact
+print e1
+print e1_1
+print e1_inf
 #crunch the slopes and put in the figures
 Xplot, Yplot = np.meshgrid(x,y)
 if REFINEMENTS>1:

@@ -215,9 +215,12 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
 		#as we believe it to be the diffusion tensor equation
 		A = np.array([[a1+a2,0,c1,-c2],[0,a3+a4,-c3,c4],[c1,-c3,b1+b3,0],[-c2,c4,0,b2+b4]])
 		B = np.array([[a1+c1,a2-c2,0,0],[0,0,a3-c3,a4+c4],[b1+c1,0,b3-c3,0],[0,b2-c2,0,b4+c4]])
-		if EXPLICIT==1:
-			C = -np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]])
-			F = -np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]])
+		#print A
+		if EXPLICIT==0:
+			C = -np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]]) #should be fine
+			F = -np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]]) #should be fine
+			#C = -np.array([[-a1,0,-c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[c2,0,0,-b2]])
+			#F = -np.array([[a1+c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,-c2+b2,0,0]])
 		else:
 			C = np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]])
 			F = np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]])

@@ -24,12 +24,12 @@ xmax = 2#+.2
 T = 1
 Niter = 1 #maximum number of iterations
 tolerance = 1e-4
-alpha_upper = 2
-alpha_lower = -2
+alpha_upper = 1
+alpha_lower = -1
 
 #STUFF TO MINIMIZE
 N = 200 #searchpoints
-Nr = 10
+Nr = 5
 min_tol = 1e-6#tolerance#1e-5 #tolerance for minimum
 min_left = alpha_lower #search region left
 min_right = alpha_upper #search region right
@@ -94,24 +94,32 @@ for n in range (0,Niter):
 	temptime = time.time()
 	#Compute u
 	u[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)])
-	for k in range (K-2,-1,-1): 
-		u_last = np.copy(u[((k+1)*I):((k+1)*I+I)]) #this one to keep
-		m_last = np.copy(m[((k)*I):((k)*I+I)]) #only actually need this, amirite?
+	#print u[]
+	for k in range (K-1,0,-1):  #this is how it has to be...
+		u_last = np.copy(u[((k+1)*I-I):((k+1)*I)]) #this one to keep
+		m_last = np.copy(m[((k+1)*I-I):((k+1)*I)]) #only actually need this, amirite?
 		#a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,N,scatters) #scatter
-		a_tmp = solve.control_newton(x,k*dt,u_last,m_last,dt,dx,xpts_newton,min_tol) #newton
+		#a_tmp,stats = solve.control_newton(x,k*dt,u_last,m_last,dt,dx,xpts_newton,min_tol) #newton
+		#a_tmp = solve.control_crafty(x,k*dt,u_last,m_last,dt,dx,xpts_newton,min_tol) #crafty
+		a_tmp = solve.control_hybrid(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,min_tol,N) #hybrid
+		#print "Minimiser succes: (",stats,"/",x.size,")"
+		#a_tmp = solve.control_newton_wolfe(x,k*dt,u_last,m_last,dt,dx,xpts_newton,min_tol) #newton
 		#a_tmp = solve.control_bisect(x,k*dt,u_last,m_last,dt,dx,xpts_newton,N,min_tol) #bisection
 		#implicit
 		if NICE_DIFFUSION==0:
 			u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,m_last,a_tmp,dt,dx) #implicit
 		else:
-			if n==0 and k==K-2:
+			if n==0 and k==K-1:
 				LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,m_last,dt,dx)
 			RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,m_last,dt,dx)
 			Ltmp = iF.L_global(k*dt,x,a_tmp,m_last)
 			#print RHS_HJB*u_last
+			#print LHS_HJB
+			#print ss
 			u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*Ltmp)
-		u[(k*I):(k*I+I)] = np.copy(u_tmp)
-		a[(k*I):(k*I+I)] = np.copy(a_tmp)
+		u[(k*I-I):(k*I)] = np.copy(u_tmp)
+		a[(k*I-I):(k*I)] = np.copy(a_tmp)
+		
 	print "Spent time", time.time()-temptime, "on computing u"
 	#store changes in norms
 	uchange = np.copy(u-u_old)

@@ -11,63 +11,46 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 ###################
 #MINIMISING FUNCTIONS
 ###################
-def scatter_search(function, (args),dx,x0,y0,N,k): #here k is the number of laps going
+def scatter_search(function, (args),dx,dy,x0,y0,N,k,xmin,xmax,ymin,ymax): #here k is the number of laps going
 	x_naught = x0
 	y_naught = y0
-	dex = dx
+	dex_x = dx
+	dex_y = dy
 	for i in range (0,k):
-		xpts = np.linspace(x_naught-dex,x_naught+dex,N)
-		ypts = np.linspace(y_naught-dex,y_naught+dex,N)
+		if x_naught+dex_x > xmax:
+			xpts = np.linspace(x_naught-dex_x,xmax,N)
+		elif x_naught-dex_x < xmin:
+			xpts = np.linspace(xmin,x_naught+dex_x,N)
+		else:
+			xpts = np.linspace(x_naught-dex_x,x_naught+dex_x,N)
+		if y_naught+dex_y > ymax:
+			ypts = np.linspace(y_naught-dex_y,ymax,N)
+		elif y_naught-dex_y < ymin:
+			ypts = np.linspace(ymin,y_naught+dex_y,N)
+		else:
+			ypts = np.linspace(y_naught-dex_y,y_naught+dex_y,N)
+		xpts,ypts = np.meshgrid(xpts,ypts)
 		fpts = function(xpts,ypts,*args)
 		if i!=k-1:
+			key = xpts.shape
 			crit_ind = np.argmin(fpts)
-			xi,yi = recover_index(crit_ind,xpts.size)
-			x_naught = xpts[xi]
-			y_naught = ypts[yi]
-			dex = xpts[2]-xpts[1]
+			xi,yi = recover_index(crit_ind,key[0])
+			#print xi,yi
+			#print xpts.shape,ypts.shape
+			x_naught = xpts[xi,yi]
+			y_naught = ypts[xi,yi]
+			dex_x = xpts[0,1]-xpts[0,0]
+			dex_y = ypts[1,0]-ypts[0,0]
+			#print dex_x,dex_y
+			#print ss
 	crit_ind = np.argmin(fpts)
 	#print crit_ind
-	xi,yi = recover_index(crit_ind,xpts.size)
+	xi,yi = recover_index(crit_ind,key[0])
 	#print xi,yi
-	return xpts[xi],ypts[yi]
+	#print "Indices:",xi,yi
+	#print "Storage:",xpts.shape,ypts.shape
+	return xpts[xi,yi],ypts[xi,yi]
 
-###################
-#POLICY ITERATION
-###################
-def policy_implicit(search,x,y,u0,m,dt,dx,time,I,J,tol,scatters,N):
-	count = 0
-	err = 1
-	u = u0
-	a1 = np.zeros((I,J))
-	a2 = np.zeros((I,J))
-	a1old = np.zeros((I,J))
-	a2old = np.zeros((I,J))
-	#print "Search",search
-	while err > tol:
-		count +=1
-		#compute a guess of a1,a2
-		for i in range (0,I):
-			for j in range (0,J):
-				fpts = iF.hamiltonian(search,search,x,y,u,m,dt,dx,time,i,j,I,J)
-				xi,yi = recover_index(np.argmin(fpts),search.size)
-				tmp_x,tmp_y = scatter_search(iF.hamiltonian,(x,y,u,m,dt,dx,time,i,j,I,J),search[2]-search[1],search[xi],search[yi],N,scatters)
-				a1[i,j] = tmp_x
-				a2[i,j] = tmp_y
-		err = 0.5*(abs(max(np.ravel(a1old-a1)))+abs(max(np.ravel(a2old-a2))))
-		if err > tol:
-			L_var = np.ravel(iF.L_global(time,x,y,a1,a2,m))
-			[f1_array, f2_array] = iF.f_global(time,x,y,a1,a2)
-			D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m)
-			D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m)
-			D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m)
-			U_WORK_4_DIS = mg.u_matrix_implicit(f1_array,f2_array,D11,D22,D12,I,J,dx,dt)
-			u = spsolve(U_WORK_4_DIS,np.ravel(u0)+dt*L_var)
-			a1old = a1
-			a2old = a2
-		else:
-			break
-	#print count
-	return a1,a2
 
 ###################
 #AUXILIARY FUNCTIONS

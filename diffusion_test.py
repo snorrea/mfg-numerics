@@ -13,17 +13,17 @@ import matrix_gen as mg
 from scipy import sparse
 
 animate = False
-EXPLICIT = 1
-dx = 0.05
+EXPLICIT = 0
+dx = 0.2
 dt = 0.1*dx**2 #this is the finest CFL we can find for (D11,D22,D12)=(1,1,0); but not necessarily enough for monotonicity
 xmin = 0
 xmax = 1
 ymin = 0
 ymax = 1
-T = .01
+T = .1
 Niter = 1 #maximum number of iterations
 D11 = 1
-D12 = .9#0.5
+D12 = 0.65
 D22 = 1
 #CRUNCH
 dx2 = dx**2
@@ -70,11 +70,12 @@ M = mg.add_diffusion_flux_Ometh(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(
 #M,u = mg.add_direchlet_boundary(M,u,I,J,dt/dx2,0)
 M = sparse.csr_matrix(M)*lamb
 print M
+print np.amin(np.linalg.inv(M.todense()))
 #print ss
 #plt.spy(M)
 #plt.show()
 #print M.sum(1)
-#print ss
+print ss
 mass0 = sum(u)*dx**2
 ######################################################################################
 ######################################################################################

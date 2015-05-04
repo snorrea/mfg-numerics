@@ -3,6 +3,7 @@ import numpy as np
 import input_functions as iF
 import matrix_gen1d as mg
 import scipy.sparse as sparse
+import matplotlib.pyplot as plt
 import scipy.optimize as optimize
 #these functions complete 1 iteration of the explicit schemes
 
@@ -141,28 +142,54 @@ def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
 def control_general(x,time,u_last,m_last,dt,dx,xpts_search,N,scatters):
 	a_tmp = np.empty(x.size)
 	for i in range (0,x.size):
-		fpts = iF.hamiltonian(xpts_search,x,u_last,m_last,dt,dx,time,i)
-		x0 = xpts_search[np.argmin(fpts)]
-		tmp,tmpval = iF.scatter_search(iF.hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,N,scatters,xpts_search[0],xpts_search[-1])
+		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
+		x0 = xpts_search[np.argmin(fpts)] 
+		tmp,tmpval = iF.scatter_search(iF.Hamiltonian,(time,x,u_last,m_last,i,dx),xpts_search[2]-xpts_search[1],x0,N,scatters,xpts_search[0],xpts_search[-1])
 		a_tmp[i] = tmp
 	return a_tmp
 
 def control_newton(x,time,u_last,m_last,dt,dx,xpts_search,tol):
 	a_tmp = np.empty(x.size)
+	stats = np.empty(x.size)
 	for i in range (0,x.size):
-		fpts = iF.hamiltonian(xpts_search,x,u_last,m_last,dt,dx,time,i)
+		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
 		x0 = xpts_search[np.argmin(fpts)]
-		zero = iF.newton_search(iF.Hamiltonian_Derivative,iF.Hamiltonian_Derivative2,(time,x[i],u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],xpts_search[0],xpts_search[-1])
+		a_tmp[i],stats[i] = iF.newton_search(iF.Hamiltonian_Derivative,iF.Hamiltonian_Derivative2,(time,x,u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],xpts_search[0],xpts_search[-1])
+	return a_tmp,sum(stats)
+
+def control_crafty(x,time,u_last,m_last,dt,dx,xpts_search,tol):
+	a_tmp = np.empty(x.size)
+	for i in range (0,x.size):
+		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
+		x0 = xpts_search[np.argmin(fpts)]
+		a_tmp[i]= iF.crafty_jew_search(iF.Hamiltonian_Derivative,(time,x,u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],xpts_search[0],xpts_search[-1])
+	return a_tmp
+
+def control_hybrid(x,time,u_last,m_last,dt,dx,xpts_search,tol,N):
+	a_tmp = np.empty(x.size)
+	for i in range (0,x.size):
+		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
+		x0 = xpts_search[np.argmin(fpts)]
+		a_tmp[i]= iF.hybrid_search(iF.Hamiltonian,iF.Hamiltonian_Derivative,(time,x,u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],N,xpts_search[0],xpts_search[-1])
+	return a_tmp
+
+def control_newton_wolfe(x,time,u_last,m_last,dt,dx,xpts_search,tol):
+	a_tmp = np.empty(x.size)
+	for i in range (0,x.size):
+		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
+		x0 = xpts_search[np.argmin(fpts)]
+		#zero = iF.newton_search_wolfe(iF.Hamiltonian_Derivative,iF.Hamiltonian_Derivative2,(time,x[i],u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],xpts_search[0],xpts_search[-1])
 		a_tmp[i] = zero
 	return a_tmp	
+
 
 def control_bisect(x,time,u_last,m_last,dt,dx,xpts_search,N,tol):
 	a_tmp = np.empty(x.size)
 	dx
 	for i in range (0,x.size):
-		fpts = iF.hamiltonian(xpts_search,x,u_last,m_last,dt,dx,time,i)
+		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
 		x0 = xpts_search[np.argmin(fpts)]
-		tmp,tmpval = iF.bisection_search(iF.hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,tol) 
+		tmp,tmpval = iF.bisection_search(iF.Hamiltonian,(x,u_last,m_last,dt,dx,time,i),xpts_search[2]-xpts_search[1],x0,tol) 
 		a_tmp[i] = tmp
 	return a_tmp
 
