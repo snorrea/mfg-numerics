@@ -14,16 +14,18 @@ from scipy import sparse
 
 animate = False
 EXPLICIT = 0
-dx = 0.2
-dt = 0.1*dx**2 #this is the finest CFL we can find for (D11,D22,D12)=(1,1,0); but not necessarily enough for monotonicity
+OMETH = False#False#True
+dx = 0.05
+dt = .1*dx#.1*dx
+#dt = 0.1*dx**2 #this is the finest CFL we can find for (D11,D22,D12)=(1,1,0); but not necessarily enough for monotonicity
 xmin = 0
 xmax = 1
 ymin = 0
 ymax = 1
-T = .1
+T = .05
 Niter = 1 #maximum number of iterations
 D11 = 1
-D12 = 0.65
+D12 = .99
 D22 = 1
 #CRUNCH
 dx2 = dx**2
@@ -63,19 +65,41 @@ lamb = dt/dx2
 #IIOE
 #LHS,RHS = mg.diffusion_flux_iioe(D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt)
 #O-method
-#M = np.identity(I*J)/lamb
-M = sparse.eye(I*J)/lamb
-M = sparse.lil_matrix(M)
-M = mg.add_diffusion_flux_Ometh(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt,EXPLICIT)
-#M,u = mg.add_direchlet_boundary(M,u,I,J,dt/dx2,0)
-M = sparse.csr_matrix(M)*lamb
-print M
-print np.amin(np.linalg.inv(M.todense()))
-#print ss
+if OMETH:
+	M = sparse.eye(I*J)
+	M = sparse.lil_matrix(M)
+	M = mg.add_diffusion_flux_Ometh(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt,EXPLICIT)
+	M = sparse.csr_matrix(M)
+else:
+	M = sparse.eye(I*J)
+	M = sparse.lil_matrix(M)
+	M = mg.add_diffusion_flux_nonlinear(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt,u,EXPLICIT)
+	M = sparse.csr_matrix(M)
+
 #plt.spy(M)
 #plt.show()
+####CHECK THE SUMS, EACH SHOULD GO TO 1
+#print M
+#print ss
 #print M.sum(1)
-print ss
+#sums = M.sum(1)
+#fucks = np.empty(0)
+#for i in range(0,sums.size):
+#	if abs(sums[i]-1) > 1e-10:
+#		fucks = np.append(fucks,i)
+#		#print abs(sums[i]-1)
+#print fucks
+#xbound1 = range(0,I)
+#ybound1 = range(0,I*J,I)
+#xbound2 = range(I*J-I,I*J)
+#ybound2 = range(I-1,I*J,I)
+#print xbound1
+#print xbound2
+#print ybound1
+#print ybound2
+#print ss
+#print M[fucks,:]
+#print ss
 mass0 = sum(u)*dx**2
 ######################################################################################
 ######################################################################################
@@ -106,14 +130,40 @@ if animate:
 ######################################################################################
 
 #ACTUALLY SOLVE
+print "Solving commences"
 for k in range(0,K-1):
 	#u = spsolve(LHS,RHS*np.ravel(u)) #IIOE
 	if EXPLICIT==1:
 		u = M*np.ravel(u) #O-method
 	else:
-		u = spsolve(M,u) #implicit O-method
-	print "Mass deviation:", (mass0-sum(u)*dx**2)
-	print "Max vs min:", abs(max(u)-min(u))
+		if OMETH:
+			u = spsolve(M,u)
+		else:
+			u_last = u
+			count = 0
+			t1 = time.time()
+			t2 = 0
+			while True:
+				M = sparse.lil_matrix(sparse.eye(I*J))
+				t3 = time.time()
+				M = mg.add_diffusion_flux_nonlinear(M,D11*np.ones(I*J),D22*np.ones(I*J),D12*np.ones(I*J),I,J,dx,dt,u,EXPLICIT)
+				t2 += time.time()-t3
+				M = sparse.csr_matrix(M)
+				u_old = u
+				u = spsolve(M,u_last) #implicit O-method
+				if np.linalg.norm(u-u_old) < 1e-6:
+					print np.linalg.norm(u-u_old)
+					break
+				print np.linalg.norm(u-u_old)
+				count += 1
+			print "Iteration succesful,", k,"/",K-2
+			print "\tPicard iteration successful on iteration number:",count
+			print "\tTime spent:",time.time()-t1
+			print "\tGeneration time:",t2/(time.time()-t1)*100
+	print "Iteration succesful,", k,"/",K-2
+	print "\tMass deviation:", (mass0-sum(u)*dx**2)
+	#print "Max vs min:", abs(max(u)-min(u))
+	print "\tMinimum value:", min(u)
 print "Time spent:", time.time()-time_total
 
 #PLOT STUFF

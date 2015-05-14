@@ -1,8 +1,6 @@
 from __future__ import division
 import numpy as np
 from scipy import sparse
-import applications as app
-import assembly as ass
 import input_functions as iF
 ##################
 # MATRIX GENERATION: HJB
@@ -36,7 +34,7 @@ def hjb_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
 ##################
 # MATRIX GENERATION: FINITE VOLUME
 ##################
-def fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
+def fp_fv_convection_classic(time,x,a_tmp,m_tmp,dt,dx): #for explicit
 	#functions
 	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
 	movement = iF.f_global(time,x,a_tmp) #the function f
@@ -56,6 +54,34 @@ def fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
 	here = 1-dt/dx*abs(Fi)
 	east = -dt/dx*np.minimum(Fi[1:],zerohero[1:])
 	west = dt/dx*np.maximum(Fi[0:-1],zerohero[0:-1])
+	output = sparse.diags([here, east, west],[0, 1, -1])
+	return sparse.csr_matrix(output)
+
+def fp_fv_convection_interpol(time,x,a_tmp,m_tmp,dt,dx): #for explicit
+	#functions
+	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
+	movement = iF.f_global(time,x,a_tmp) #the function f
+	#generate the flux vectors
+	sigmad = np.gradient(sigma,dx)
+	#print sigmad
+	#print movement
+	#Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
+	Fi = movement-sigma*sigmad
+	Fi_up = .5*(Fi[0:-1] + Fi[1:])
+	Fi_up = np.insert(Fi_up,0,0)
+	Fi_down = .5*(Fi[1:] + Fi[0:-1])
+	Fi_down = np.append(Fi_down,0)
+	#print Fi
+	#print ss
+	#print Fi_up.shape,Fi_down.shape
+	zerohero = np.zeros(x.size)
+	#print zerohero.shape
+	here = 1-dt/dx*(np.maximum(Fi_down,zerohero) - np.minimum(Fi_up,zerohero))
+	#here = np.append(here, 1-dt/dx*np.maximum(Fi_down[-1],0))
+	#here = np.insert(here,0,1+dt/dx*np.minimum(Fi_up[0],0))
+	east = -dt/dx*np.minimum(Fi_up[1:],zerohero[1:])
+	west = dt/dx*np.maximum(Fi_down[0:-1],zerohero[0:-1])
+	#print here.size, east.size,west.size
 	output = sparse.diags([here, east, west],[0, 1, -1])
 	return sparse.csr_matrix(output)
 

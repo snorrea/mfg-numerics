@@ -165,12 +165,12 @@ def control_crafty(x,time,u_last,m_last,dt,dx,xpts_search,tol):
 		a_tmp[i]= iF.crafty_jew_search(iF.Hamiltonian_Derivative,(time,x,u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],xpts_search[0],xpts_search[-1])
 	return a_tmp
 
-def control_hybrid(x,time,u_last,m_last,dt,dx,xpts_search,tol,N):
+def control_hybrid(x,time,u_last,m_last,dt,dx,xpts_search,tol,N,scatters):
 	a_tmp = np.empty(x.size)
 	for i in range (0,x.size):
 		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
 		x0 = xpts_search[np.argmin(fpts)]
-		a_tmp[i]= iF.hybrid_search(iF.Hamiltonian,iF.Hamiltonian_Derivative,(time,x,u_last,m_last,i,dx),tol,20,x0,xpts_search[2]-xpts_search[1],N,xpts_search[0],xpts_search[-1])
+		a_tmp[i]= iF.hybrid_search(iF.Hamiltonian,iF.Hamiltonian_Derivative,(time,x,u_last,m_last,i,dx),tol,scatters,x0,xpts_search[2]-xpts_search[1],N,xpts_search[0],xpts_search[-1])
 	return a_tmp
 
 def control_newton_wolfe(x,time,u_last,m_last,dt,dx,xpts_search,tol):

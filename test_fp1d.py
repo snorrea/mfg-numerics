@@ -16,7 +16,7 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #INPUTS
 dx0 = 2*0.1
-REFINEMENTS = 8
+REFINEMENTS = 6
 X0 = -0.5
 cutoff = 0
 #constant coefficient test
@@ -124,9 +124,11 @@ for N in range(0,REFINEMENTS):
 			RHS_centered = mg.fp_fd_centered_convection(k*dt,x,m0,m1,dt,dx)
 			RHS_upwind = mg.fp_fd_upwind_convection(k*dt,x,m0,m2,dt,dx)
 			LHS_fv = mg.fp_fv_diffusion(k*dt,x,m0,m4,dt,dx)
-			RHS_fv = mg.fp_fv_convection(k*dt,x,m0,m4,dt,dx)
+			RHS_fv = mg.fp_fv_convection_classic(k*dt,x,m0,m4,dt,dx)
+			RHS_fv2 = mg.fp_fv_convection_interpol(k*dt,x,m0,m4,dt,dx)
 		m1 = sparse.linalg.spsolve(LHS_centered,RHS_centered*np.ravel(m1))
 		m2 = sparse.linalg.spsolve(LHS_centered,RHS_upwind*np.ravel(m2))
+		m3 = sparse.linalg.spsolve(LHS_fv,RHS_fv2*np.ravel(m4))
 		m4 = sparse.linalg.spsolve(LHS_fv,RHS_fv*np.ravel(m4))
 		#print m4
 	print "Time spent:",time.time()-t0
@@ -136,15 +138,15 @@ for N in range(0,REFINEMENTS):
 	m_exact = convolution(x,T) #Ornstein test
 	e1[N] = np.linalg.norm(m1-m_exact)*np.sqrt(dx)
 	e2[N] = np.linalg.norm(m2-m_exact)*np.sqrt(dx)
-	#e3[N] = np.linalg.norm(m3-m_exact)*np.sqrt(dx)
+	e3[N] = np.linalg.norm(m3-m_exact)*np.sqrt(dx)
 	e4[N] = np.linalg.norm(m4-m_exact)*np.sqrt(dx)
 	e1_1[N] = np.linalg.norm(m1-m_exact,ord=1)*dx
 	e2_1[N] = np.linalg.norm(m2-m_exact,ord=1)*dx
-	#e3_1[N] = np.linalg.norm(m3-m_exact,ord=1)*dx
+	e3_1[N] = np.linalg.norm(m3-m_exact,ord=1)*dx
 	e4_1[N] = np.linalg.norm(m4-m_exact,ord=1)*dx
 	e1_inf[N] = np.linalg.norm(m1-m_exact,ord=np.inf)
 	e2_inf[N] = np.linalg.norm(m2-m_exact,ord=np.inf)
-	#e3_inf[N] = np.linalg.norm(m3-m_exact,ord=np.inf)
+	e3_inf[N] = np.linalg.norm(m3-m_exact,ord=np.inf)
 	e4_inf[N] = np.linalg.norm(m4-m_exact,ord=np.inf)
 
 #print e1
@@ -156,15 +158,15 @@ print e4_1
 print e4_inf
 slope1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1[cutoff:]), 1)
 slope2, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2[cutoff:]), 1)
-#slope3, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3[cutoff:]), 1)
+slope3, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3[cutoff:]), 1)
 slope4, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4[cutoff:]), 1)
 slope1_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_1[cutoff:]), 1)
 slope2_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2_1[cutoff:]), 1)
-#slope3_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3_1[cutoff:]), 1)
+slope3_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3_1[cutoff:]), 1)
 slope4_1, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4_1[cutoff:]), 1)
 slope1_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e1_inf[cutoff:]), 1)
 slope2_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e2_inf[cutoff:]), 1)
-#slope3_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3_inf[cutoff:]), 1)
+slope3_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e3_inf[cutoff:]), 1)
 slope4_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4_inf[cutoff:]), 1)
 
 
@@ -172,11 +174,11 @@ slope4_inf, intercept = np.polyfit(np.log(dexes[cutoff:]), np.log(e4_inf[cutoff:
 fig4 = plt.figure(6)
 str1 = "Centered FD, slope:", "%.2f" %slope1
 str2 = "Upwind FD, slope:", "%.2f" %slope2
-#str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3
+str3 = "Finite volume with interpolation, slope:", "%.2f" %slope3
 str4 = "Finite volume, slope:", "%.2f" %slope4
 plt.loglog(dexes,e1,'o-',label=str1)
 plt.loglog(dexes,e2,'o-',label=str2)
-#plt.loglog(dexes,e3,'o-',label=str3)
+plt.loglog(dexes,e3,'o-',label=str3)
 plt.loglog(dexes,e4,'o-',label=str4)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 ax4 = fig4.add_subplot(111)
@@ -190,7 +192,7 @@ fig4.suptitle('Convergence of m(x,t) in 2-norm', fontsize=14)
 fig3 = plt.figure(2)
 plt.plot(x,(m1-m_exact),label="Centered FD")
 plt.plot(x,(m2-m_exact),label="Upwind FD")
-#plt.plot(x,(m3-m_exact),label="Upwind FD with viscosity")
+plt.plot(x,(m3-m_exact),label="Finite volume with interpolation")
 plt.plot(x,(m4-m_exact),label="Finite volume")
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 fig3.suptitle('Deviation from true solution', fontsize=14)
@@ -198,7 +200,7 @@ fig3.suptitle('Deviation from true solution', fontsize=14)
 fig2 = plt.figure(3)
 plt.plot(x,m1,label="Centered FD")
 plt.plot(x,m2,label="Upwind FD")
-#plt.plot(x,m3,label="Upwind FD with viscosity")
+plt.plot(x,m3,label="Finite volume with interpolation")
 plt.plot(x,m4,label="Finite volume")
 plt.plot(x,m_exact,label="Exact solution")
 fig2.suptitle('Solutions', fontsize=14)
@@ -208,11 +210,11 @@ legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 fig5 = plt.figure(5)
 str1 = "Centered FD, slope:", "%.2f" %slope1_1
 str2 = "Upwind FD, slope:", "%.2f" %slope2_1
-#str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3_1
+str3 = "Finite volume with interpolation, slope:", "%.2f" %slope3_1
 str4 = "Finite volume, slope:", "%.2f" %slope4_1
 plt.loglog(dexes,e1_1,'o-',label=str1)
 plt.loglog(dexes,e2_1,'o-',label=str2)
-#plt.loglog(dexes,e3_1,'o-',label=str3)
+plt.loglog(dexes,e3_1,'o-',label=str3)
 plt.loglog(dexes,e4_1,'o-',label=str4)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 ax4 = fig5.add_subplot(111)
@@ -225,11 +227,11 @@ fig5.suptitle('Convergence of m(x,t) in 1-norm', fontsize=14)
 fig6 = plt.figure(7)
 str1 = "Centered FD, slope:", "%.2f" %slope1_inf
 str2 = "Upwind FD, slope:", "%.2f" %slope2_inf
-#str3 = "Upwind FD with viscosity, slope:", "%.2f" %slope3_inf
+str3 = "Finite volume with interpolation:", "%.2f" %slope3_inf
 str4 = "Finite volume, slope:", "%.2f" %slope4_inf
 plt.loglog(dexes,e1_inf,'o-',label=str1)
 plt.loglog(dexes,e2_inf,'o-',label=str2)
-#plt.loglog(dexes,e3_inf,'o-',label=str3)
+plt.loglog(dexes,e3_inf,'o-',label=str3)
 plt.loglog(dexes,e4_inf,'o-',label=str4)
 legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 ax4 = fig6.add_subplot(111)
@@ -238,6 +240,12 @@ ax4.set_ylabel('Log10 of error')
 plt.grid(True,which="both",ls="-")
 ax4.invert_xaxis()
 fig6.suptitle('Convergence of m(x,t) in inf-norm', fontsize=14)
+
+fig9000 = plt.figure(9)
+plt.plot(e3_inf/e4_inf, label="Inf norm")
+plt.plot(e3_1/e4_1, label="1 norm")
+plt.plot(e3/e4, label="2 norm")
+legend = plt.legend(loc='upper right', shadow=True, fontsize='medium')
 
 plt.show()
 

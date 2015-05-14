@@ -5,7 +5,7 @@ import applications as app
 import assembly as ass
 import input_functions_2D as iF
 import time as timer
-
+import matplotlib.pyplot as plt
 ##################
 # MATRIX GENERATION: HJB
 ##################
@@ -212,7 +212,7 @@ def FP_diffusion_implicit_Diamond(time,x,y,a1,a2,m,dx,dt):
 	LHS = add_diffusion_flux_DIAMOND(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt)
 	return sparse.csr_matrix(LHS)*lamb
 
-def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
+def add_diffusion_flux_nonlinear(output,D11,D22,D12,I,J,dx,dt,m,EXPLICIT): #this is implicit
 	h = dx
 	dx2 = h**2
 	xbound1 = range(0,I)
@@ -222,6 +222,92 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
 	D11 = np.ravel(D11)
 	D12 = np.ravel(D12)
 	D22 = np.ravel(D22)
+	#ratios
+	ratio_up = np.minimum(D12,D22)/np.maximum(D12,D22)
+	ratio_down = np.maximum(-D12,-D22)/np.minimum(-D12,-D22)
+	ratio_right = np.minimum(D11,D12)/np.maximum(D11,D12) #this is vetted
+	ratio_left = np.maximum(-D11,-D12)/np.minimum(-D11,-D12)
+	#length of diffusion vector, ex D(K)*nK
+	length_updown = np.sqrt(D12**2 + D22**2)
+	length_rightleft = np.sqrt(D11**2 + D12**2)
+	#length of intersection vectors, ex KO1
+	intersect_up = .5*dx*np.sqrt(1+ratio_up)
+	intersect_right = .5*dx*np.sqrt(1+ratio_right)
+	intersect_down = .5*dx*np.sqrt(1+ratio_down)
+	intersect_left = .5*dx*np.sqrt(1+ratio_left)
+	#cell areas
+	mK = np.ravel(np.ones(I*J)*dx2)
+	mK[xbound1] = mK[xbound1]*2
+	mK[xbound2] = mK[xbound2]*2
+	mK[ybound1] = mK[ybound1]*2
+	mK[ybound2] = mK[ybound2]*2
+	#for i in range(0,I*J-I-1):
+	for i in range(0,I*J):
+		#north
+		if not ismember(i,xbound2): #if north, do nothing
+			if ismember(i,ybound1): #west, north changes
+				length_n = .5*dx
+				m_p = .25*(m[i]+m[i+1]+m[i+I]+m[i+I+1])
+				m_p1,m_p2 = m_p,m_p
+			elif ismember(i,ybound2): #east, north changes
+				length_n = .5*dx
+				m_p = .25*(m[i]+m[i-1]+m[i+I]+m[i-I+1])
+				m_p1,m_p2 = m_p,m_p
+			else:
+				length_n = dx
+				m_p1 = .25*(m[i]+m[i+I]+m[i-1]+m[i+I-1])
+				m_p2 = .25*(m[i]+m[i+I]+m[i+1]+m[i+I+1])
+			a1 = (length_n*length_updown[i])/(intersect_up[i]*dx) * ( .5*dx*(1+ratio_up[i])*m_p2 + .5*dx*(1-ratio_up[i])*m_p1 )
+			a2 = (length_n*length_updown[i+I])/(intersect_down[i+I]*dx) * ( .5*dx*(1-ratio_down[i+I])*m_p2 + .5*dx*(1+ratio_down[i+I])*m_p1 )
+			if a1+a2 == 0:
+				mu1,mu2 = .5,.5
+			else:
+				mu1,mu2 = a2/(a1+a2),a1/(a1+a2)
+			AK = length_n*mu1*length_updown[i]/intersect_up[i]
+			AL = length_n*mu2*length_updown[i+I]/intersect_down[i+I]
+			output[i,i] += AK*dt/mK[i]
+			output[i,i+I] += -AL*dt/mK[i]
+			output[i+I,i] += -AK*dt/mK[i+I]
+			output[i+I,i+I] += AL*dt/mK[i+I]
+		#east
+		if not ismember(i,ybound2): #if east, do nothing
+			if ismember(i,xbound1): #south, east changes
+				length_e = .5*dx
+				m_p = .25*(m[i]+m[i+1]+m[i+I]+m[i+I+1])
+				m_p1,m_p2 = m_p,m_p
+			elif ismember(i,xbound2): #north, east changes
+				length_e = .5*dx
+				m_p = .25*(m[i]+m[i+1]+m[i-I]+m[i-I+1])
+				m_p1,m_p2 = m_p,m_p
+			else:
+				length_e = dx
+				m_p1 = .25*(m[i]+m[i+1]+m[i-I]+m[i+1-I])
+				m_p2 = .25*(m[i]+m[i+1]+m[i+I]+m[i+1+I])
+			#print ratio_left[i+1]
+			a1 = (length_e*length_rightleft[i])/(intersect_right[i]*dx) * ( .5*dx*(1+ratio_right[i])*m_p2 + .5*dx*(1-ratio_right[i])*m_p1 )
+			a2 = (length_e*length_rightleft[i+1])/(intersect_left[i+1]*dx) * ( .5*dx*(1-ratio_left[i+1])*m_p2 + .5*dx*(1+ratio_left[i+1])*m_p1 ) 
+			if a1+a2 == 0:
+				mu1,mu2 = .5,.5
+			else:
+				mu1,mu2 = a2/(a1+a2),a1/(a1+a2)
+			#print i+I,I*J
+			AK = length_e*mu1*length_rightleft[i]/intersect_right[i]
+			AL = length_e*mu2*length_rightleft[i+1]/intersect_left[i+1]
+			output[i,i] += AK*dt/mK[i]
+			output[i,i+1] += -AL*dt/mK[i]
+			output[i+1,i] += -AK*dt/mK[i+1]
+			output[i+1,i+1] += AL*dt/mK[i+1]
+	return output
+
+def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
+	dx2 = dx**2
+	xbound1 = range(0,I)
+	ybound1 = range(0,I*J,I)
+	xbound2 = range(I*J-I,I*J)
+	ybound2 = range(I-1,I*J,I)
+	D11 = dt*np.ravel(D11)/dx2
+	D12 = dt*np.ravel(D12)/dx2
+	D22 = dt*np.ravel(D22)/dx2
 	for i in range(0,I*J-I-1):
 		#make matrices
 		#print i,I*J-I-1-1
@@ -247,8 +333,6 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
 		if EXPLICIT==0:
 			C = -np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]]) #should be fine
 			F = -np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]]) #should be fine
-			#C = -np.array([[-a1,0,-c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[c2,0,0,-b2]])
-			#F = -np.array([[a1+c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,-c2+b2,0,0]])
 		else:
 			C = np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]])
 			F = np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]])

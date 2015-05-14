@@ -66,10 +66,10 @@ for N in range(0,REFINEMENTS):
 		if k==1:
 			LHS = mg.FP_diffusion_implicit_Ometh(k*dt,x,y,x,y,m,dx,dt)
 			#LHS = mg.FP_diffusion_implicit_Diamond(k*dt,x,y,x,y,m,dx,dt)
-			#print LHS.sum(1)
+			#print LHS.sum(2)
 			#print ss
 		RHS = mg.FP_convection_explicit(k*dt,x,y,x,y,m,dx,dt)
-		#print RHS
+		#print RHS.sum(1)
 		#print ss
 		t1 += time.time() - t1_tmp
 		t2_tmp = time.time()

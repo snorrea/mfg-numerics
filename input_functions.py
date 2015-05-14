@@ -75,7 +75,7 @@ def crafty_jew_search(funcprime,(args),tolerance,max_iter,x0,dx,left,right):
 			return x
 	return x
 
-def hybrid_search(func,funcprime,(args),tolerance,max_iter,x0,dx,N,left,right):
+def hybrid_search(func,funcprime,(args),tolerance,iterations,x0,dx,N,left,right):
 	x = x0
 	dex = dx
 	p = funcprime(x,*args)
@@ -85,21 +85,23 @@ def hybrid_search(func,funcprime,(args),tolerance,max_iter,x0,dx,N,left,right):
 	elif psign<0 and x0==right:
 		return x0
 	elif psign==0:
-		return x0
-	for i in range(0,max_iter):
+		print "Found exact"
+		return x0	
+	for i in range(0,iterations):
+		if i is not 0:
+			p = funcprime(x,*args)
+			psign = np.sign(p)
 		if psign>0: #go left
 			xt = np.linspace(x-dex,x,N)
 		elif psign<0: #go right
 			xt = np.linspace(x,x+dex,N)
 		else:
-			return x0
+			#print "Found exact"
+			return x
 		dex = xt[1]-xt[0]
 		fpts = func(xt,*args)
 		x = xt[np.argmin(fpts)]
-		if abs(dex) < tolerance:
-			return x
-	print "Fuckup"
-	return 0
+	return x
 
 def newton_search(func,funcprime,(args),tolerance,max_iter,x0,dx,left,right):
 	x = x0
@@ -243,9 +245,9 @@ def L_global(time,x_array,a_array,m_array): #general cost
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#return -1*np.ones(x_array.size) #FP test, constant coefficients
-	#return 2.5*x_array #Ornstein FP test
+	return 2.5*x_array #Ornstein FP test
 	#return x_array*np.sin(a_array) #brutal test
-	return a_array #standard MFG, HJB test
+	#return a_array #standard MFG, HJB test
 
 def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJB test
 	#return 4+a_array*x_array #Classic Robstad
@@ -261,20 +263,24 @@ def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 	if i!=0 and i!=m.size-1:
 		u1 = (u[i]-u[i-1])/dx
 		u2 = (u[i+1]-u[i])/dx
-		u3 = (u[i+1]+u[i-1]-2*u[i])/(dx**2)	
+		u3 = (u[i+1]+u[i-1]-2*u[i])/(dx**2)
+		u4 = (u[i+1]-u[i-1])/(2*dx)
 	elif i==0:
 		u1 = (u[i]-u[i+1])/dx
 		u2 = (u[i+1]-u[i])/dx
 		u3 = (u[i+1]+u[i+1]-2*u[i])/(dx**2)
+		u4 = 0
 	elif i==m.size-1:
 		u1 = (u[i]-u[i-1])/dx
 		u2 = (u[i-1]-u[i])/dx
 		u3 = (u[i-1]+u[i-1]-2*u[i])/(dx**2)
+		u4 = 0
 	#tmp = a - 0.2 + a**3/2 * u3 + max_or_if(x*np.cos(a)*u1,x*np.sin(a))+min_or_if(x*np.cos(a)*u2,x*np.sin(a))
 	#print tmp
 	#print "Inputs:",a,t,x[i],u,m,i,dx
 	#print a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
-	return a + u1*max_or_if(1,a) + u2*min_or_if(1,a) #HJB exact test
+	#return a + u1*max_or_if(1,a) + u2*min_or_if(1,a) #HJB exact test
+	return a + u4
 	#return a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
 #def max_or_if(val,valif):
 #	if valif>0:
