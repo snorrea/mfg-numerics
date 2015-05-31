@@ -30,5 +30,25 @@ def FVL2G(Local,Global,i,I,J):
 	Global[i+I+1,i+1] += Local[3,1]
 	Global[i+I+1,i+I] += Local[3,2]
 	Global[i+I+1,i+I+1] += Local[3,3]
+	#F1;
+#	Global[i,i] += Local[0,0]
+#	Global[i,i+1] += Local[1,0]
+#	Global[i,i+I] += Local[2,0]
+#	Global[i,i+I+1] += Local[3,0]
+	#F2;  
+#	Global[i+1,i] += Local[0,1]
+#	Global[i+1,i+1] += Local[1,1]
+#	Global[i+1,i+I] += Local[2,1]
+#	Global[i+1,i+I+1] += Local[3,1]
+	#F3; 
+#	Global[i+I,i] += Local[0,2]
+#	Global[i+I,i+1] += Local[1,2]
+#	Global[i+I,i+I] += Local[2,2]
+#	Global[i+I,i+I+1] += Local[3,2]
+	#F4; 
+#	Global[i+I+1,i] += Local[0,3]
+#	Global[i+I+1,i+1] += Local[1,3]
+#	Global[i+I+1,i+I] += Local[2,3]
+#	Global[i+I+1,i+I+1] += Local[3,3]
 	return Global
 

@@ -108,18 +108,45 @@ def L_global(time,x,y,a1,a2,m_array): #general cost
 def f_global(time,x_array,y_array,ax_array,ay_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	x,y = np.meshgrid(x_array,y_array)
-	return [.1*x_array*y_array,.1*x_array*y_array] #FP test
+	#return [.1*x_array*y_array,.1*x_array*y_array] #FP test
+	c = .5
+	return [c*x,c*y]
+	#return [c*x*np.exp(-time),c*y*np.exp(-time)] #FP test
 	#return [ax_array, ay_array] #standard MFG
 
-def Sigma_D11_test(time,x,y,ax_array,ay_array,m_array):
+def Sigma_D11_test(time,x,y,ax_array,ay_array):
+	I = x.size
+	J = y.size
 	x,y = np.meshgrid(x,y)
-	return .5**2*np.ones(x.shape)
-def Sigma_D22_test(time,x,y,ax_array,ay_array,m_array):
+	#return .5**2*np.ones(x.shape)
+	out = .005*np.ones(x.shape)
+	for i in range(0,I):
+		for j in range(0,J):
+			if x[i,j] >= .5:
+				out[i,j] = 2*out[i,j]
+	return out
+def Sigma_D22_test(time,x,y,ax_array,ay_array):
+	I = x.size
+	J = y.size
 	x,y = np.meshgrid(x,y)
-	return .5**2*np.ones(x.shape)
-def Sigma_D12_test(time,x,y,ax_array,ay_array,m_array):
+	#return .5**2*np.ones(x.shape)
+	out = .005*np.ones(x.shape)
+	for i in range(0,I):
+		for j in range(0,J):
+			if y[i,j] >= .5:
+				out[i,j] = 2*out[i,j]
+	return out
+def Sigma_D12_test(time,x,y,ax_array,ay_array):
+	I,J = x.size,y.size
 	x,y = np.meshgrid(x,y)
-	return .0**2*np.ones(x.shape)
+	#out = 0.00125*(2+x+y)#+1e-3 #FP test mean
+	out = 0.005*np.ones(x.shape)
+	for i in range(0,I):
+		for j in range(0,J):
+			if y[i,j] >= .5 and x[i,j] >= .5:
+				out[i,j] = 2*out[i,j]
+	return out
+	#return .0**2*np.ones(x.shape) #FP test nice
 
 ##################
 #TERMINAL COST
@@ -135,9 +162,15 @@ def G(x_array,y_array,m_array): #this is the final cost, and is a function of th
 #INITIAL DISTRIBUTION
 ##################
 def initial_distribution(x,y): #this now works
-	x,y = np.meshgrid(x,y)
+	#x,y = np.meshgrid(x,y)
 	#return np.exp( -(x-0.)**2/(0.2**2) - (y-0.)**2/(0.2**2) )
-	return np.exp( -(x-0.5)**2/(0.1**2) - (y-0.5)**2/(0.1**2) )
+	m0 = np.zeros((x.size,y.size))
+	for i in range(x.size):
+		for j in range(y.size):
+			if x[i] <= .3 and y[j] <= .3 and x[i] >= 0.1 and y[j] >=0.1:
+				m0[i,j] = .1
+	return m0
+	#return np.exp( -(x-0.5)**2/(0.1**2) - (y-0.5)**2/(0.1**2) )
 	#return 1-0.2*np.cos(np.pi*x) #gueant's original
 	#return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
 	#return np.exp(-(np.outer(x,y)-0.5)**2/0.1**2) #shyness game

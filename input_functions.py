@@ -31,20 +31,23 @@ def hmean_scalar(a,b):
 def scatter_search(function, (args),dx,x0,N,k,left,right): #here k is the number of laps going
 	x_naught = x0
 	dex = dx
-	for i in range (0,k):
-		#define searchspace
-		if x_naught+dex > right:
-			xpts = np.linspace(x_naught-dex,right,N)
-		elif x_naught-dex < left:
-			xpts = np.linspace(left,x_naught+dex,N)
-		else:
-			xpts = np.linspace(x_naught-dex,x_naught+dex,N)
-		#evaluate and cherry pick
-		dex = xpts[2]-xpts[1]
-		fpts = function(xpts,*args)
-		if i!=k-1: #this if is here just to save an extra evaluation
-			x_naught = xpts[np.argmin(fpts)]
-	return xpts[np.argmin(fpts)],min(fpts)
+	if k>0:
+		for i in range (0,k):
+			#define searchspace
+			if x_naught+dex > right:
+				xpts = np.linspace(x_naught-dex,right,N)
+			elif x_naught-dex < left:
+				xpts = np.linspace(left,x_naught+dex,N)
+			else:
+				xpts = np.linspace(x_naught-dex,x_naught+dex,N)
+			#evaluate and cherry pick
+			dex = xpts[2]-xpts[1]
+			fpts = function(xpts,*args)
+			if i!=k-1: #this if is here just to save an extra evaluation
+				x_naught = xpts[np.argmin(fpts)]
+		return xpts[np.argmin(fpts)],min(fpts)
+	else:
+		return x_naught,function(x_naught,*args)
 
 def scatter_search2(function, (args),dx,x0,N,k,alpha): #here k is the number of laps going, also this is bad
 	x_naught = x0
@@ -179,9 +182,9 @@ def bisection_search(function, (args),dx,x0,tol):
 def Hamiltonian(alphas,time,x_array,u_array,m_array,index,dx):
 	BIGZERO = np.zeros(alphas.size)
 	#print alphas,time,x_array,u_array,m_array,index,dx
-	sigma2 = Sigma_global(time,x_array[index],alphas,m_array[index])**2
+	sigma2 = Sigma_global(time,x_array[index],alphas)**2
 	movement = f_global(time,x_array[index],alphas)
-	L_var = L_global(time,x_array[index],alphas,m_array[index])
+	L_var = L_global(time,x_array[index],alphas,m_array[index],dx)
 	dx2 = dx**2
 	#Kushner
 	if index==0: #topmost stuff is correct
@@ -208,11 +211,12 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 ###################
 #RUNNING COST
 ###################
-def F_global(x_array,m_array,sigma,time): #more effective running cost function
-	#return (x_array-0.2)**2 #Carlini's no-game
-	tau = 1
-	omega = 1
-	return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
+def F_global(x_array,m_array,time,dx): #more effective running cost function
+	return (x_array-0.5)**2 #Carlini's no-game
+	#dx=1
+	#tau = 1
+	#omega = 1
+	#return 0.5*(omega**2)*np.exp(-2*time*tau)*np.cos(omega*x_array)**2 + (tau + 0.5*(omega**2)*Sigma_global(time,x_array,x_array,x_array)**2) * np.exp(-tau*time)*np.sin(omega*x_array) #HJB exact test
 	#ONE = np.ones(m_array.size)
 	#return (x_array-0.2)**2 + np.minimum(4*ONE,np.maximum(m_array,ONE))
 	#return np.minimum(1.4*np.ones(x_array.size),np.maximum(m_array,0.7*np.ones(x_array.size))) #Gueant's game
@@ -220,43 +224,66 @@ def F_global(x_array,m_array,sigma,time): #more effective running cost function
 	#tmp = mollify_array(tmp,sigma,x_array,gll_x,gll_w)
 	#return 0.05*mollify_array(tmp,sigma,x_array,gll_x,gll_w)
 	#return 0.03*tmp
-	#return 0.1*m_array #shyness game
-	#return (powerbill(time)*(1-0.8*x_array) + x_array/(0.1+m_array))
+	#print "A:",sum(m_array/sum(m_array))
+	#print "B:",sum(m_array)
+	#print "C:",sum(m_array)*dx
+	#plt.plot(x_array,m_array)
+	#plt.plot(x_array,m_array/sum(m_array))
+	#plt.show()
+	#return -.1*m_array #shyness game
+	#return .1*m_array/sum(m_array) #modified shyness game
+	#return 2*powerbill(time)*(1-.95*x_array) + .4*x_array/((1+dx*m_array)**(1.))
+	#print np.mean(.1*x_array/((1+m_array)**(1.)))
+	#return 2*powerbill(time)*(1-.95*x_array)+ .4*x_array/((1+m_array)**(1.))
 	#return 0*x_array#no-game
 
 def powerbill(time):
-	if time<=0.2:
-		return 50*time
-	elif time<=0.3:
-		return 10
-	elif time <=0.75:
-		return 10+10/(0.3-0.75)*time
-	else:
-		return 0
+	return np.sin(np.pi*time)
+	#if time<=0.2:
+	#	return 50*time
+	#elif time<=0.3:
+	#	return 10
+	#elif time <=0.75:
+	#	return 10+10/(0.3-0.75)*time
+	#else:
+	#	return 0
 #	return 0
 
-def L_global(time,x_array,a_array,m_array): #general cost
+def L_global(time,x_array,a_array,m_array,dx): #general cost
 	#return a_array + np.sqrt(x_array) + a_array**2 #Classic Robstad
 	#one = np.ones(x_array.size)
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
 	#return np.exp(-time)*abs(x_array) + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
-	return 0.5*a_array**2 + F_global(x_array,m_array,0,time) #HJB test and "nice" MFG
+	#return (0.5*a_array**2+.4*x_array)/(1+dx*m_array) + 2*powerbill(time)*(1-.95*x_array)
+	#return (0.5*a_array**2+.4*x_array) + 2*powerbill(time)*(1-.95*x_array)
+	return 0.5*a_array**2 + F_global(x_array,m_array,time,dx) #HJB test and "nice" MFG
 
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#return -1*np.ones(x_array.size) #FP test, constant coefficients
-	return 2.5*x_array #Ornstein FP test
+	#return 2.5*x_array #Ornstein FP test
 	#return x_array*np.sin(a_array) #brutal test
-	#return a_array #standard MFG, HJB test
+	#output = np.empty(a_array.size)
+	#for i in range(0,output.size):
+	#	if a_array[i]>=0:
+	#		output[i] = a_array[i]*(2-np.exp(-time))
+	#	else:
+	#		output[i] = 0.1*a_array[i]
+	#return output
+#	return a_array*(2-np.exp(-time))
+	return a_array #standard MFG, HJB test
 
-def Sigma_global(time,x_array,a_array,m_array): #any of these will do for the HJB test
+def Sigma_global(time,x_array,a_array): #any of these will do for the HJB test
+	return 0.0*x_array
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
-	#one = np.ones(m_array.size)
+	#one = np.ones(x_array.size)
+	#return 0.1*one
+	#return 0.1*abs(a_array)
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
 	#return 0.5*a_array**2# + xenophobia #brutal test
 	#return .1*np.ones(x_array.size)
-	return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
+	#return np.sqrt(2*0.1)*np.ones(x_array.size) #FP test, constant coefficients
 	
 def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 	#print x
@@ -280,6 +307,7 @@ def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 	#print "Inputs:",a,t,x[i],u,m,i,dx
 	#print a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
 	#return a + u1*max_or_if(1,a) + u2*min_or_if(1,a) #HJB exact test
+	#return a + 
 	return a + u4
 	#return a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
 #def max_or_if(val,valif):
@@ -288,30 +316,17 @@ def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 #	else:
 #		return 0
 
-
-def Hamiltonian_Derivative2(a,t,x,u,m,i,dx):
-	if i!=0 and i!=m.size-1:
-		u1 = (u[i]-u[i-1])/dx
-		u2 = (u[i+1]-u[i])/dx
-		u3 = (u[i+1]+u[i-1]-2*u[i])/(dx**2)	
-	elif i==0:
-		u1 = (u[i]-u[i+1])/dx
-		u2 = (u[i+1]-u[i])/dx
-		u3 = (u[i+1]+u[i+1]-2*u[i])/(dx**2)
-	elif i==m.size-1:
-		u1 = (u[i]-u[i-1])/dx
-		u2 = (u[i-1]-u[i])/dx
-		u3 = (u[i-1]+u[i-1]-2*u[i])/(dx**2)
-	return 1 + 1.5*a**2 * u3 - max_or_if(x[i]*np.sin(a)*u1,x[i]*np.sin(a))-min_or_if(x[i]*np.sin(a)*u2,x[i]*np.sin(a))
-
 ##################
 #TERMINAL COST
 ##################
-def G(x_array,m_array): #this is the final cost, and is a function of the entire distribution m and each point x_i
-	return -(x_array+2)**2 * (x_array-2)**2 + 4
+def G(x,m): #this is the final cost, and is a function of the entire distribution m and each point x_i
+	#return -(x_array+2)**2 * (x_array-2)**2 + 4
 	#return 0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
 	#return 0.1*(x_array*(1-x_array))**2 #Gueant's game
 	#return -((x_array+0.2)*(1.2-x_array))**4 #Shyness game
+	return x*.0 
+	#return .4*x**2*(1.5-x) #isolation game
+	#return x_array*4 #skyness
 	#return np.zeros(x_array.size) #Carlini's no-game & Isolation game
 	#return 0.001*m_array
 
@@ -321,14 +336,23 @@ def G(x_array,m_array): #this is the final cost, and is a function of the entire
 ##################
 def initial_distribution(x):
 	#return 1-0.2*np.cos(np.pi*x) #gueant's original
-	#return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
-	m0 = 0.33*np.exp(-(x-0.00)**2/0.1**2)
-	m0 += 0.33*np.exp(-(x-1)**2/0.1**2)
-	m0 += 0.33*np.exp(-(x+1)**2/0.1**2)
-	return m0
+	return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+	#m0 = 0.33*np.exp(-(x-0.3)**2/0.1**2)
+	#m0 += 0.33*np.exp(-(x-.6)**2/0.1**2)
+	#m0 += 0.33*np.exp(-(x+1)**2/0.1**2)
+	#return m0
 	#return np.exp(-(x-0.5)**2/0.1**2) #shyness game
 	#return np.exp(-(x-0.3)**2/0.1**2) #isolation game
-	#return 1/(3*x+1)**3 #isolation game 2
+	#return  (32./5.) * 1/((3*x+1)**3) #isolation game 2
+
+############
+# OPTIMAL CONTROL
+#######
+def opt_cmfg(u,dx):
+	output = -np.gradient(u,dx)
+	output[0] = 0
+	output[-1] = 0
+	return output
 
 ###################
 #AUXILIARY FUNCTIONS
@@ -338,11 +362,18 @@ def mollifier(x_val): #Evans' mollifier
 		return np.exp(1/(x_val**2 - 1))/0.443994
 	else:
 		return 0
+
+def mollifier_arr(x): #Evans' mollifier
+	return np.nan_to_num(np.exp(1/(x**2-1))/0.443994) * abs(np.sign(np.minimum(np.zeros(x.size),abs(x) - 1)))
+	
 def mollify_array(array,epsilon,x_array,gll_x,gll_w): 
 	output = np.zeros((array.size))
-	for k in range (0,array.size):
-		for j in range (0,gll_x.size):
-			output[k] += gll_w[j]*mollifier(gll_x[j])*np.interp(x_array[k]-epsilon*gll_x[j],x_array,array)
+#	for k in range (0,array.size):
+		#for j in range (0,gll_x.size):
+		#	output[k] += gll_w[j]*mollifier(gll_x[j])*np.interp(x_array[k]-epsilon*gll_x[j],x_array,array)
+#		output[k] = sum(gll_w*mollifier_arr(gll_x)*np.interp(x_array[k]-epsilon*gll_x,x_array,array))
+	for j in range(0,gll_x.size):
+		output += gll_w[j]*mollifier_arr(gll_x[j])*np.interp(x_array-epsilon*gll_x[j],x_array,array)
 	return output
 def restrain(trajectory,x_array):
 	trajectory = np.minimum(np.maximum(x_array[0]*np.ones(x_array.size),trajectory),x_array[-1]*np.ones(x_array.size))

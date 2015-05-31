@@ -143,7 +143,7 @@ def control_general(x,time,u_last,m_last,dt,dx,xpts_search,N,scatters):
 	a_tmp = np.empty(x.size)
 	for i in range (0,x.size):
 		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
-		x0 = xpts_search[np.argmin(fpts)] 
+		x0 = xpts_search[np.argmin(fpts)]
 		tmp,tmpval = iF.scatter_search(iF.Hamiltonian,(time,x,u_last,m_last,i,dx),xpts_search[2]-xpts_search[1],x0,N,scatters,xpts_search[0],xpts_search[-1])
 		a_tmp[i] = tmp
 	return a_tmp
@@ -185,7 +185,6 @@ def control_newton_wolfe(x,time,u_last,m_last,dt,dx,xpts_search,tol):
 
 def control_bisect(x,time,u_last,m_last,dt,dx,xpts_search,N,tol):
 	a_tmp = np.empty(x.size)
-	dx
 	for i in range (0,x.size):
 		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
 		x0 = xpts_search[np.argmin(fpts)]

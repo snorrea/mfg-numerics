@@ -5,7 +5,7 @@ import input_functions as iF
 ##################
 # MATRIX GENERATION: HJB
 ##################
-def hjb_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
+def hjb_convection(time,x,a_tmp,dt,dx): #for explicit
 	#functions
 	movement = iF.f_global(time,x,a_tmp) #the function f
 	I = x.size
@@ -15,103 +15,139 @@ def hjb_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
 	m_west = -np.minimum(movement,zerohero)*dt/dx
 	m_west[-1] = abs(movement[-1])*dt/dx #reflective
 	here = 1-dt/dx*abs(movement)
+	#here = 1-(m_east+m_west)
 	output = sparse.diags([here, m_east[0:-1], m_west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
-def hjb_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
+def hjb_diffusion(time,x,a_tmp,dt,dx): #for implicit
 	#functions
-	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
+	sigma = iF.Sigma_global(time,x,a_tmp)
 	sigma2 = sigma**2
 	dx2 = dx**2
 	I = x.size
 	s_east = -sigma2*dt/(2*dx2)
-	s_east[0] = 2*s_east[0] #reflective
+	s_east[0] = s_east[0]*2 #reflective
 	s_west = -sigma2*dt/(2*dx2)
-	s_west[-1] = 2*s_west[-1] #reflective
+	s_west[-1] = s_west[-1]*2 #reflective
+	here = 1+sigma2*dt/dx2
+	output = sparse.diags([here, s_east[0:-1], s_west[1:]],[0, 1, -1])
+	#print sparse.csr_matrix(output).sum(0)
+	#print ss
+	return sparse.csr_matrix(output)
+
+def hjb_diffusion_av(time,x,a_tmp,dt,dx,artificial): #for implicit
+	#functions
+	sigma = iF.Sigma_global(time,x,a_tmp)+artificial
+	sigma2 = sigma**2
+	dx2 = dx**2
+	I = x.size
+	s_east = -sigma2*dt/(2*dx2)
+	s_east[0] = s_east[0]*2 #reflective
+	s_west = -sigma2*dt/(2*dx2)
+	s_west[-1] = s_west[-1]*2 #reflective
 	here = 1+sigma2*dt/dx2
 	output = sparse.diags([here, s_east[0:-1], s_west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 ##################
 # MATRIX GENERATION: FINITE VOLUME
 ##################
-def fp_fv_convection_classic(time,x,a_tmp,m_tmp,dt,dx): #for explicit
+def fp_fv_convection_classic(time,x,a_tmp,dt,dx): #for explicit
 	#functions
-	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
-	movement = iF.f_global(time,x,a_tmp) #the function f
+	sigma = iF.Sigma_global(time,x,a_tmp)
+	movement = iF.f_global(time,x,a_tmp)
 	#generate the flux vectors
 	sigmad = np.gradient(sigma,dx)
-	#print sigmad
-	#print movement
-	#Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
-	Fi = movement[1:-1]-sigma[1:-1]*sigmad[1:-1]	
-	Fi = np.append(Fi,(dx*movement[-1])/dx )
-	Fi = np.insert(Fi,0,(dx*movement[0])/dx)
-	#Fi = np.append(Fi,(dx*movement[-1]-sigma[-1]*(-sigma[-2]))/dx )
-	#Fi = np.insert(Fi,0,(dx*movement[0]-sigma[0]*sigma[1])/dx)
-	#print Fi
-	#print ss
+	Fi = movement-sigma*sigmad
+	Fi[0] = Fi[0]*2
+	Fi[-1] = Fi[-1]*2
 	zerohero = np.zeros(x.size)
-	here = 1-dt/dx*abs(Fi)
-	east = -dt/dx*np.minimum(Fi[1:],zerohero[1:])
-	west = dt/dx*np.maximum(Fi[0:-1],zerohero[0:-1])
+	F_here = np.maximum(Fi,zerohero) - np.minimum(Fi,zerohero)
+	F_here[0] = max(Fi[0],0)
+	F_here[-1] = -min(Fi[-1],0)
+	F_east = -np.minimum(Fi,zerohero)
+	F_west = np.maximum(Fi,zerohero)
+	here = 1-dt/dx*(F_here)
+	east = dt/dx*F_east[1:]
+	west = dt/dx*F_west[0:-1]
 	output = sparse.diags([here, east, west],[0, 1, -1])
+	#print sparse.csr_matrix(output)#.sum(1)
+	#print ss
 	return sparse.csr_matrix(output)
 
-def fp_fv_convection_interpol(time,x,a_tmp,m_tmp,dt,dx): #for explicit
+def fp_fv_convection_interpol(time,x,a_tmp,dt,dx): #for explicit; this has been vetted
 	#functions
-	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
+	sigma = iF.Sigma_global(time,x,a_tmp)
 	movement = iF.f_global(time,x,a_tmp) #the function f
 	#generate the flux vectors
 	sigmad = np.gradient(sigma,dx)
-	#print sigmad
-	#print movement
-	#Fi = (dx*movement[1:-1]-sigma[1:-1]*( sigma[2:]-sigma[0:-2] ))/(dx)
 	Fi = movement-sigma*sigmad
-	Fi_up = .5*(Fi[0:-1] + Fi[1:])
-	Fi_up = np.insert(Fi_up,0,0)
-	Fi_down = .5*(Fi[1:] + Fi[0:-1])
-	Fi_down = np.append(Fi_down,0)
-	#print Fi
-	#print ss
-	#print Fi_up.shape,Fi_down.shape
+	Fi_up = np.zeros(x.size)
+	Fi_down = np.zeros(x.size)
+	Fi_up[1:] = .5*(Fi[0:-1] + Fi[1:])
+	Fi_down[:-1] = .5*(Fi[1:] + Fi[0:-1])
+	#Fi_up[:-1] = .5*(Fi[:-1]+Fi[1:])
+	#Fi_down[1:] = .5*(Fi[1:]+Fi[:-1])
 	zerohero = np.zeros(x.size)
-	#print zerohero.shape
-	here = 1-dt/dx*(np.maximum(Fi_down,zerohero) - np.minimum(Fi_up,zerohero))
-	#here = np.append(here, 1-dt/dx*np.maximum(Fi_down[-1],0))
-	#here = np.insert(here,0,1+dt/dx*np.minimum(Fi_up[0],0))
 	east = -dt/dx*np.minimum(Fi_up[1:],zerohero[1:])
 	west = dt/dx*np.maximum(Fi_down[0:-1],zerohero[0:-1])
-	#print here.size, east.size,west.size
+	#east = -dt/dx*np.minimum(Fi_up[:-1],zerohero[:-1])
+	#west = dt/dx*np.maximum(Fi_down[1:],zerohero[1:])
+	here = 1-dt/dx*(np.maximum(Fi_down,zerohero) - np.minimum(Fi_up,zerohero))
+	##print here
 	output = sparse.diags([here, east, west],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
-def fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
-	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
+
+def fp_fv_diffusion(time,x,a_tmp,dt,dx): #for implicit
+	sigma = iF.Sigma_global(time,x,a_tmp)
 	sigma2 = sigma**2
 	dx2 = dx**2
 	I = x.size
 	#generate the flux vectors; this is a little messy
-	D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])#/2
-	D_w = iF.hmean_scalar(sigma2[0],sigma2[1])#/2
+	D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])/2#/2
+	D_w = iF.hmean_scalar(sigma2[0],sigma2[1])/2
 	D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2
 	D_up = np.append(D_up,0)
-	D_up = np.insert(D_up,0,D_e)
+	D_up = np.insert(D_up,0,D_w)
 	D_down = iF.hmean(sigma2[1:-1],sigma2[0:-2])/2
-	D_down = np.append(D_down,D_w)
+	D_down = np.append(D_down,D_e)
 	D_down = np.insert(D_down,0,0)
+	#D_up[0] = 2*D_up[0]
+	#D_down[-1] = 2*D_down[-1]
 	#make the matrix
 	here = 1+dt/dx2*(D_up+D_down)
-	#print here
-	#print ss
 	east = -dt/dx2*D_up
 	west = -dt/dx2*D_down
 	output = sparse.diags([here, east[0:-1], west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
+
+
+def fp_fv_diffusion_av(time,x,a_tmp,dt,dx,artificial): #for implicit
+	sigma = iF.Sigma_global(time,x,a_tmp)+artificial
+	sigma2 = sigma**2
+	dx2 = dx**2
+	I = x.size
+	#generate the flux vectors; this is a little messy
+	D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])/2#/2
+	D_w = iF.hmean_scalar(sigma2[0],sigma2[1])/2#/2
+	D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2
+	D_up = np.append(D_up,0)
+	D_up = np.insert(D_up,0,D_w)
+	D_down = iF.hmean(sigma2[1:-1],sigma2[0:-2])/2
+	D_down = np.append(D_down,D_e)
+	D_down = np.insert(D_down,0,0)
+	#make the matrix
+	here = 1+dt/dx2*(D_up+D_down)
+	east = -dt/dx2*D_up
+	west = -dt/dx2*D_down
+	output = sparse.diags([here, east[0:-1], west[1:]],[0, 1, -1])
+	return sparse.csr_matrix(output)
+
 ############
 # MATRIX GENERATION OF THE SHIT
 ############
 
-def fp_fd_centered_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
+def fp_fd_centered_convection(time,x,a_tmp,dt,dx): #for explicit
 	#functions
 	movement = iF.f_global(time,x,a_tmp) #the function f
 	I = x.size
@@ -123,8 +159,8 @@ def fp_fd_centered_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
 	output = sparse.diags([here, east, west[0:-1]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
-def fp_fd_centered_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
-	sigma = iF.Sigma_global(time,x,a_tmp,m_tmp)
+def fp_fd_centered_diffusion(time,x,a_tmp,dt,dx): #for implicit
+	sigma = iF.Sigma_global(time,x,a_tmp)
 	sigma2 = sigma**2
 	dx2 = dx**2
 	I = x.size
@@ -134,7 +170,7 @@ def fp_fd_centered_diffusion(time,x,a_tmp,m_tmp,dt,dx): #for implicit
 	output = sparse.diags([here, east, west[0:-1]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
-def fp_fd_upwind_convection(time,x,a_tmp,m_tmp,dt,dx): #for explicit
+def fp_fd_upwind_convection(time,x,a_tmp,dt,dx): #for explicit
 	#functions
 	movement = iF.f_global(time,x,a_tmp) #the function f
 	I = x.size
@@ -160,4 +196,13 @@ def ismember_sorted(a,array):
 			return False
 	return False
 
-
+def add_direchlet_boundary(A,B,sol_vector,val):
+	#set output to exactly one
+	I = sol_vector.size
+	A[0,:] = unit(0,I)
+	A[I-1,:] = unit(I-1,I)
+	B[0,:] = unit(0,I)
+	B[I-1,:] = unit(I-1,I)
+	sol_vector[0] = val
+	sol_vector[I-1] = val
+	return A,B,sol_vector

@@ -117,10 +117,77 @@ def hybrid_search(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,x
 	#print "Storage:",xpts.shape,ypts.shape
 	return xpts[xi,yi],ypts[xi,yi]
 
+##################
+# GRID FUNCTIONS
+##################
+
+def add_obstacle(x,y,(xmin,xmax,ymin,ymax),south,north,west,east,nulled):
+	#inputs:
+		#x,y are 1D vectors of the grid
+		#xmin,xmax,ymin,ymax indicate the vertices of the obstacle
+		#south,north,west,east are the boundaries of the grid as they are
+	#outputs:
+		#south,north,west,east are the updates boundaries of the grid
+	#x,y = np.meshgrid(x,y)
+	#find the closest indices for xmin,xmax,ymin,ymax
+	#corners are (xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax)
+	xmin_i = find_nearest_index(x,xmin)
+	xmax_i = find_nearest_index(x,xmax)
+	ymin_i = find_nearest_index(y,ymin)
+	ymax_i = find_nearest_index(y,ymax)
+	I = x.size
+	new_south = range(xmin_i+I*ymin_i,xmax_i+I*ymin_i+1)
+	new_north = range(xmin_i+I*ymax_i,xmax_i+I*ymax_i+1)
+	new_west = range(xmin_i+I*ymin_i,xmin_i+I*ymax_i+1,I)
+	new_east = range(xmax_i+I*ymin_i,xmax_i+I*ymax_i+1,I)
+	south = np.sort(np.concatenate((new_south,south),0)) 
+	north = np.sort(np.concatenate((new_north,north),0)) 
+	west = np.sort(np.concatenate((new_west,west),0)) 
+	east = np.sort(np.concatenate((new_east,east),0)) 
+	if nulled==None:
+		nulled = range(xmin_i + 1 + I*(ymin_i + 1),xmax_i - 1 + I*(ymin_i + 1)+1)
+		for i in range(1,ymax_i - ymin_i-1):
+			tmp = range(xmin_i + 1 + I*(ymin_i + 1+i),xmax_i - 1 + I*(ymin_i + 1+i)+1)
+			nulled = np.concatenate((tmp,nulled),0)
+	else:
+		for i in range(ymax_i - ymin_i - 2):
+			tmp = range(xmin_i + 1 + I*(ymin_i + 1+i),xmax_i - 1 + I*(ymin_i + 1+i)+1)
+			nulled = np.concatenate((tmp,nulled),0)
+	return south,north,west,east,np.sort(nulled)
 
 ###################
 #AUXILIARY FUNCTIONS
 ###################
+def find_nearest_index(array,value):
+    return (np.abs(array-value)).argmin()
+
+def find_nearest_value(array,value):
+    idx = (np.abs(array-value)).argmin()
+    return array[idx]
+
+def spike_detector(array): #finds the spikes, assuming reflective boundary
+	u_xx = np.empty(array.size)
+	for i in range(0,array.size):
+		if i==0:
+			u_xx[i] = 2*(array[i+1]-array[i])
+		elif i==array.size-1:
+			u_xx[i] = 2*(array[i-1]-array[i])
+		else:
+			u_xx[i] = array[i+1]+array[i-1]-2*array[i]
+	#now find sign change
+	u_xx = np.gradient(np.sign(u_xx))
+	begins = [] #stores indices where things begin
+	ends = [] #stores indices where things end
+	look = None #
+	for i in range(0,array.size):
+		if u_xx[i] < 0 and look!=True: #start of thing
+			begins.append(i)
+			look = True
+		elif u_xx[i] > 0 and look==True:
+			ends.append(i)
+			look = False
+	return begins,ends
+
 def hmean(a,b): #returns harmonic mean of a,b
 	return 2*a*b/(a+b)
 

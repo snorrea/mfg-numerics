@@ -16,7 +16,7 @@ gll_w = qn.GLL_weights(quad_order,gll_x)
 
 #INPUTS
 dx0 = 2*0.1
-REFINEMENTS = 6
+REFINEMENTS = 7
 X0 = -0.5
 cutoff = 0
 #constant coefficient test
@@ -120,16 +120,29 @@ for N in range(0,REFINEMENTS):
 		#m3 = solve.fp_fd_upwind_visc(x,(k)*dt,m2,m0,dt,dx)
 		#m4 = solve.fp_fv_mod(x,(k)*dt,m4,m0,dt,dx)
 		if k==0:
-			LHS_centered = mg.fp_fd_centered_diffusion(k*dt,x,m0,m1,dt,dx)
-			RHS_centered = mg.fp_fd_centered_convection(k*dt,x,m0,m1,dt,dx)
-			RHS_upwind = mg.fp_fd_upwind_convection(k*dt,x,m0,m2,dt,dx)
-			LHS_fv = mg.fp_fv_diffusion(k*dt,x,m0,m4,dt,dx)
-			RHS_fv = mg.fp_fv_convection_classic(k*dt,x,m0,m4,dt,dx)
-			RHS_fv2 = mg.fp_fv_convection_interpol(k*dt,x,m0,m4,dt,dx)
+			LHS_centered = mg.fp_fd_centered_diffusion(k*dt,x,m1,dt,dx)
+			RHS_centered = mg.fp_fd_centered_convection(k*dt,x,m1,dt,dx)
+			RHS_upwind = mg.fp_fd_upwind_convection(k*dt,x,m2,dt,dx)
+			LHS_fv = mg.fp_fv_diffusion(k*dt,x,m4,dt,dx)
+			RHS_fv = mg.fp_fv_convection_classic(k*dt,x,m4,dt,dx)
+			RHS_fv2 = mg.fp_fv_convection_interpol(k*dt,x,m4,dt,dx)
+		#add direchlet boundary... kinda fake, but fuck it
+		#LHS_centered,RHS_centered,m1 = mg.add_direchlet_boundary(LHS_centered,RHS_centered,m1,0)
+		#LHS_centered,RHS_upwind,m2 = mg.add_direchlet_boundary(LHS_centered,RHS_centered,m2,0)
+		#LHS_fv,RHS_fv,m3 = mg.add_direchlet_boundary(LHS_fv,RHS_fv,m3,0)
+		#LHS_fv,RHS_fv2,m4 = mg.add_direchlet_boundary(LHS_fv,RHS_fv2,m4,0)
 		m1 = sparse.linalg.spsolve(LHS_centered,RHS_centered*np.ravel(m1))
 		m2 = sparse.linalg.spsolve(LHS_centered,RHS_upwind*np.ravel(m2))
-		m3 = sparse.linalg.spsolve(LHS_fv,RHS_fv2*np.ravel(m4))
+		m3 = sparse.linalg.spsolve(LHS_fv,RHS_fv2*np.ravel(m3)) #interpolated
 		m4 = sparse.linalg.spsolve(LHS_fv,RHS_fv*np.ravel(m4))
+		m1[0] = 0
+		m1[-1] = 0
+		m2[0] = 0
+		m2[-1] = 0
+		m3[0] = 0
+		m3[-1] = 0
+		m4[0] = 0
+		m4[-1] = 0
 		#print m4
 	print "Time spent:",time.time()-t0
 	#compute error in 2-norm
