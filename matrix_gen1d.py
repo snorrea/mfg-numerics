@@ -104,6 +104,7 @@ def fp_fv_diffusion(time,x,a_tmp,dt,dx): #for implicit
 	dx2 = dx**2
 	I = x.size
 	#generate the flux vectors; this is a little messy
+	#print sigma2[-1],sigma2[-2]
 	D_e = iF.hmean_scalar(sigma2[-1],sigma2[-2])/2#/2
 	D_w = iF.hmean_scalar(sigma2[0],sigma2[1])/2
 	D_up = iF.hmean(sigma2[1:-1],sigma2[2:])/2

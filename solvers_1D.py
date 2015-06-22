@@ -5,6 +5,8 @@ import matrix_gen1d as mg
 import scipy.sparse as sparse
 import matplotlib.pyplot as plt
 import scipy.optimize as optimize
+import time as time
+import applications as app
 #these functions complete 1 iteration of the explicit schemes
 
 ###################
@@ -15,7 +17,7 @@ def hjb_kushner(x,time,u_last,m_tmp,a_tmp,dt,dx): #monotone, explicit
 	u_tmp = np.empty(x.size)
 	dx2 = dx**2
 	BIGZERO = np.zeros(x.size-2)
-	sigma2 = iF.Sigma_global(time,x,a_tmp,m_tmp)**2
+	sigma2 = iF.Sigma_global(time,x,a_tmp)**2
 	L_var = iF.L_global(time,x,a_tmp,m_tmp)
 	movement = iF.f_global(time,x,a_tmp)
 	#Kushner
@@ -25,9 +27,9 @@ def hjb_kushner(x,time,u_last,m_tmp,a_tmp,dt,dx): #monotone, explicit
 	return u_tmp
 
 def hjb_kushner_mod(x,time,u_last,m_tmp,a_tmp,dt,dx): #monotone, implicit
-	LHS = mg.hjb_diffusion(time,x,a_tmp,m_tmp,dt,dx)
-	RHS = mg.hjb_convection(time,x,a_tmp,m_tmp,dt,dx)
-	Ltmp = iF.L_global(time,x,a_tmp,m_tmp)
+	LHS = mg.hjb_diffusion(time,x,a_tmp,dt,dx)
+	RHS = mg.hjb_convection(time,x,a_tmp,dt,dx)
+	Ltmp = iF.L_global(time,x,a_tmp,m_tmp,dx)
 	return sparse.linalg.spsolve(LHS,RHS*u_last+dt*Ltmp)
 	#return sparse.linalg.spsolve(LHS,RHS*u_last)
 
@@ -107,8 +109,8 @@ def fp_fd_upwind_visc(x,time,m_tmp,a_tmp,dt,dx):
 	return m_update
 
 def fp_fv_mod(x,time,m_tmp,a_tmp,dt,dx):
-	LHS = mg.fp_fv_diffusion(time,x,a_tmp,m_tmp,dt,dx)
-	RHS = mg.fp_fv_convection(time,x,a_tmp,m_tmp,dt,dx)
+	LHS = mg.fp_fv_diffusion(time,x,a_tmp,dt,dx)
+	RHS = mg.fp_fv_convection_interpol(time,x,a_tmp,dt,dx)
 	return sparse.linalg.spsolve(LHS,RHS*m_tmp)
 def fp_fv(x,time,m_tmp,a_tmp,dt,dx):
 	I = x.size
@@ -147,6 +149,164 @@ def control_general(x,time,u_last,m_last,dt,dx,xpts_search,N,scatters):
 		tmp,tmpval = iF.scatter_search(iF.Hamiltonian,(time,x,u_last,m_last,i,dx),xpts_search[2]-xpts_search[1],x0,N,scatters,xpts_search[0],xpts_search[-1])
 		a_tmp[i] = tmp
 	return a_tmp
+
+def control_scipy(x,time,u_last,m_last,dx,xpts_search,N,tolerance):
+	a_tmp = np.empty(x.size)
+	for i in range (0,x.size):
+		fpts = iF.Hamiltonian(xpts_search,time,x,u_last,m_last,i,dx)
+		x0 = xpts_search[np.argmin(fpts)]
+		tmp = optimize.minimize(iF.Hamiltonian, x0, args=(time,x,u_last,m_last,i,dx), tol=tolerance)
+		#tmp,tmpval = iF.scatter_search(iF.Hamiltonian,(time,x,u_last,m_last,i,dx),xpts_search[2]-xpts_search[1],x0,N,scatters,xpts_search[0],xpts_search[-1])
+		a_tmp[i] = tmp.x
+	return a_tmp
+
+def control_scipy_vectorised(x,time,u,m,dx,xpts_search,N,tolerance):
+	#for i in range (0,x.size):
+	u_down = np.zeros(x.size)
+	u_up = np.zeros(x.size)
+	X,Xpts_search = np.meshgrid(x,xpts_search)
+	u_down[1:] = (u[1:]-u[:-1])/dx
+	u_up[:-1] = (u[1:]-u[:-1])/dx
+	u_down[0] = (u[0]-u[1])/dx
+	u_up[-1] = (u[-2]-u[-1])/dx
+	#make matrices out of u_up,u_down
+	U_up = np.empty((Xpts_search.shape))
+	U_down = np.empty((Xpts_search.shape))
+	M = np.empty((Xpts_search.shape))
+	#print Xpts_search.shape
+	#print ss
+	for i in range(Xpts_search.shape[0]):
+		U_up[i,:] = u_up
+		U_down[i,:] = u_down
+		M[i,:] = m
+	VALUEGRID = iF.Hamiltonian_array(Xpts_search,time,X,U_up,U_down,M,dx) #evaluate
+	BEST_BUYS = Xpts_search[np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])]
+	#print iF.Hamiltonian_array(x,time,x,u_up,u_down,m,dx)
+	#print ss
+	ones = np.ones(x.size)
+	tmp = optimize.fmin(iF.Hamiltonian_array, BEST_BUYS, args=(time,x,u_up,u_down,m,dx), xtol=tolerance)
+	#tmp = optimize.minimize(iF.Hamiltonian_array, BEST_BUYS, args=(time,x,u_up,u_down,m,dx), tol=tolerance)
+	return tmp.xopt
+
+def control_general_vectorised(x,time,u,m,dx,xpts_search,N,scatters):
+	ax = xpts_search[1]-xpts_search[0]
+	u_down = np.zeros(x.size)
+	u_up = np.zeros(x.size)
+	X,Xpts_search = np.meshgrid(x,xpts_search)
+	u_down[1:] = (u[1:]-u[:-1])/dx
+	u_up[:-1] = (u[1:]-u[:-1])/dx
+	u_down[0] = (u[0]-u[1])/dx
+	u_up[-1] = (u[-2]-u[-1])/dx
+	#make matrices out of u_up,u_down
+	U_up = np.empty((Xpts_search.shape))
+	U_down = np.empty((Xpts_search.shape))
+	M = np.empty((Xpts_search.shape))
+	#print Xpts_search.shape
+	#print ss
+	for i in range(Xpts_search.shape[0]):
+		U_up[i,:] = u_up
+		U_down[i,:] = u_down
+		M[i,:] = m
+	for i in range(scatters):
+		VALUEGRID = iF.Hamiltonian_array(Xpts_search,time,X,U_up,U_down,M,dx) #evaluate
+		BEST_BUYS = Xpts_search[np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])] #pick least values by row
+		#BEST_BUYS = Xpts_search[np.unravel_index(np.amin(VALUEGRID,axis=0),VALUEGRID.shape)] #pick least values by row
+		if i-1 is not scatters:
+			for j in range(BEST_BUYS.size):
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax,BEST_BUYS[j]+ax,N)
+			ax = Xpts_search[1,0] - Xpts_search[0,0]
+	return BEST_BUYS
+
+def control_general_vectorised_optimised(x,time,u,m,dx,xpts_search,N,scatters):
+	ax = xpts_search[1]-xpts_search[0]
+	u_down = np.zeros(x.size)
+	u_up = np.zeros(x.size)
+	X,Xpts_search = np.meshgrid(x,xpts_search)
+	u_down[1:] = (u[1:]-u[:-1])/dx
+	u_up[:-1] = (u[1:]-u[:-1])/dx
+	u_down[0] = (u[0]-u[1])/dx
+	u_up[-1] = (u[-2]-u[-1])/dx
+	for i in range(scatters):
+		VALUEGRID = iF.Hamiltonian_array(Xpts_search,time,x,u_up,u_down,m,dx) #evaluate
+		BEST_BUYS = Xpts_search[np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])] #pick least values by row
+		if i-1 is not scatters:
+			for j in range(BEST_BUYS.size):
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax,BEST_BUYS[j]+ax,N)
+			ax = Xpts_search[1,0]-Xpts_search[0,0]
+	return BEST_BUYS
+
+def control_hybrid_vectorised(x,timez,u,m,dx,xpts_search,N,scatters): #does pretty much the same as the others
+	ax = xpts_search[1]-xpts_search[0]
+	u_down = np.zeros(x.size)
+	u_up = np.zeros(x.size)
+	X,Xpts_search = np.meshgrid(x,xpts_search)
+	u_down[1:] = (u[1:]-u[:-1])/dx
+	u_up[:-1] = (u[1:]-u[:-1])/dx
+	u_down[0] = (u[0]-u[1])/dx
+	u_up[-1] = (u[-2]-u[-1])/dx
+	#for i in range(scatters):
+	zero = np.zeros((x.shape))
+	#FOUNDS = [None]*x.size
+	#while True:
+	#decimals = len(str(int(1/mil_tol)))
+	#print ss
+	zer_ind = None
+	for i in range(scatters):
+		VALUEGRID = iF.Hamiltonian_array(Xpts_search,timez,x,u_up,u_down,m,dx) #evaluate
+		minis = np.argmin(VALUEGRID,axis=0)
+		BEST_BUYS = Xpts_search[minis,range(0,VALUEGRID.shape[1])]
+		if zer_ind==None:
+			Xpts_search = np.empty((np.ceil(N/2),x.size))
+		if i-1 is not scatters:
+			DERIV_GRID = np.gradient(VALUEGRID)[0][np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])]
+			pos_ind = np.nonzero(np.maximum(DERIV_GRID,zero))[0]
+			neg_ind = np.nonzero(np.minimum(DERIV_GRID,zero))[0]
+			zer_ind = [n for n in (range(x.size)) if n not in pos_ind and n not in neg_ind]
+			for j in zer_ind:
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax/2,BEST_BUYS[j]+ax/2,np.ceil(N/2))
+			for j in pos_ind:
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax,BEST_BUYS[j],np.ceil(N/2))
+			for j in neg_ind:
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j],BEST_BUYS[j]+ax,np.ceil(N/2))
+			ax = Xpts_search[1,j]-Xpts_search[0,j]
+	return BEST_BUYS
+
+def control_hybrid_vectorised_optimised(x,timez,u,m,dx,xpts_search,N,scatters):
+	ax = xpts_search[1]-xpts_search[0]
+	u_down = np.zeros(x.size)
+	u_up = np.zeros(x.size)
+	X,Xpts_search = np.meshgrid(x,xpts_search)
+	u_down[1:] = (u[1:]-u[:-1])/dx
+	u_up[:-1] = (u[1:]-u[:-1])/dx
+	u_down[0] = (u[0]-u[1])/dx
+	u_up[-1] = (u[-2]-u[-1])/dx
+	#for i in range(scatters):
+	zero = np.zeros((x.shape))
+	#FOUNDS = [None]*x.size
+	#while True:
+	#print ss
+	zer_ind = None
+	for i in range(scatters):
+		VALUEGRID = iF.Hamiltonian_array(Xpts_search,timez,x,u_up,u_down,m,dx) #evaluate
+		BEST_BUYS = Xpts_search[np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])]
+		if zer_ind==None:
+			Xpts_search = np.empty((np.ceil(N/2),x.size))
+		if i-1 is not scatters:
+			grad_list = iF.Hamiltonian_Derivative_vectorised(BEST_BUYS,timez,x,u_up,u_down,m,dx)
+			pos_ind = np.nonzero(np.maximum(grad_list,zero))[0]
+			neg_ind = np.nonzero(np.minimum(grad_list,zero))[0]
+			zer_ind = [n for n in (range(x.size)) if n not in pos_ind and n not in neg_ind]
+			for j in zer_ind:
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax/2,BEST_BUYS[j]+ax/2,np.ceil(N/2))
+			for j in pos_ind:
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax,BEST_BUYS[j],np.ceil(N/2))
+			for j in neg_ind:
+				Xpts_search[:,j] = np.linspace(BEST_BUYS[j],BEST_BUYS[j]+ax,np.ceil(N/2))
+			ax = Xpts_search[1,j]-Xpts_search[0,j]
+			
+			showme_pt = iF.Hamiltonian_array(BEST_BUYS[3],timez,x[3],u_up[3],u_down[3],m[3],dx)				
+	return BEST_BUYS
+
 
 def control_newton(x,time,u_last,m_last,dt,dx,xpts_search,tol):
 	a_tmp = np.empty(x.size)

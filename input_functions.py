@@ -199,6 +199,17 @@ def Hamiltonian(alphas,time,x_array,u_array,m_array,index,dx):
 	#print tmp
 	return tmp
 
+def Hamiltonian_array(alphas,time,x,U_up,U_down,m,dx): 
+	#for every value in alphas, give a 2D array for the entire x-alpha plane
+	#assumes that alphas,x are meshgrid'ed
+	s2 = Sigma_global(time,x,alphas)**2
+	f = f_global(time,x,alphas)
+	L = L_global(time,x,alphas,m,dx)
+	dx2 = dx**2
+	zero = np.zeros(alphas.shape)
+	return L + np.maximum(zero,f)*U_down + np.minimum(zero,f)*U_up + .5*s2*(U_up-U_down)/dx
+	
+
 ###################
 #TAU FUNCTION
 ###################
@@ -211,8 +222,8 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 ###################
 #RUNNING COST
 ###################
-def F_global(x_array,m_array,time,dx): #more effective running cost function
-	return (x_array-0.5)**2 #Carlini's no-game
+def F_global(x_array,m_array,time,damp): #more effective running cost function
+	#return (x_array-0.5)**2 #Carlini's no-game
 	#dx=1
 	#tau = 1
 	#omega = 1
@@ -230,11 +241,9 @@ def F_global(x_array,m_array,time,dx): #more effective running cost function
 	#plt.plot(x_array,m_array)
 	#plt.plot(x_array,m_array/sum(m_array))
 	#plt.show()
-	#return -.1*m_array #shyness game
+	#return m_array #shyness game
 	#return .1*m_array/sum(m_array) #modified shyness game
-	#return 2*powerbill(time)*(1-.95*x_array) + .4*x_array/((1+dx*m_array)**(1.))
-	#print np.mean(.1*x_array/((1+m_array)**(1.)))
-	#return 2*powerbill(time)*(1-.95*x_array)+ .4*x_array/((1+m_array)**(1.))
+	return 2*powerbill(time)*(1-.95*x_array)+ .4*x_array/((1+damp*m_array)**(1.))
 	#return 0*x_array#no-game
 
 def powerbill(time):
@@ -249,37 +258,49 @@ def powerbill(time):
 	#	return 0
 #	return 0
 
-def L_global(time,x_array,a_array,m_array,dx): #general cost
+def L_global(time,x_array,a_array,m_array,damp): #general cost
 	#return a_array + np.sqrt(x_array) + a_array**2 #Classic Robstad
 	#one = np.ones(x_array.size)
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
 	#return np.exp(-time)*abs(x_array) + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
-	#return (0.5*a_array**2+.4*x_array)/(1+dx*m_array) + 2*powerbill(time)*(1-.95*x_array)
+	return (0.5*a_array**2+.4*x_array)/(1+.1*m_array*damp) + 2*powerbill(time)*(1-.95*x_array)
 	#return (0.5*a_array**2+.4*x_array) + 2*powerbill(time)*(1-.95*x_array)
-	return 0.5*a_array**2 + F_global(x_array,m_array,time,dx) #HJB test and "nice" MFG
-
+	#return 0.5*a_array**2 + F_global(x_array,m_array,time,damp) #HJB test and "nice" MFG
+	
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#return -1*np.ones(x_array.size) #FP test, constant coefficients
 	#return 2.5*x_array #Ornstein FP test
 	#return x_array*np.sin(a_array) #brutal test
-	#output = np.empty(a_array.size)
+	#print x_array.shape,a_array.shape
+	#print type(a_array)
+	#print a_array
+	if isinstance(a_array, np.float64):
+		return max(a_array,0)*np.exp(-time) + min(a_array,0)*0.1
+	output = np.zeros(a_array.shape)
+	#print output.shape
+	pos_ind = np.nonzero(np.maximum(np.sign(a_array),output))
+	neg_ind = np.nonzero(np.minimum(np.sign(a_array),output))
+	output[pos_ind] = a_array[pos_ind]*np.exp(-time)
+	output[neg_ind] = .1*a_array[neg_ind]
+	#tmp = np.maximum(np.sign(a_array),output) 
 	#for i in range(0,output.size):
 	#	if a_array[i]>=0:
-	#		output[i] = a_array[i]*(2-np.exp(-time))
+	#		output[i] = a_array[i]*(np.exp(-time))
 	#	else:
 	#		output[i] = 0.1*a_array[i]
-	#return output
-#	return a_array*(2-np.exp(-time))
-	return a_array #standard MFG, HJB test
+	#print output
+	#print ss
+	return output
+	#return a_array #standard MFG, HJB test
 
 def Sigma_global(time,x_array,a_array): #any of these will do for the HJB test
-	return 0.0*x_array
+	#return 0.*x_array
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
 	#one = np.ones(x_array.size)
-	#return 0.1*one
-	#return 0.1*abs(a_array)
+	#return .05*one
+	return 0.1*abs(a_array)
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
 	#return 0.5*a_array**2# + xenophobia #brutal test
 	#return .1*np.ones(x_array.size)
@@ -310,6 +331,16 @@ def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 	#return a + 
 	return a + u4
 	#return a - 0.2 + a**3/2 * u3 + max_or_if(x[i]*np.cos(a)*u1,x[i]*np.sin(a))+min_or_if(x[i]*np.cos(a)*u2,x[i]*np.sin(a))
+
+def Hamiltonian_Derivative_vectorised(alphas,time,x,u_up,u_down,m,dx): 
+	#for every value in alphas, give a 2D array for the entire x-alpha plane
+	#assumes that alphas,x are meshgrid'ed
+	#s = Sigma_global(time,x,alphas)
+	#f = f_global(time,x,alphas)
+	#L = L_global(time,x,alphas,m,dx)
+	zero = np.zeros(alphas.shape)
+	return alphas/(1+0.1*m) + np.exp(-time)*u_down*np.maximum(np.sign(alphas),zero) + .1*u_up*np.minimum(np.sign(alphas),zero) + .01*alphas*(u_up-u_down)/dx 
+
 #def max_or_if(val,valif):
 #	if valif>0:
 #		return val
@@ -320,12 +351,13 @@ def Hamiltonian_Derivative(a,t,x,u,m,i,dx):
 #TERMINAL COST
 ##################
 def G(x,m): #this is the final cost, and is a function of the entire distribution m and each point x_i
+	#return 0*m #shyness game
 	#return -(x_array+2)**2 * (x_array-2)**2 + 4
 	#return 0.5*(x_array+0.5)**2 * (1.5-x_array)**2 #Carlini's original
 	#return 0.1*(x_array*(1-x_array))**2 #Gueant's game
 	#return -((x_array+0.2)*(1.2-x_array))**4 #Shyness game
 	return x*.0 
-	#return .4*x**2*(1.5-x) #isolation game
+	#return .4*x**2*(1.5-x) #isolation game cmfg1d
 	#return x_array*4 #skyness
 	#return np.zeros(x_array.size) #Carlini's no-game & Isolation game
 	#return 0.001*m_array
@@ -336,14 +368,15 @@ def G(x,m): #this is the final cost, and is a function of the entire distributio
 ##################
 def initial_distribution(x):
 	#return 1-0.2*np.cos(np.pi*x) #gueant's original
-	return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
+	##return np.exp(-(x-0.75)**2/0.1**2) #carlini's no-game
 	#m0 = 0.33*np.exp(-(x-0.3)**2/0.1**2)
 	#m0 += 0.33*np.exp(-(x-.6)**2/0.1**2)
+	#return m0
 	#m0 += 0.33*np.exp(-(x+1)**2/0.1**2)
 	#return m0
 	#return np.exp(-(x-0.5)**2/0.1**2) #shyness game
 	#return np.exp(-(x-0.3)**2/0.1**2) #isolation game
-	#return  (32./5.) * 1/((3*x+1)**3) #isolation game 2
+	return  (32./5.) * 1/((3*x+1)**3) #isolation game 2
 
 ############
 # OPTIMAL CONTROL

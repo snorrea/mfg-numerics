@@ -16,9 +16,9 @@ import matrix_gen as mg
 NONLINEAR = True
 POINTSx = 5 #points in x-direction
 POINTSy = 5 #points in y-direction
-REFINEMENTS = 5
+REFINEMENTS = 3
 X_NAUGHT = 0.0
-DT = .8#ratio as in dt = DT*dx(**2)
+DT = .2#ratio as in dt = DT*dx(**2)
 NICE_DIFFUSION = 1
 n = 2 #must be integer greater than 0
 cutoff = 0 #for convergence slope
@@ -131,28 +131,13 @@ m_interpolates = np.zeros((REFINEMENTS-1,x.size*y.size))
 
 for i in range(REFINEMENTS-1):
 	tmp = intpol.RectBivariateSpline(x_solns[i], y_solns[i], np.reshape(m_solns[i],m_solns_dims[i]), bbox=[xmin, xmax, ymin, ymax], kx=1, ky=1, s=0)
-	#tmp = intpol.RectBivariateSpline(x_solns[-1], y_solns[-1], np.reshape(m_solns[-1],m_solns_dims[-1]), bbox=[xmin, xmax, ymin, ymax], kx=1, ky=1, s=0)
-	#x,y = np.meshgrid(x_solns[-1],y_solns[-1])
-	#print x_solns[-1].shape
-	#m_interpolates[i,:] = tmp.ev(x_solns[-1],y_solns[-1])
 	m_interpolates[i,:] = np.ravel(tmp(x_solns[-1],y_solns[-1]))
-	#m_interpolates[i,:] = tmp.ev(x_solns[i],y_solns[i])
-	#m_interpolates[i,:] = intpol.interp2d(x,y,np.reshape(m_solns[i],(I,I)))
-
-#tmp.ev(x_solns[-1],y_solns[-1])
-#print m_interpolates[0,:].shape
-#print m_interpolates[1,:].shape
-#print m.shape
-#print ss
 
 e1 = np.zeros(REFINEMENTS-1)
 e2 = np.zeros(REFINEMENTS-1)
 einf = np.zeros(REFINEMENTS-1)
 
 for i in range(REFINEMENTS-1):
-	#e1[i] = np.linalg.norm(m_interpolates[i,:]-m_solns[-1],ord=1)*dexes[i]#**2
-	#e2[i] = np.linalg.norm(m_interpolates[i,:]-m_solns[-1],ord=2)*np.sqrt(dexes[i])#**2
-	#einf[i] = np.linalg.norm(m_interpolates[i,:]-m_solns[-1],ord=np.inf)
 	e1[i] = sum(abs(m_interpolates[i,:]-m_solns[-1]))#*dexes[i]
 	e2[i] = np.sqrt(sum(abs(m_interpolates[i,:]-m_solns[-1])**2))#*np.sqrt(dexes[i])
 	einf[i] = max(abs(m_interpolates[i,:]-m_solns[-1]))

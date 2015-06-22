@@ -14,24 +14,24 @@ import scipy.sparse as sparse
 
 #INPUTS
 FINITE_VOLUME = 1 #0 if FD, 1 if FV
-NICE_DIFFUSION = 1 #1 if diffusion indep of t,m,alpha
+NICE_DIFFUSION = 0 #1 if diffusion indep of t,m,alpha
 #dx = 0.1**2/2
-dx = 0.04#25
-dt = .3*dx#**2
+dx = 0.1#25
+dt = .1*dx#**2
 #dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
 xmin = 0#-2
 xmax = 1#+.2
 T = 1
-Niter = 500#5000 #maximum number of iterations
+Niter = 150#5000 #maximum number of iterations
 tolerance = 1e-4
-alpha_upper = 2
-alpha_lower = -2
+alpha_upper = 5
+alpha_lower = -5
 
 #STUFF TO MINIMIZE
-N = 100 #searchpoints
+N = 500 #searchpoints
 Nr = 5
-min_tol = 0.01*dx**2#tolerance#1e-5 #tolerance for minimum
+min_tol = 0.01*dx**1#tolerance#1e-5 #tolerance for minimum
 min_left = alpha_lower #search region left
 min_right = alpha_upper #search region right
 relation = 2
@@ -101,15 +101,21 @@ for n in range (0,Niter):
 	#print u[]
 	for k in range (K-1,0,-1):  #this is how it has to be...
 		u_last = np.copy(u[((k+1)*I-I):((k+1)*I)]) #this one to keep
-		m_last = np.copy(m[((k+1)*I-I):((k+1)*I)]) #only actually need this, amirite?
-		a_tmp = -np.gradient(u_last,dx)
+		m_last = np.copy(m[((k)*I-I):((k)*I)]) #only actually need this, amirite?
+		#a_tmp = -np.gradient(u_last,dx)
+		a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,N,scatters)
+		#print max(abs(a_tmp-a_tmp1))
+		#print a_tmp
+		#print -np.gradient(u_last,dx)
+		#print ss
+		#a_tmp = solve.control_hybrid(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,N,scatters)
 		#print "u:",u_last
 		#print "a:",a_tmp
 		#a_tmp = iF.opt_cmfg(u[((k+1)*I-I):((k+1)*I)],dx)
 		#a_tmp = np.maximum(-np.gradient(u_last,dx),np.zeros(u_last.size))
 		#a_tmp = solve.control_hybrid(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,min_tol,N,scatters) #hybrid
 		if NICE_DIFFUSION==0:
-			u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,a_tmp,dt,dx) #implicit
+			u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,m_last,a_tmp,dt,dx) #implicit
 		else:
 			if n==0 and k==K-1:
 				LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
@@ -145,25 +151,14 @@ for n in range (0,Niter):
 		a_tmp = a[(k*I):(k*I+I)]
 		m_tmp = m[(k*I):(k*I+I)]
 		#finite differences
-		if FINITE_VOLUME == 0:
-			#shitty centered differences
-			#m_update = solve.fp_fd_centered(x,k*dt,m_tmp,a_tmp,dt,dx)
-			#excellent, monotone, upwind
-			m_update = solve.fp_fd_upwind(x,k*dt,a_tmp,dt,dx)
-		#finite volume gold standard
+		if NICE_DIFFUSION==0:
+			m_update = solve.fp_fv_mod(x,k*dt,m_tmp,a_tmp,dt,dx)
 		else:
-			if NICE_DIFFUSION==0:
-				m_update = solve.fp_fv(x,k*dt,a_tmp,dt,dx)
-			else:
-				if n==0 and k==0:
-					LHS_FP = mg.fp_fv_diffusion(0,x,a_tmp,dt,dx)
-				#RHS_FP = mg.fp_fv_convection_classic(k*dt,x,a_tmp,dt,dx)
-				RHS_FP = mg.fp_fv_convection_interpol(k*dt,x,a_tmp,dt,dx)
-				m_update = sparse.linalg.spsolve(LHS_FP,RHS_FP*m_tmp)
-				#m_update = sparse.linalg.bicgstab(LHS_FP,RHS_FP*u_tmp,tol=1e-6,maxiter=20)[0]
-				#m_update = RHS_FP*m_tmp
-				#print RHS_FP
-				#print ss
+			if n==0 and k==0:
+				LHS_FP = mg.fp_fv_diffusion(0,x,a_tmp,dt,dx)
+			#RHS_FP = mg.fp_fv_convection_classic(k*dt,x,a_tmp,dt,dx)
+			RHS_FP = mg.fp_fv_convection_interpol(k*dt,x,a_tmp,dt,dx)
+			m_update = sparse.linalg.spsolve(LHS_FP,RHS_FP*m_tmp)
 		m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
 		#if sum(m_update)*dx is not 1:
 		#	print sum(m_update)*dx-1

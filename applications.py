@@ -32,26 +32,24 @@ def scatter_search(function, (args),dx,dy,x0,y0,N,k,xmin,xmax,ymin,ymax): #here 
 		xpts,ypts = np.meshgrid(xpts,ypts)
 		fpts = function(xpts,ypts,*args)
 		if i!=k-1:
-			key = xpts.shape
-			crit_ind = np.argmin(fpts)
-			xi,yi = recover_index(crit_ind,key[0])
+			(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
+			#if fpts[xi,yi]!=np.amin(fpts):
+			#	print "Picked wrong thing..."
 			#print xi,yi
 			#print xpts.shape,ypts.shape
 			x_naught = xpts[xi,yi]
 			y_naught = ypts[xi,yi]
 			dex_x = xpts[0,1]-xpts[0,0]
 			dex_y = ypts[1,0]-ypts[0,0]
-			#print dex_x,dex_y
+			#print i,dex_x,dex_y
 			#print ss
-	crit_ind = np.argmin(fpts)
 	#print crit_ind
-	xi,yi = recover_index(crit_ind,key[0])
-	#print xi,yi
+	(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)#print xi,yi
 	#print "Indices:",xi,yi
 	#print "Storage:",xpts.shape,ypts.shape
 	return xpts[xi,yi],ypts[xi,yi]
 
-def hybrid_search(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,xmax,ymin,ymax): 
+def hybrid_search2(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,xmax,ymin,ymax,tolerance): 
 	x_naught = x0
 	y_naught = y0
 	dex_x = dx
@@ -61,7 +59,8 @@ def hybrid_search(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,x
 		psign1 = np.sign(p1)
 		psign2 = np.sign(p2)
 		if (psign1 > 0 and x_naught==xmin) or (psign1<0 and x_naught==xmax) or (psign1==0): #x0 is found
-			if (psign2 > 0 and y_naught==ymin) or (psign2 <0 and y_naught==ymax) or (psign2==0):
+			xpts = x_naught
+			if (psign2 > 0 and y_naught==ymin) or (psign2 < 0 and y_naught==ymax) or (psign2==0):
 				return x_naught,y_naught
 			else: #search in y
 				if y_naught+dex_y > ymax:
@@ -71,8 +70,9 @@ def hybrid_search(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,x
 				else:
 					ypts = np.linspace(y_naught-dex_y,y_naught+dex_y,N)
 			#NEEDS TO EVAL AND ALL THAT
-		elif (psign2 > 0 and y_naught==ymin) or (psign2<0 and y_naught==ymax) or (psign2==0): #y0 is found
-			if (psign1 > 0 and x_naught==xmin) or (psign1 <0 and x_naught==xmax) or (psign1==0):
+		elif (psign2 > 0 and y_naught==ymin) or (psign2 < 0 and y_naught==ymax) or (psign2==0): #y0 is found
+			ypts = y_naught
+			if (psign1 > 0 and x_naught==xmin) or (psign1 < 0 and x_naught==xmax) or (psign1==0):
 				return x_naught,y_naught
 			else: #search in x
 				if x_naught+dex_x > xmax:
@@ -95,28 +95,169 @@ def hybrid_search(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,x
 				ypts = np.linspace(ymin,y_naught+dex_y,N)
 			else:
 				ypts = np.linspace(y_naught-dex_y,y_naught+dex_y,N)
+		tmpx = np.copy(xpts)
+		tmpy = np.copy(ypts)
 		xpts,ypts = np.meshgrid(xpts,ypts)
 		fpts = function(xpts,ypts,*args)
-		if i!=k-1:
-			key = xpts.shape
-			crit_ind = np.argmin(fpts)
-			xi,yi = recover_index(crit_ind,key[0])
+		if i!=max_iterations:
+			(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
 			x_naught = xpts[xi,yi]
 			y_naught = ypts[xi,yi]
-			dex_x = xpts[0,1]-xpts[0,0]
-			dex_y = ypts[1,0]-ypts[0,0]
+			if tmpx.size==1:
+				dex_x = 0
+			else:
+				dex_x = tmpx[1]-tmpx[0]
+			if tmpy.size==1:
+				dex_y = 0
+			else:
+				dex_y = tmpy[1]-tmpy[0]
 			if max(abs(dex_x),abs(dex_y)) < tolerance:
 				return x_naught,y_naught
 			#print dex_x,dex_y
 			#print ss
-	crit_ind = np.argmin(fpts)
-	#print crit_ind
-	xi,yi = recover_index(crit_ind,key[0])
+	(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
+	#print xi,yi
+	#print "Indices:",xi,yi
+	#print "Storage:",xpts.shape,ypts.shape
+	return xpts[xi,yi],ypts[xi,yi]
+def hybrid_search(function,funcprime, (args),dx,dy,x0,y0,N,max_iterations,xmin,xmax,ymin,ymax,tolerance): 
+	x_naught = x0
+	y_naught = y0
+	dex_x = dx
+	dex_y = dy
+	for i in range(0,10*max_iterations):
+		xpts = None
+		ypts = None
+		[p1,p2] = funcprime(x_naught,y_naught,*args)
+		#print p1,p2
+		psign1 = np.sign(p1)
+		psign2 = np.sign(p2)
+		#print psign1,psign2
+		if (psign1 > 0 and x_naught==xmin) or (psign1 < 0 and x_naught==xmax) or (psign1==0) or (dex_x==0): #x0 is found
+		#if (psign1 > 0 and x_naught==xmin) or (psign1 < 0 and x_naught==xmax) or (dex_x==0): #x0 is found
+			xpts = x_naught
+		if (psign2 > 0 and y_naught==ymin) or (psign2 < 0 and y_naught==ymax) or (psign2==0) or (dex_y==0): #y0 is found
+		#if (psign2 > 0 and y_naught==ymin) or (psign2 < 0 and y_naught==ymax) or (dex_y==0): #y0 is found
+			ypts = y_naught
+		#set xpts
+		if xpts!=None and ypts!=None: #found both
+			return xpts, ypts
+		if psign1 < 0 and xpts==None: #go forward
+			xpts = np.linspace(x_naught,min(x_naught+dex_x,xmax),N/2)
+		elif psign1 > 0 and xpts==None: #go back
+			xpts = np.linspace(max(x_naught-dex_x,xmin),x_naught,N/2)
+		#else:
+		#	xpts = np.linspace(max(x_naught-dex_x,xmin),min(x_naught+dex_x,xmax),N)
+		#set ypts
+		if psign2 < 0 and ypts==None: #go forward
+			ypts = np.linspace(y_naught,min(y_naught+dex_y,ymax),N/2)
+		elif psign2 > 0 and ypts==None: #go back
+			ypts = np.linspace(max(y_naught-dex_y,ymin),y_naught,N/2)
+		#else:
+		#	ypts = np.linspace(max(y_naught-dex_y,ymin),min(y_naught+dex_y,ymax),N)
+		#by this time, ypts and xpts should have been set
+		tmpx = np.copy(xpts)
+		tmpy = np.copy(ypts)
+		xpts,ypts = np.meshgrid(xpts,ypts)
+		fpts = function(xpts,ypts,*args)
+		if i!=max_iterations:
+			(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
+			x_naught = xpts[xi,yi]
+			y_naught = ypts[xi,yi]
+			if tmpx.size==1:
+				dex_x = 0
+			else:
+				dex_x = abs(tmpx[1]-tmpx[0])
+			if tmpy.size==1:
+				dex_y = 0
+			else:
+				dex_y = abs(tmpy[1]-tmpy[0])
+			if max(abs(dex_x),abs(dex_y)) < tolerance:
+				return x_naught,y_naught
+			#print dex_x,dex_y
+			#print ss
+	(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
 	#print xi,yi
 	#print "Indices:",xi,yi
 	#print "Storage:",xpts.shape,ypts.shape
 	return xpts[xi,yi],ypts[xi,yi]
 
+def hybrid_search66(function,(args),f0,dx,dy,x0,y0,N,max_iterations,xmin,xmax,ymin,ymax,tolerance): 
+	x_naught = x0
+	y_naught = y0
+	dex_x = dx
+	dex_y = dy
+	for i in range(0,10*max_iterations):
+		xpts = None
+		ypts = None
+		psign1,psign2 = sign_of_derivative(function,x_naught,y_naught,(args),f0)
+		#print psign1,psign2
+		if (psign1 == 1 and x_naught==xmin) or (psign1 == -1 and x_naught==xmax) or (psign1==0) or (dex_x==0): #x0 is found
+			xpts = x_naught
+		if (psign2 == 1 and y_naught==ymin) or (psign2 == -1 and y_naught==ymax) or (psign2==0) or (dex_y==0): #y0 is found
+			ypts = y_naught
+		#set xpts
+		if xpts!=None and ypts!=None: #found both
+			return xpts, ypts
+		if psign1 == -1 and xpts==None: #go forward
+			xpts = np.linspace(x_naught,min(x_naught+dex_x,xmax),N/2)
+		elif psign1 == 1 and xpts==None: #go back
+			xpts = np.linspace(max(x_naught-dex_x,xmin),x_naught,N/2)
+		elif psign1 == 2 and xpts==None:
+			xpts = np.linspace(max(x_naught-dex_x,xmin),min(x_naught+dex_x,xmax),N)
+		#set ypts
+		if psign2 == -1 and ypts==None: #go forward
+			ypts = np.linspace(y_naught,min(y_naught+dex_y,ymax),N/2)
+		elif psign2 == 1 and ypts==None: #go back
+			ypts = np.linspace(max(y_naught-dex_y,ymin),y_naught,N/2)
+		elif psign2 == 2 and ypts==None:
+			ypts = np.linspace(max(y_naught-dex_y,ymin),min(y_naught+dex_y,ymax),N)
+		#by this time, ypts and xpts should have been set
+		tmpx = np.copy(xpts)
+		tmpy = np.copy(ypts)
+		xpts,ypts = np.meshgrid(xpts,ypts)
+		fpts = function(xpts,ypts,*args)
+		if i!=max_iterations:
+			(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
+			x_naught = xpts[xi,yi]
+			y_naught = ypts[xi,yi]
+			f0 = fpts[xi,yi]
+			if tmpx.size==1:
+				dex_x = 0
+			else:
+				dex_x = abs(tmpx[1]-tmpx[0])
+			if tmpy.size==1:
+				dex_y = 0
+			else:
+				dex_y = abs(tmpy[1]-tmpy[0])
+			if max(abs(dex_x),abs(dex_y)) < tolerance:
+				return x_naught,y_naught
+	(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
+	return xpts[xi,yi],ypts[xi,yi]
+
+def sign_of_derivative(function,x,y,(args),f0):
+	eps = 1e-6
+	x_args = np.array([x-eps, x+eps, x, x])
+	y_args = np.array([y, y, y-eps, y+eps])
+	x_args,y_args = np.meshgrid(x_args,y_args)
+	[west, east, south, north] = np.diagonal(function(x_args,y_args,*args))
+	if west > f0 and east > f0: #both bigger
+		ps1 = 0
+	elif west>f0 and east<f0: #east
+		ps1 = -1
+	elif west<f0 and east>f0: #west
+		ps1 = 1
+	else: #both smaller...
+		ps1 = 2 #special case
+	if south > f0 and north > f0: #both bigger
+		ps2 = 0
+	elif south>f0 and north<f0: #east
+		ps2 = -1
+	elif south<f0 and north>f0: #west
+		ps2 = 1
+	else: #both smaller...
+		ps2 = 2 #special case
+	return ps1, ps2
 ##################
 # GRID FUNCTIONS
 ##################
@@ -136,28 +277,134 @@ def add_obstacle(x,y,(xmin,xmax,ymin,ymax),south,north,west,east,nulled):
 	ymin_i = find_nearest_index(y,ymin)
 	ymax_i = find_nearest_index(y,ymax)
 	I = x.size
-	new_south = range(xmin_i+I*ymin_i,xmax_i+I*ymin_i+1)
-	new_north = range(xmin_i+I*ymax_i,xmax_i+I*ymax_i+1)
-	new_west = range(xmin_i+I*ymin_i,xmin_i+I*ymax_i+1,I)
-	new_east = range(xmax_i+I*ymin_i,xmax_i+I*ymax_i+1,I)
-	south = np.sort(np.concatenate((new_south,south),0)) 
-	north = np.sort(np.concatenate((new_north,north),0)) 
-	west = np.sort(np.concatenate((new_west,west),0)) 
-	east = np.sort(np.concatenate((new_east,east),0)) 
+	new_north = range(xmin_i+I*ymin_i,xmax_i+I*ymin_i+1)
+	new_south = range(xmin_i+I*ymax_i,xmax_i+I*ymax_i+1)
+	new_east = range(xmin_i+I*ymin_i,xmin_i+I*ymax_i+1,I)
+	new_west = range(xmax_i+I*ymin_i,xmax_i+I*ymax_i+1,I)
+	south = np.sort(np.concatenate((new_south,south),0)).astype(int)
+	north = np.sort(np.concatenate((new_north,north),0)).astype(int)
+	west = np.sort(np.concatenate((new_west,west),0)).astype(int)
+	east = np.sort(np.concatenate((new_east,east),0)).astype(int)
 	if nulled==None:
 		nulled = range(xmin_i + 1 + I*(ymin_i + 1),xmax_i - 1 + I*(ymin_i + 1)+1)
-		for i in range(1,ymax_i - ymin_i-1):
+		for i in range(1,ymax_i - ymin_i):
 			tmp = range(xmin_i + 1 + I*(ymin_i + 1+i),xmax_i - 1 + I*(ymin_i + 1+i)+1)
 			nulled = np.concatenate((tmp,nulled),0)
 	else:
-		for i in range(ymax_i - ymin_i - 2):
+		for i in range(ymax_i - ymin_i):
 			tmp = range(xmin_i + 1 + I*(ymin_i + 1+i),xmax_i - 1 + I*(ymin_i + 1+i)+1)
 			nulled = np.concatenate((tmp,nulled),0)
-	return south,north,west,east,np.sort(nulled)
+	se = np.intersect1d(south,east)
+	sw = np.intersect1d(south,west)
+	ne = np.intersect1d(north,east)
+	nw = np.intersect1d(north,west)
+	return south,north,west,east,np.sort(nulled).astype(int),se,sw,ne,nw
+
+###########
+#FMM
+###########
+
+def FMM(x,y,nulled,goal_x,goal_y):
+	dx = x[1]-x[0]
+	I = x.size
+	J = y.size
+	south = range(0,I) #ok
+	west = range(0,I*J,I) #ok
+	north = range(I*J-I,I*J)
+	east = range(I-1,I*J+1,I)
+	index_0 = []
+	for i in range(len(goal_x)):
+		index_0.append(find_nearest_index(x,goal_x[i])+I*find_nearest_index(y,goal_y[i]))
+	known = list(np.unique(index_0[:]))
+	trial = []
+	unvisited = [ item for i,item in enumerate(range(I*J)) if i not in known ]
+	cost_function = np.ones(I*J)*dx
+	cost_function[nulled] = 100*dx
+	known_costs = np.empty(I*J)
+	known_costs[:] = np.inf
+	trial_costs = np.empty(I*J)
+	trial_costs[:] = np.inf
+	for i in range(len(index_0)): #add known stuff
+		neb = find_neighbours(index_0[i],north,south,west,east,I)
+		trial.extend(neb) #expand to index_0 -> known
+		trial_costs[neb] = cost_function[neb]
+	known_costs[index_0] = 0
+	trial_costs[index_0] = np.inf
+	while len(known)!=I*J:
+		idx = int(np.argmin(trial_costs)) #picks values that are already in known because of value-ties
+		val = np.amin(trial_costs)
+		trial_costs[idx] = np.inf #remove trial value
+		trial.remove(idx) #remove trial
+		known.append(idx)
+		known_costs[idx] = val #store known cost
+		neighbours0 = find_neighbours(idx,north,south,west,east,I)
+		neighbours = [x for x in neighbours0 if (x not in known) and (x not in trial)]
+		trial.extend(neighbours)
+		#trial_costs[neighbours] = np.minimum(val + cost_function[neighbours],trial_costs[neighbours])
+		trial_costs[neighbours] = val + cost_function[neighbours]
+	return known_costs
 
 ###################
 #AUXILIARY FUNCTIONS
 ###################
+
+
+def gimme_gradient_points(minis,index_max):
+	my_list_x = []
+	my_list_y = []	
+	for v in range(minis.size):
+		if minis[v]==0:
+			my_list_x.append(0)
+			my_list_x.append(1)
+			my_list_y.append(v)
+			my_list_y.append(v)
+		elif minis[v]==index_max:
+			my_list_x.append(index_max-1)
+			my_list_x.append(index_max)
+			my_list_y.append(v)
+			my_list_y.append(v)
+		else:
+			tmp = minis[v]
+			my_list_x.append(tmp-1)
+			my_list_x.append(tmp)
+			my_list_x.append(tmp+1)
+			my_list_y.append(v)
+			my_list_y.append(v)
+			my_list_y.append(v)
+	return my_list_x,my_list_y
+
+def gimme_gradient_indices(minis,index_max):
+	my_list_y = range(index_max+1)*2
+	my_list_y.sort()
+	my_list_x = []
+	for v in range(minis.size):
+			tmp = minis[v]
+			my_list_x.append(max(tmp-1,0))
+			my_list_x.append(min(tmp+1,index_max))
+	return my_list_x,my_list_y
+	
+#def gimme_gradient_values(minis,index_max,array):
+#	gradlist = []
+#	for v in range(minis.size):
+#		gradlist.append(array[min(minis[v]+1,index_max),v]-array[max(minis[v]-1,0),v])
+#	return gradlist
+
+def gimme_gradient_values(minis,index_max,array):
+	return [array[min(minis[v]+1,index_max),v]-array[max(minis[v]-1,0),v] for v in range(minis.size)]
+
+def find_neighbours(node_index,north,south,west,east,I):
+	#print (node_index)
+	neighbours = []
+	if not ismember(node_index,north):
+		neighbours.append(node_index + I)
+	if not ismember(node_index,south):
+		neighbours.append(node_index - I)
+	if not ismember(node_index,west):
+		neighbours.append(node_index - 1)
+	if not ismember(node_index,east):
+		neighbours.append(node_index + 1)
+	return neighbours
+
 def find_nearest_index(array,value):
     return (np.abs(array-value)).argmin()
 
@@ -221,3 +468,11 @@ def restrain(trajectory,x_array):
 def restrain4isolation(trajectory,x_array):
 	return np.maximum(restrain(trajectory),x_array)
 
+
+def ismember(a,array): #assumes sorted
+	for i in range(0,len(array)):
+		if array[i]==a:
+			return True
+		elif array[i]>a:
+			return False
+	return False

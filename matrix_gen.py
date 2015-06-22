@@ -10,130 +10,135 @@ import matplotlib.pyplot as plt
 # MATRIX GENERATION: HJB
 ##################
 
-def HJB_diffusion_implicit(time,x,y,a1,a2,m_tmp,dx,dy,dt): #this works, at least for constant diffusion and without D12; CORNERS ARE BAD FOR D12
+def HJB_diffusion_implicit(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled,se,sw,ne,nw): #this works, at least for constant diffusion and without D12; CORNERS ARE BAD FOR D12
 	I,J = x.size,y.size
 	output = sparse.lil_matrix((I*J,I*J))
 	dx2 = dx**2
 	dy2 = dy**2
 	dxy = dx*dy
-	xbound1 = range(0,I) 
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
-	D11 = iF.Sigma_D11_test(time,x,y,a1,a2,m_tmp)
-	D22 = iF.Sigma_D22_test(time,x,y,a1,a2,m_tmp)
-	D12 = iF.Sigma_D12_test(time,x,y,a1,a2,m_tmp)
+	#indices = np.delete(range(I*J),nulled)
+	#indices = [n for n in list(range(I*J)) if n not in list(nulled)]
+	indices = list(range(I*J))
+	not_south = [n for n in indices if n not in list(south)]
+	not_north = [n for n in indices if n not in list(north)]
+	not_east = [n for n in indices if n not in list(east)]
+	not_west = [n for n in indices if n not in list(west)]
+	not_sw = np.intersect1d(not_south,not_west)
+	not_se = np.intersect1d(not_south,not_east)
+	not_nw = np.intersect1d(not_north,not_west)
+	not_ne = np.intersect1d(not_north,not_east)
+	se = np.intersect1d(np.intersect1d(south,east),se)
+	sw = np.intersect1d(np.intersect1d(south,west),sw)
+	ne = np.intersect1d(np.intersect1d(north,east),ne)
+	nw = np.intersect1d(np.intersect1d(north,west),nw)
+	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
+	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
+	D12 = iF.Sigma_D12_test(time,x,y,a1,a2)
 	D11 = np.ravel(D11)
 	D22 = np.ravel(D22)
 	D12 = np.ravel(D12)
+	zero = np.zeros(I*J)
 	#generate the vectors
-	here = 1+dt/dx2*D11 + dt/dy2*D22- dt/dxy*abs(D12) #[i,i]
-	north = np.zeros(I*J) #[i,i+I]
-	south = np.zeros(I*J) #[i,i-I]
-	west = np.zeros(I*J) #[i,i-1]
-	east = np.zeros(I*J) #[i,i+1]
-	south_east = np.zeros(I*J) #[i,i-I+1]
-	south_west = np.zeros(I*J) #[i,i-I-1]
-	north_west = np.zeros(I*J) #[i,i+I-1]
-	north_east = np.zeros(I*J) #[i,i+I+1]
-	for i in range(0,I*J):
-		#print i
-		d12 = D12[i]
-		d11 = D11[i]
-		d22 = D22[i]
-		#avoid segfaults
-		if not ismember(i,xbound1): #allows (i,j-1)
-			south[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-		if not ismember(i,xbound2): #allows (i,j+1)
-			north[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-		if not ismember(i,ybound1): #allows (i-1,j) 
-			west[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-		if not ismember(i,ybound2): #allows (i+1,j)
-			east[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-		if not ismember(i,xbound1) and not ismember(i,ybound1): #allows (i-1,j-1)
-			south_west[i] += -dt/dxy*max(d12,0)/2
-		if not ismember(i,xbound2) and not ismember(i,ybound2): #allows (i+1,j+1)
-			north_east[i] += -dt/dxy*max(d12,0)/2
-		if not ismember(i,xbound1) and not ismember(i,ybound2): #allows (i+1,j-1)
-			north_west[i] += dt/dxy*min(d12,0)/2
-		if not ismember(i,ybound1) and not ismember(i,xbound2): #allows (i-1,j+1)
-			south_east[i] += dt/dxy*min(d12,0)/2
-		#then add boundary conditions
-		if ismember(i,xbound1): #allows (i,j-1)
-			north[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-			if not ismember(i,ybound2):
-				north_east[i] += dt/dxy*min(d12,0)/2
-			if not ismember(i,ybound1):
-				north_west[i] += -dt/dxy*max(d12,0)/2
-		if ismember(i,xbound2): #allows (i,j+1)
-			south[i] += -dt*(d22/dy2-abs(d12)/dxy)/2
-			if not ismember(i,ybound1):
-				south_west[i] += dt/dxy*min(d12,0)/2
-			if not ismember(i,ybound2):
-				south_east[i] = -dt/dxy*max(d12,0)/2
-		if ismember(i,ybound1): #allows (i-1,j) 
-			east[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-			if not ismember(i,xbound2):
-				north_east[i] += dt/dxy*min(d12,0)/2
-			if not ismember(i,xbound1):
-				south_east[i] += -dt/dxy*max(d12,0)/2
-		if ismember(i,ybound2): #allows (i+1,j)
-			west[i] += -dt*(d11/dx2-abs(d12)/dxy)/2
-			if not ismember(i,xbound2):
-				north_west[i] += -dt/dxy*max(d12,0)/2
-			if not ismember(i,xbound1):
-				south_west[i] += dt/dxy*min(d12,0)/2
-		if ismember(i,xbound1) and ismember(i,ybound1): #allows (i-1,j-1)
-			north_east[i] += -dt/dxy*max(d12,0)/2
-		if ismember(i,xbound2) and ismember(i,ybound2): #allows (i+1,j+1)
-			south_west[i] += -dt/dxy*max(d12,0)/2
-		if ismember(i,xbound1) and ismember(i,ybound2): #allows (i+1,j-1)
-			south_east[i] += dt/dxy*min(d12,0)/2
-		if ismember(i,ybound1) and ismember(i,xbound2): #allows (i-1,j+1)
-			north_west[i] += dt/dxy*min(d12,0)/2
-	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1], north_east[0:-I-1], south_west[(I+1):], north_west[0:-I+1], south_east[(I-1):]],[0, I, -I, -1, 1,I+1,-I-1,I-1,-I+1])
+	F_here = np.zeros(I*J) 
+	F_here[indices] = 1+dt/dx2*D11[indices] + dt/dy2*D22[indices]- dt/dxy*abs(D12[indices]) #[i,i]
+	F_north = np.zeros(I*J) #[i,i+I]
+	F_south = np.zeros(I*J) #[i,i-I]
+	F_west = np.zeros(I*J) #[i,i-1]
+	F_east = np.zeros(I*J) #[i,i+1]
+	F_south_east = np.zeros(I*J) #[i,i-I+1]
+	F_south_west = np.zeros(I*J) #[i,i-I-1]
+	F_north_west = np.zeros(I*J) #[i,i+I-1]
+	F_north_east = np.zeros(I*J) #[i,i+I+1]
+	F_south[not_south] += -dt*(D22[not_south]/dy2-abs(D12[not_south])/dxy)/2
+	F_north[not_north] += -dt*(D22[not_north]/dy2-abs(D12[not_north])/dxy)/2
+	F_west[not_west] += -dt*(D11[not_west]/dx2-abs(D12[not_west])/dxy)/2
+	F_east[not_east] += -dt*(D11[not_east]/dx2-abs(D12[not_east])/dxy)/2
+	F_south_west[not_sw] += -dt/dxy*np.maximum(D12[not_sw],zero[not_sw])/2
+	F_north_east[not_ne] += -dt/dxy*np.maximum(D12[not_ne],zero[not_ne])/2
+	F_north_west[not_se] += dt/dxy*np.minimum(D12[not_se],zero[not_se])/2
+	F_south_east[not_nw] += dt/dxy*np.minimum(D12[not_nw],zero[not_nw])/2
+	#boundary stuff
+	F_north[south] += -dt*(D22[south]/dy2-abs(D12[south])/dxy)/2
+	F_north_east[np.intersect1d(south,not_east)] += dt/dxy*np.minimum(D12[np.intersect1d(south,not_east)],zero[np.intersect1d(south,not_east)])/2
+	F_north_west[np.intersect1d(south,not_west)] += -dt/dxy*np.maximum(D12[np.intersect1d(south,not_west)],zero[np.intersect1d(south,not_west)])/2
+	F_south[north] += -dt*(D22[north]/dy2-abs(D12[north])/dxy)/2
+	F_south_west[np.intersect1d(north,not_west)] += dt/dxy*np.minimum(D12[np.intersect1d(north,not_west)],zero[np.intersect1d(north,not_west)])/2
+	F_south_east[np.intersect1d(north,not_east)] += -dt/dxy*np.maximum(D12[np.intersect1d(north,not_east)],zero[np.intersect1d(north,not_east)])/2
+	F_east[west] += -dt*(D11[west]/dx2-abs(D12[west])/dxy)/2
+	F_north_east[np.intersect1d(west,not_north)] += dt/dxy*np.minimum(D12[np.intersect1d(west,not_north)],zero[np.intersect1d(west,not_north)])/2
+	F_south_east[np.intersect1d(west,not_south)] += -dt/dxy*np.maximum(D12[np.intersect1d(west,not_south)],zero[np.intersect1d(west,not_south)])/2
+	F_west[east] += -dt*(D11[east]/dx2-abs(D12[east])/dxy)/2
+	F_north_west[np.intersect1d(east,not_north)] += -dt/dxy*np.maximum(D12[np.intersect1d(east,not_north)],zero[np.intersect1d(east,not_north)])/2
+	F_south_west[np.intersect1d(east,not_south)] += dt/dxy*np.minimum(D12[np.intersect1d(east,not_south)],zero[np.intersect1d(east,not_south)])/2
+	F_north_east[sw] += -dt/dxy*np.maximum(D12[sw],zero[sw])/2
+	F_south_west[ne] += -dt/dxy*np.maximum(D12[ne],zero[ne])/2
+	F_south_east[nw] += dt/dxy*np.minimum(D12[nw],zero[nw])/2
+	F_north_west[se] += dt/dxy*np.minimum(D12[se],zero[se])/2
+	#remove nulled things
+#	if nulled!=None:
+#		F_here[nulled] = 1
+#		F_north[nulled] = 0
+#		F_south[nulled] = 0
+#		F_west[nulled] = 0
+#		F_east[nulled] = 0
+#		F_south_east[nulled] = 0
+#		F_south_west[nulled] = 0
+#		F_north_west[nulled] = 0
+#		F_north_east[nulled] = 0
+	output = sparse.diags([F_here, F_north[0:-I], F_south[I:], F_west[1:], F_east[0:-1], F_north_east[0:-I-1], F_south_west[(I+1):], F_north_west[0:-I+1], F_south_east[(I-1):]],[0, I, -I, -1, 1,I+1,-I-1,I-1,-I+1])
 	return sparse.csr_matrix(output)
 
-def HJB_convection_explicit(time,x,y,a1,a2,dx,dy,dt): #this should work, but also needs BC
+
+def HJB_convection_explicit(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled): #this should work, but also needs BC
 	I,J = x.size,y.size
 	[f1_array, f2_array] = iF.f_global(time,x,y,a1,a2)
-	xbound1 = range(0,I) 
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
+	#xbound1 = range(0,I) 
+	#ybound1 = range(0,I*J,I)
+	#xbound2 = range(I*J-I,I*J)
+	#ybound2 = range(I-1,I*J,I)
 	f1_array = np.ravel(f1_array)
 	f2_array = np.ravel(f2_array)
 	zero = np.zeros(f1_array.size)
-	here = 1-dt*(abs(f1_array)/dx+abs(f2_array)/dy) #[i,i]
-	north = np.zeros(I*J) #[i,i+I]
-	south = np.zeros(I*J) #[i,i-I]
-	west = np.zeros(I*J) #[i,i-1]
-	east = np.zeros(I*J) #[i,i+1]
+	F_here = np.zeros(I*J)
+	F_north = np.zeros(I*J) #[i,i+I]
+	F_south = np.zeros(I*J) #[i,i-I]
+	F_west = np.zeros(I*J) #[i,i-1]
+	F_east = np.zeros(I*J) #[i,i+1]
 	f1min = np.minimum(f1_array,zero)
 	f1max = np.maximum(f1_array,zero)
 	f2min = np.minimum(f2_array,zero)
 	f2max = np.maximum(f2_array,zero)
+	#indices = np.array([ item for i,item in enumerate(range(I*J)) if i not in nulled ])
+	#not_south = [ item for i,item in enumerate(indices) if i not in south ] 
+	#not_north = [ item for i,item in enumerate(indices) if i not in north ]
+	#not_west = [ item for i,item in enumerate(indices) if i not in west ]
+	#not_east = [ item for i,item in enumerate(indices) if i not in east ]
+	#indices = [n for n in list(range(I*J)) if n not in list(nulled)]
+	indices = list(range(I*J))
+	not_south = [n for n in indices if n not in list(south)]
+	not_north = [n for n in indices if n not in list(north)]
+	not_east = [n for n in indices if n not in list(east)]
+	not_west = [n for n in indices if n not in list(west)]
+	
 	#finalise
-	for i in range(0,I*J):
-		#avoid segfaults
-		if not ismember(i,xbound1): #allows (i,j-1)
-			south[i] += - dt/dy*f2min[i]
-		if not ismember(i,xbound2): #allows (i,j+1)
-			north[i] += dt/dy*f2max[i]
-		if not ismember(i,ybound1): #allows (i-1,j) 
-			west[i] += - dt/dx*f1min[i]
-		if not ismember(i,ybound2): #allows (i+1,j)
-			east[i] += dt/dx*f1max[i]
-		#then add boundary conditions
-		if ismember(i,xbound1): #allows (i,j-1)
-			north[i] += - dt/dy*f2min[i]
-		if ismember(i,xbound2): #allows (i,j+1)
-			south[i] += dt/dy*f2max[i]
-		if ismember(i,ybound1): #allows (i-1,j) 
-			east[i] += - dt/dx*f1min[i]
-		if ismember(i,ybound2): #allows (i+1,j)
-			west[i] += dt/dx*f1max[i]
-	output = sparse.diags([here, north[0:-I], south[I:], west[1:], east[0:-1]],[0, I, -I, -1, 1])
+	F_here[indices] = 1-dt*(abs(f1_array[indices])/dx+abs(f2_array[indices])/dy) #[i,i]
+	F_south[not_south] += -dt/dy * f2min[not_south]
+	F_north[not_north] += dt/dy * f2max[not_north]
+	F_west[not_west] += - dt/dx * f1min[not_west]
+	F_east[not_east] += dt/dx * f1max[not_east]
+	#boundary stuff
+	F_north[south] += -dt/dy*f2min[south]
+	F_south[north] += dt/dy*f2max[north]
+	F_east[west] += -dt/dx*f1min[west]
+	F_west[east] += dt/dx*f1max[east]
+	#remove nulled things
+#	if nulled!=None:
+#		F_here[nulled] = 1
+#		F_north[nulled] = 0
+#		F_south[nulled] = 0
+#		F_west[nulled] = 0
+#		F_east[nulled] = 0
+	output = sparse.diags([F_here, F_north[0:-I], F_south[I:], F_west[1:], F_east[0:-1]],[0, I, -I, -1, 1])
 	return sparse.csr_matrix(output)
 
 #####################
@@ -160,6 +165,7 @@ def FP_convection_explicit_classic(time,x,y,a1,a2,dx,dt):
 	#print f1
 	#print ss
 	zero = np.zeros(F1.size)
+	here = np.zeros(I*J)
 	here = 1-dt/dx*(abs(F1)+abs(F2)) #[i,i]
 	north = np.zeros(I*J) #[i,i+I]
 	south = np.zeros(I*J) #[i,i-I]
@@ -192,7 +198,7 @@ def FP_convection_explicit_classic(time,x,y,a1,a2,dx,dt):
 	#print sparse.csr_matrix(output).sum(0)
 	#print ss
 	return sparse.csr_matrix(output)
-def FP_convection_explicit_interpol(time,x,y,a1,a2,dx,dt):
+def FP_convection_explicit_interpol(time,x,y,a1,a2,dx,dt,south,north,west,east,nulled):
 	I,J = x.size,y.size
 	[f1, f2] = iF.f_global(time,x,y,a1,a2)
 	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
@@ -205,11 +211,18 @@ def FP_convection_explicit_interpol(time,x,y,a1,a2,dx,dt):
 	F1 = np.ravel(f1 - 0.5*D11x-0.5*D12y)#,order='F')
 	F2 = np.ravel(f2 - 0.5*D12x-0.5*D22y)#,order='F')
 	zero = np.zeros(F1.size)
-	indices = range(I*J)
-	not_south = np.delete(indices,range(0,I))
-	not_north = np.delete(indices,range(I*J-I,I*J))
-	not_west = np.delete(indices,range(0,I*J,I))
-	not_east = np.delete(indices,range(I-1,I*J,I))
+	#indices = np.delete(range(I*J),nulled)
+	#not_south = np.array([ item for i,item in enumerate(range(I*J)) if i not in south ])
+	#not_north = np.array([ item for i,item in enumerate(range(I*J)) if i not in north ])
+	#not_west = np.array([ item for i,item in enumerate(range(I*J)) if i not in west ])
+	#not_east = np.array([ item for i,item in enumerate(range(I*J)) if i not in east ])
+	#indices = np.array([ item for i,item in enumerate(range(I*J)) if i not in nulled ])
+	indices = np.array([n for n in list(range(I*J)) if n not in list(nulled)])
+	not_south = np.array([n for n in indices if n not in list(south)])
+	not_north = np.array([n for n in indices if n not in list(north)])
+	not_east = np.array([n for n in indices if n not in list(east)])
+	not_west = np.array([n for n in indices if n not in list(west)])
+	
 	F_east = np.zeros(I*J)
 	F_west = np.zeros(I*J)
 	F_north = np.zeros(I*J)
@@ -219,15 +232,22 @@ def FP_convection_explicit_interpol(time,x,y,a1,a2,dx,dt):
 	F_west[not_west] = .5*(F1[not_west]+F1[not_west-1])
 	F_north[not_north] = .5*(F2[not_north]+F2[not_north+I])
 	F_south[not_south] = .5*(F2[not_south]+F2[not_south-I])
-	here = 1-dt/dx*(-np.minimum(F_south,zero)-np.minimum(F_west,zero)+np.maximum(F_north,zero)+np.maximum(F_east,zero))
-	east = -dt/dx*np.minimum(F_east[:-1],zero[:-1])
-	west = dt/dx*np.maximum(F_west[1:],zero[1:])
-	north = -dt/dx*np.minimum(F_north[:-I],zero[:-I])
-	south = dt/dx*np.maximum(F_south[I:],zero[I:])
-	output = sparse.diags([here, north, south, west, east],[0, I, -I, -1, 1])
+	Fl_here = np.zeros(I*J)
+	Fl_here[indices] = 1-dt/dx*(-np.minimum(F_south[indices],zero[indices])-np.minimum(F_west[indices],zero[indices])+np.maximum(F_north[indices],zero[indices])+np.maximum(F_east[indices],zero[indices]))
+	Fl_east = -dt/dx*np.minimum(F_east[:-1],zero[:-1])
+	Fl_west = dt/dx*np.maximum(F_west[1:],zero[1:])
+	Fl_north = -dt/dx*np.minimum(F_north[:-I],zero[:-I])
+	Fl_south = dt/dx*np.maximum(F_south[I:],zero[I:])
+#	if nulled!=None:
+#		Fl_here[nulled] = 1
+#		Fl_north[nulled] = 0
+#		Fl_south[nulled] = 0
+#		Fl_west[nulled] = 0
+#		Fl_east[nulled] = 0
+	output = sparse.diags([Fl_here, Fl_north, Fl_south, Fl_west, Fl_east],[0, I, -I, -1, 1])
 	return sparse.csr_matrix(output)
 
-def FP_diffusion_implicit_Ometh(time,x,y,a1,a2,dx,dt):
+def FP_diffusion_implicit_Ometh(time,x,y,a1,a2,dx,dt,south,north,west,east,nulled):
 	I,J = x.size,y.size
 	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
 	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
@@ -235,10 +255,10 @@ def FP_diffusion_implicit_Ometh(time,x,y,a1,a2,dx,dt):
 	lamb = dt/(dx**2)
 	LHS = sparse.eye(I*J)#/lamb
 	LHS = sparse.lil_matrix(LHS)
-	LHS = add_diffusion_flux_Ometh(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt,0)
+	LHS = add_diffusion_flux_Ometh(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt,0,south,north,west,east,nulled)
 	return sparse.csr_matrix(LHS)#*lamb
 
-def FP_diffusion_implicit_Nonlinear(time,x,y,a1,a2,dx,dt,m): #implicit
+def FP_diffusion_implicit_Nonlinear(time,x,y,a1,a2,dx,dt,m,south,north,west,east,nulled): #implicit
 	I,J = x.size,y.size
 	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
 	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
@@ -247,108 +267,12 @@ def FP_diffusion_implicit_Nonlinear(time,x,y,a1,a2,dx,dt,m): #implicit
 	LHS = sparse.eye(I*J)
 	LHS = sparse.lil_matrix(LHS)
 	#AKu,ALu,AKr,ALr,LHS = add_diffusion_flux_nonlinear(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt,m,0)
-	LHS = add_diffusion_flux_nonlinear(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt,m,0)
+	LHS = add_diffusion_flux_nonlinear(LHS,D11*np.ones((I,J)),D22*np.ones((I,J)),D12*np.ones((I,J)),I,J,dx,dt,m,0,south,north,west,east,nulled)
 	#return AKu,ALu,AKr,ALr,sparse.csr_matrix(LHS)
 	return sparse.csr_matrix(LHS)
 
-def add_diffusion_flux_nonlinear(output,D11,D22,D12,I,J,dx,dt,m,EXPLICIT): #this is implicit
-	h = dx
-	dx2 = h**2
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
-	D11 = np.ravel(D11)
-	D12 = np.ravel(D12)
-	D22 = np.ravel(D22)
-	m = np.ravel(m)
-	#ratios
-	ratio_up = np.minimum(D12,D22)/np.maximum(D12,D22)
-	ratio_down = np.maximum(-D12,-D22)/np.minimum(-D12,-D22)
-	ratio_right = np.minimum(D11,D12)/np.maximum(D11,D12) #this is vetted
-	ratio_left = np.maximum(-D11,-D12)/np.minimum(-D11,-D12)
-	#length of diffusion vector, ex D(K)*nK
-	length_updown = np.sqrt(D12**2 + D22**2)
-	length_rightleft = np.sqrt(D11**2 + D12**2)
-	#length of intersection vectors, ex KO1
-	intersect_up = .5*dx*np.sqrt(1+ratio_up)
-	intersect_right = .5*dx*np.sqrt(1+ratio_right)
-	intersect_down = .5*dx*np.sqrt(1+ratio_down)
-	intersect_left = .5*dx*np.sqrt(1+ratio_left)
-	#cell areas
-	mK = np.ravel(np.ones(I*J)*dx2)
-	#mK[xbound1] = mK[xbound1]/2
-	#mK[xbound2] = mK[xbound2]/2
-	#mK[ybound1] = mK[ybound1]/2
-	#mK[ybound2] = mK[ybound2]/2
-	#for i in range(0,I*J-I-1):
-	#AKu = np.zeros(I*J)
-	#ALu = np.zeros(I*J)
-	#AKr = np.zeros(I*J)
-	#ALr = np.zeros(I*J)
-	for i in range(0,I*J):
-		#north
-		if not ismember(i,xbound2): #if north, do nothing
-			if ismember(i,ybound1): #west, north changes
-				length_n = .5*dx
-				m_p = .25*(m[i]+m[i+1]+m[i+I]+m[i+I+1])
-				m_p1,m_p2 = m_p,m_p
-			elif ismember(i,ybound2): #east, north changes
-				length_n = .5*dx
-				m_p = .25*(m[i]+m[i-1]+m[i+I]+m[i-I+1])
-				m_p1,m_p2 = m_p,m_p
-			else:
-				length_n = dx
-				m_p1 = .25*(m[i]+m[i+I]+m[i-1]+m[i+I-1])
-				m_p2 = .25*(m[i]+m[i+I]+m[i+1]+m[i+I+1])
-			a1 = (length_n*length_updown[i])/(intersect_up[i]*dx) * ( .5*dx*(1+ratio_up[i])*m_p2 + .5*dx*(1-ratio_up[i])*m_p1 )
-			a2 = (length_n*length_updown[i+I])/(intersect_down[i+I]*dx) * ( .5*dx*(1-ratio_down[i+I])*m_p2 + .5*dx*(1+ratio_down[i+I])*m_p1 )
-			if a1+a2 == 0:
-				mu1,mu2 = .5,.5
-			else:
-				mu1,mu2 = a2/(a1+a2),a1/(a1+a2)
-			AK = length_n*mu1*length_updown[i]/intersect_up[i]
-			AL = length_n*mu2*length_updown[i+I]/intersect_down[i+I]
-			output[i,i] += AK*dt/mK[i]
-			output[i,i+I] += -AL*dt/mK[i]
-			output[i+I,i] += -AK*dt/mK[i+I]
-			output[i+I,i+I] += AL*dt/mK[i+I]
-			#AKu[i] = AK
-			#ALu[i] = AL
-		#east
-		if not ismember(i,ybound2): #if east, do nothing
-			if ismember(i,xbound1): #south, east changes
-				length_e = .5*dx
-				m_p = .25*(m[i]+m[i+1]+m[i+I]+m[i+I+1])
-				m_p1,m_p2 = m_p,m_p
-			elif ismember(i,xbound2): #north, east changes
-				length_e = .5*dx
-				m_p = .25*(m[i]+m[i+1]+m[i-I]+m[i-I+1])
-				m_p1,m_p2 = m_p,m_p
-			else:
-				length_e = dx
-				m_p1 = .25*(m[i]+m[i+1]+m[i-I]+m[i+1-I])
-				m_p2 = .25*(m[i]+m[i+1]+m[i+I]+m[i+1+I])
-			#print ratio_left[i+1]
-			a1 = (length_e*length_rightleft[i])/(intersect_right[i]*dx) * ( .5*dx*(1+ratio_right[i])*m_p2 + .5*dx*(1-ratio_right[i])*m_p1 )
-			a2 = (length_e*length_rightleft[i+1])/(intersect_left[i+1]*dx) * ( .5*dx*(1-ratio_left[i+1])*m_p2 + .5*dx*(1+ratio_left[i+1])*m_p1 ) 
-			if a1+a2 == 0:
-				mu1,mu2 = .5,.5
-			else:
-				mu1,mu2 = a2/(a1+a2),a1/(a1+a2)
-			#print i+I,I*J
-			AK = length_e*mu1*length_rightleft[i]/intersect_right[i]
-			AL = length_e*mu2*length_rightleft[i+1]/intersect_left[i+1]
-			#AKr[i] = AK
-			#ALr[i] = AL
-			output[i,i] += AK*dt/mK[i]
-			output[i,i+1] += -AL*dt/mK[i]
-			output[i+1,i] += -AK*dt/mK[i+1]
-			output[i+1,i+1] += AL*dt/mK[i+1]
-	#return AKu,ALu,AKr,ALr,output
-	return output
 
-def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m): #tried to optimise
+def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m,south,north,west,east,nulled): #tried to optimise
 	dx2 = dx**2
 	I,J = x.size,y.size
 	D11 = np.ravel(iF.Sigma_D11_test(time,x,y,a1,a2))
@@ -356,15 +280,15 @@ def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m): #tried to optimise
 	D12 = np.ravel(iF.Sigma_D12_test(time,x,y,a1,a2))
 	m = np.ravel(m)
 	#initialise shitloads of stuff
-	indices = range(I*J)
-	south = range(0,I) #in the future, we load these guys
-	west = range(0,I*J,I)#in the future, we load these guys
-	north = range(I*J-I,I*J)#in the future, we load these guys
-	east = range(I-1,I*J,I)#in the future, we load these guys
-	not_south = np.delete(indices,south)
-	not_north = np.delete(indices,north)
-	not_west = np.delete(indices,west)
-	not_east = np.delete(indices,east)
+	indices = [n for n in list(range(I*J)) if n not in list(nulled)]
+	#south = range(0,I) #in the future, we load these guys
+	#west = range(0,I*J,I)#in the future, we load these guys
+	#north = range(I*J-I,I*J)#in the future, we load these guys
+	#east = range(I-1,I*J,I)#in the future, we load these guys
+	not_south = np.array([ item for i,item in enumerate(range(I*J)) if i not in south ])
+	not_north = np.array([ item for i,item in enumerate(range(I*J)) if i not in north ])
+	not_west = np.array([ item for i,item in enumerate(range(I*J)) if i not in west ])
+	not_east = np.array([ item for i,item in enumerate(range(I*J)) if i not in east ])
 	not_ne = np.intersect1d(not_north,not_east)
 	not_new = np.intersect1d(not_west,not_ne)
 	not_nes = np.intersect1d(not_south,not_ne)
@@ -489,32 +413,32 @@ def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m): #tried to optimise
 	return sparse.csr_matrix(output)
 
 
-def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
+def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT,south,north,west,east,nulled):
 	dx2 = dx**2
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
+	#xbound1 = range(0,I)
+	#ybound1 = range(0,I*J,I)
+	#xbound2 = range(I*J-I,I*J)
+	#ybound2 = range(I-1,I*J,I)
 	D11 = np.ravel(D11)*dt/dx2
 	D22 = np.ravel(D22)*dt/dx2
 	D12 = np.ravel(D12)*dt/dx2
-	indices = range(I*J)
-	not_north = np.delete(indices,range(I*J-I,I*J))
-	not_east = np.delete(indices,range(I-1,I*J,I))
+	indices = np.array([ item for i,item in enumerate(range(I*J)) if i not in nulled ])
+	not_north = [ item for i,item in enumerate(indices) if i not in north ]
+	not_east = [ item for i,item in enumerate(indices) if i not in east ]
 	for i in np.intersect1d(not_north,not_east):
 		a1,a2,a3,a4 = D11[i],D11[i+1],D11[i+I],D11[i+I+1]
 		b1,b2,b3,b4 = D22[i],D22[i+1],D22[i+I],D22[i+I+1]
 		c1,c2,c3,c4 = D12[i],D12[i+1],D12[i+I],D12[i+I+1]
-		if ismember(i,xbound1): #south
+		if ismember(i,south): #south
 			a1,b1,c1 = a1*2,b1*2,c1*2
 			a2,b2,c2 = a2*2,b2*2,c2*2
-		if ismember(i,ybound1): #west
+		if ismember(i,west): #west
 			a1,b1,c1 = a1*2,b1*2,c1*2
 			a3,b3,c3 = a3*2,b3*2,c3*2
-		if ismember(i+I,xbound2): #north
+		if ismember(i+I,north): #north
 			a3,b3,c3 = a3*2,b3*2,c3*2
 			a4,b4,c4 = a4*2,b4*2,c4*2
-		if ismember(i+1,ybound2): #east
+		if ismember(i+1,east): #east
 			a2,b2,c2 = a2*2,b2*2,c2*2
 			a4,b4,c4 = a4*2,b4*2,c4*2
 		#as we believe it to be the diffusion tensor equation
@@ -533,30 +457,40 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT):
 		output = ass.FVL2G(np.dot(R,T),output,i,I,J)
 	return output
 
-def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dt): #this is implicit
+def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dt,south,north,west,east,nulled): #this is implicit
 	I,J = x.size,y.size
 	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
 	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
 	D12 = iF.Sigma_D12_test(time,x,y,a1,a2)
 	dx2 = dx**2
-	xbound1 = range(0,I)
-	ybound1 = range(0,I*J,I)
-	xbound2 = range(I*J-I,I*J)
-	ybound2 = range(I-1,I*J,I)
 	#flatten out D12, D11, D22, f1_array, f2_array
 	D11 = np.ravel(D11)
 	D12 = np.ravel(D12)
 	D22 = np.ravel(D22)
-	#print D11,D22
-	indices = range(I*J)
-	not_south = np.delete(indices,range(0,I))
-	not_north = np.delete(indices,range(I*J-I,I*J))
-	not_west = np.delete(indices,range(0,I*J,I))
-	not_east = np.delete(indices,range(I-1,I*J,I))
-	not_ne = np.intersect1d(not_north,not_east)
-	not_se = np.intersect1d(not_south,not_east)
-	not_nw = np.intersect1d(not_north,not_west)
-	not_sw = np.intersect1d(not_south,not_west)
+	indices = np.array([n for n in list(range(I*J)) if n not in list(nulled)])
+	not_south = np.array([n for n in indices if n not in list(south)])
+	not_north = np.array([n for n in indices if n not in list(north)])
+	not_east = np.array([n for n in indices if n not in list(east)])
+	not_west = np.array([n for n in indices if n not in list(west)])
+	#not_south = np.array([ item for i,item in enumerate(range(I*J)) if i not in south ])
+	#not_north = np.array([ item for i,item in enumerate(range(I*J)) if i not in north ])
+	#not_west = np.array([ item for i,item in enumerate(range(I*J)) if i not in west ])
+	#not_east = np.array([ item for i,item in enumerate(range(I*J)) if i not in east ])
+	#indices = np.array([ item for i,item in enumerate(range(I*J)) if i not in nulled ])
+	
+	not_ne = np.array([n for n in indices if (n not in north) and (n not in east)])
+	not_se = np.array([n for n in indices if (n not in south) and (n not in east)])
+	not_nw = np.array([n for n in indices if (n not in north) and (n not in west)])
+	not_sw = np.array([n for n in indices if (n not in south) and (n not in west)])
+	
+#	print not_north
+#	print not_east
+#	print not_ne
+#	print ss
+	#not_ne = np.intersect1d(not_north,not_east)
+	#not_se = np.intersect1d(not_south,not_east)
+	#not_nw = np.intersect1d(not_north,not_west)
+	#not_sw = np.intersect1d(not_south,not_west)
 	D_east = np.zeros(I*J)
 	D_west = np.zeros(I*J)
 	D_north = np.zeros(I*J)
@@ -565,16 +499,32 @@ def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dt): #this is implicit
 	D_nw = np.zeros(I*J)
 	D_se = np.zeros(I*J)
 	D_sw = np.zeros(I*J)
+	here = np.zeros(I*J)
 	#need the intersection between not_north and not_east, etc...
-	D_ne[not_ne] = .25*(D12[not_ne+I]+D12[not_ne+1])*dt/dx2
-	D_se[not_se] = -.25*(D12[not_se-I]+D12[not_se+1])*dt/dx2
-	D_sw[not_sw] = .25*(D12[not_sw-I]+D12[not_sw-1])*dt/dx2
-	D_nw[not_nw] = -.25*(D12[not_nw+I]+D12[not_nw-1])*dt/dx2
-	D_north[not_north] = app.hmean(D22[not_north],D22[not_north+I])*dt/dx2
-	D_south[not_south] = app.hmean(D22[not_south],D22[not_south-I])*dt/dx2
-	D_west[not_west] = app.hmean(D11[not_west],D11[not_west-1])*dt/dx2
-	D_east[not_east] = app.hmean(D11[not_east],D11[not_east+1])*dt/dx2
-	here = 1+(D_north+D_south+D_west+D_east+D_ne+D_se+D_sw+D_nw)
+	D_ne[not_ne] += .25*(D12[not_ne+I]+D12[not_ne+1])*dt/dx2
+	D_se[not_se] += -.25*(D12[not_se-I]+D12[not_se+1])*dt/dx2
+	D_sw[not_sw] += .25*(D12[not_sw-I]+D12[not_sw-1])*dt/dx2
+	D_nw[not_nw] += -.25*(D12[not_nw+I]+D12[not_nw-1])*dt/dx2
+	D_north[not_north] += app.hmean(D22[not_north],D22[not_north+I])*dt/dx2
+	D_south[not_south] += app.hmean(D22[not_south],D22[not_south-I])*dt/dx2
+	D_west[not_west] += app.hmean(D11[not_west],D11[not_west-1])*dt/dx2
+	D_east[not_east] += app.hmean(D11[not_east],D11[not_east+1])*dt/dx2
+	#boundary stuff
+	#D_north[south] += app.hmean(D22[south],D22[south+I])*dt/dx2
+	#D_south[north] += app.hmean(D22[north],D22[north-I])*dt/dx2
+	#D_east[west] += app.hmean(D11[west],D11[west+1])*dt/dx2
+	#D_west[east] += app.hmean(D11[east],D11[east-1])*dt/dx2
+	here[indices] = 1+(D_north[indices]+D_south[indices]+D_west[indices]+D_east[indices]+D_ne[indices]+D_se[indices]+D_sw[indices]+D_nw[indices])
+#	if nulled!=None:
+#		here[nulled] = 1
+#		D_north[nulled] = 0
+#		D_south[nulled] = 0
+#		D_west[nulled] = 0
+#		D_east[nulled] = 0
+#		D_ne[nulled] = 0
+#		D_se[nulled] = 0
+#		D_nw[nulled] = 0
+#		D_sw[nulled] = 0
 	output = sparse.diags([here, -D_north[:-I], -D_south[I:], -D_west[1:], -D_east[:-1], -D_ne[:-I-1], -D_sw[I+1:], -D_se[I-1:], -D_nw[:1-I]],[0, I, -I, -1, 1, I+1, -I-1, -I+1, I-1])
 	return sparse.csr_matrix(output)
 
@@ -590,6 +540,22 @@ def add_direchlet_boundary(output,sol_vector,I,J,lamb,val):
 			output[i,:] = unit(i,I*J)/lamb
 			sol_vector[i] = val
 	return output,sol_vector
+
+def trim_nulled(output,nulled):
+	cols_to_keep = np.where(np.logical_not(np.in1d(np.arange(output.shape[1]), nulled)))[0]
+	output = output[:, cols_to_keep]
+	output = sparse.lil_matrix(output)
+	for i in range(len(nulled)): #kill rows
+		delete_row_lil(output,nulled[i])
+	return sparse.csr_matrix(output)
+
+
+def delete_row_lil(mat, i):
+    if not isinstance(mat, sparse.lil_matrix):
+        raise ValueError("works only for LIL format -- use .tolil() first")
+    mat.rows = np.delete(mat.rows, i)
+    mat.data = np.delete(mat.data, i)
+    mat._shape = (mat._shape[0] - 1, mat._shape[1])
 
 def unit(index,length):
 	output = np.zeros(length)
