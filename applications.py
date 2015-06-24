@@ -18,17 +18,17 @@ def scatter_search(function, (args),dx,dy,x0,y0,N,k,xmin,xmax,ymin,ymax): #here 
 	dex_y = dy
 	for i in range (0,k):
 		if x_naught+dex_x > xmax:
-			xpts = np.linspace(x_naught-dex_x,xmax,N)
+			xpts = np.linspace(x_naught-dex_x,xmax,N[0])
 		elif x_naught-dex_x < xmin:
-			xpts = np.linspace(xmin,x_naught+dex_x,N)
+			xpts = np.linspace(xmin,x_naught+dex_x,N[0])
 		else:
-			xpts = np.linspace(x_naught-dex_x,x_naught+dex_x,N)
+			xpts = np.linspace(x_naught-dex_x,x_naught+dex_x,N[0])
 		if y_naught+dex_y > ymax:
-			ypts = np.linspace(y_naught-dex_y,ymax,N)
+			ypts = np.linspace(y_naught-dex_y,ymax,N[1])
 		elif y_naught-dex_y < ymin:
-			ypts = np.linspace(ymin,y_naught+dex_y,N)
+			ypts = np.linspace(ymin,y_naught+dex_y,N[1])
 		else:
-			ypts = np.linspace(y_naught-dex_y,y_naught+dex_y,N)
+			ypts = np.linspace(y_naught-dex_y,y_naught+dex_y,N[1])
 		xpts,ypts = np.meshgrid(xpts,ypts)
 		fpts = function(xpts,ypts,*args)
 		if i!=k-1:
@@ -348,6 +348,12 @@ def FMM(x,y,nulled,goal_x,goal_y):
 #AUXILIARY FUNCTIONS
 ###################
 
+def map_2d_to_3d(arr2d,arr3d):
+	#kinda broadcast the 2d-array into a 3d-shape
+	#assumes that two of the dimensions match
+	output = np.zeros(arr3d.shape)
+	output[:,0:arr3d.shape[1],:] = np.transpose(arr2d)
+	return output
 
 def gimme_gradient_points(minis,index_max):
 	my_list_x = []

@@ -21,7 +21,7 @@ POINTSx = 5*2 #points in x-direction
 POINTSy = 5*2 #points in y-direction
 REFINEMENTS = 1
 NITERATIONS = 1
-DT = .1#ratio as in dt = DT*dx(**2)
+DT = .4#ratio as in dt = DT*dx(**2)
 cutoff = 0 #for convergence slope
 grid = [0, 1, 0, 1]
 xmax = grid[1]
@@ -32,10 +32,11 @@ T = 1.5
 PLOT_GRID = [3, 4]
 
 #OBSTACLES
-obstacle_x_min = [.0, .6]
-obstacle_x_max = [.4, 1.]
-obstacle_y_min = [.4, .4]
-obstacle_y_max = [.6, .6]
+obstacle_x_min = [.0, .6]#[.0]#
+obstacle_x_max = [.4, 1.]#[.05]#
+obstacle_y_min = [.4, .4]#[.0]#
+obstacle_y_max = [.6, .6]#[.05]#
+KILL = 1 #set 0 if you don't want this to matter
 
 #GOALS
 #goals_x = [.0,.1,.2,.8,.9,1.]#[.2,.4,.6,.8]
@@ -69,8 +70,8 @@ conv_plot_m = np.zeros(NITERATIONS)
 
 #Searching stuff
 min_tol = 1e-6#tolerance#1e-5 #tolerance for minimum
-alpha_upper = 3 #search region left
-alpha_lower = -3 #search region right
+alpha_upper = np.array([1, 1]) #search region left
+alpha_lower = np.array([-1, -1]) #search region right
 
 def opt_cont_cmfg(u):
 	ush = np.transpose(np.reshape(u,(I,J)))
@@ -120,7 +121,7 @@ for N in range(REFINEMENTS):
 	new_west = []
 	temp_east = [None]*2
 	temp_west = [None]*2
-
+	
 	for i in range(len(obstacle_x_min)):
 		#new_south,new_north,new_west,new_east,nulled,se,sw,ne,nw = app.add_obstacle(x,y,(obstacle_x_min[i],obstacle_x_max[i],obstacle_y_min[i],obstacle_y_max[i]),south,north,west,east,nulled)
 		new_south,new_north,new_west,new_east,nulled,se,sw,ne,nw = app.add_obstacle(x,y,(obstacle_x_min[i],obstacle_x_max[i],obstacle_y_min[i],obstacle_y_max[i]),[],[],[],[],nulled)
@@ -136,7 +137,8 @@ for N in range(REFINEMENTS):
 	north.sort()
 	east.sort()
 	west.sort()
-	nulled.sort()
+	if nulled is not None:
+		nulled.sort()
 	
 #	indices = np.array([n for n in list(range(I*J)) if n not in list(nulled)])
 #	not_south = np.array([n for n in indices if n not in list(south)])
@@ -167,15 +169,16 @@ for N in range(REFINEMENTS):
 	not_nulled = [ item for i,item in enumerate(indices) if i not in nulled ]
 	not_obstacle = [ item for i,item in enumerate(indices) if i not in obstacle ]
 	ObstacleCourse = app.FMM(x,y,obstacle,goals_x,goals_y)
-	Obs = np.reshape(ObstacleCourse,(I,J))
+	ObstacleCourse = np.reshape(ObstacleCourse,(J,I))
 	fig1 = plt.figure(1)
 	#ax1 = fig1.add_subplot(111, projection='3d')
 	#ax1.plot_surface(X,Y,Obs,rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 	#levels = np.arange(np.amin(Obs),np.amax(Obs),0.5)
 	levels = np.arange(0,2,0.05)
-	norm = cm.colors.Normalize(vmax=abs(Obs).max(), vmin=0)
+	norm = cm.colors.Normalize(vmax=abs(ObstacleCourse).max(), vmin=0)
 	cmap = cm.PRGn
-	fig1 = plt.contourf(X,Y,Obs,levels,cmap=plt.cm.Reds)
+	#print X.shape,Y.shape,ObstacleCourse.shape
+	fig1 = plt.contourf(X,Y,ObstacleCourse,levels,cmap=plt.cm.Reds)
 	CS2 = plt.contour(fig1, levels=levels[:],colors = 'b')
 	#cbar = plt.colorbar(fig1)
 	#cbar.ax.set_ylabel('Distribution density')
@@ -183,7 +186,7 @@ for N in range(REFINEMENTS):
 	#fig1.suptitle("a1")
 	#ax1.set_xlabel('x')
 	#ax1.set_ylabel('y')
-	#plt.show()
+	#plt.show()#[]#
 	
 
 
@@ -192,9 +195,12 @@ for N in range(REFINEMENTS):
 	#print nulled
 	#print ss
 	#minimisation things
-	Ns = int(np.ceil(abs(alpha_upper-alpha_lower)/(dx)) + 1)#*10
-	xpts_scatter = np.linspace(alpha_lower,alpha_upper,Ns)
-	scatters = int(np.ceil( np.log((alpha_upper-alpha_lower)/(min_tol*Ns))/np.log(Ns/2) ))
+	Ns_x = int(np.ceil(abs(alpha_upper[0]-alpha_lower[0])/(dx)) + 1)#*10
+	Ns_y = int(np.ceil(abs(alpha_upper[1]-alpha_lower[1])/(dy)) + 1)#*10
+	xpts_scatter = np.linspace(alpha_lower[0],alpha_upper[0],Ns_x)
+	ypts_scatter = np.linspace(alpha_lower[1],alpha_upper[1],Ns_y)
+	Ns = [Ns_x,Ns_y]
+	scatters = int(np.ceil( np.log((max(alpha_upper-alpha_lower))/(min_tol*min(Ns)))/np.log(min(Ns)/2) ))
 	print "Scatters:",scatters,Ns
 
 	Mass = np.zeros(Nt)
@@ -206,6 +212,10 @@ for N in range(REFINEMENTS):
 	for k in range(0,Nt):
 		m_arr[k] = m0
 	m_last_solution = None
+
+	###################################
+	ObstacleCourse = KILL*ObstacleCourse
+	###################################
 	for ITERATION in range(NITERATIONS):
 		#m_last_solution = np.copy(m_arr[-1])
 		m_last_solution = np.copy(m_arr)
@@ -214,7 +224,9 @@ for N in range(REFINEMENTS):
 			print k
 			m_tmp = np.copy(m_arr[k])
 			a1,a2 = opt_cont_cmfg(u)
-			#a1,a2 = solve.control_general(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
+			a1,a2 = solve.control_general_vectorised(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#a1,a2 = solve.control_general_vectorised(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.transpose(ObstacleCourse),south,north,west,east)
 			#t0 = time.time()
 			#a1_,a2_ = solve.control_general(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#t0 = time.time()-t0
@@ -222,8 +234,8 @@ for N in range(REFINEMENTS):
 			#a1,a2 = solve.control_hybrid(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#t1 = time.time()-t1
 			#print "Scatter:", t0, "\nHybrid:", t1
-			#a1 = np.transpose(a1)
-			#a2 = np.transpose(a2)
+			a1 = np.transpose(a1)
+			a2 = np.transpose(a2)
 			#a1_ = np.transpose(a1_)
 			#a2_ = np.transpose(a2_)
 			#print np.linalg.norm(a1-a1_)
@@ -232,6 +244,8 @@ for N in range(REFINEMENTS):
 		#	print a2_#==a1_
 			#print a2==np.transpose(a2_)
 			#print a2_
+			#print a1.shape,a2.shape
+			
 			a1_arr[k] = np.copy(a1)
 			a2_arr[k] = np.copy(a2)
 			t1_tmp = time.time()
@@ -258,22 +272,24 @@ for N in range(REFINEMENTS):
 				#if nulled!=None:
 				#	u[nulled] = 10
 				#plot it plz
-				if PLOT_DEBUG and k<140:
+				if PLOT_DEBUG:# and k<140:
+					X,Y = np.meshgrid(x,y)
+					print u.shape
 					fig1 = plt.figure(1)
 					ax1 = fig1.add_subplot(111, projection='3d')
-					ax1.plot_surface(np.meshgrid(x,y)[0],np.meshgrid(x,y)[1],np.reshape(a1,(I,J)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+					ax1.plot_surface(X,Y,(a1),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 					fig1.suptitle("a1")
 					ax1.set_xlabel('x')
 					ax1.set_ylabel('y')
 					fig2 = plt.figure(2)
 					ax2 = fig2.add_subplot(111, projection='3d')
-					ax2.plot_surface(np.meshgrid(x,y)[0],np.meshgrid(x,y)[1],np.reshape(a2,(I,J)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+					ax2.plot_surface(X,Y,(a2),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 					ax2.set_xlabel('x')
 					ax2.set_ylabel('y')
 					fig2.suptitle("a2")
 					fig3 = plt.figure(3)
 					ax3 = fig3.add_subplot(111, projection='3d')
-					ax3.plot_surface(np.meshgrid(x,y)[0],np.meshgrid(x,y)[1],np.reshape(u,(I,J)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+					ax3.plot_surface(X,Y,np.reshape(u,(J,I)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 					ax3.set_xlabel('x')
 					ax3.set_ylabel('y')
 					fig3.suptitle("u")	
@@ -346,12 +362,12 @@ for N in range(REFINEMENTS):
 		for i in range(Nt):
 			temp += np.linalg.norm(np.ravel(m_arr[i])-np.ravel(m_last_solution[i]))
 		conv_plot_m[ITERATION] = temp
+		kMax = ITERATION
 		if temp < 1e-3:
 			print "Converged! Used iterations:", ITERATION
 			break
 		else:
 			print "Still crunching:", temp, ITERATION, "/", NITERATIONS
-		kMax = ITERATION
 	#evaluate iteration
 
 conv_plot_m = conv_plot_m[:kMax]

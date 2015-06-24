@@ -1,6 +1,8 @@
 from __future__ import division
 import numpy as np
 import math
+import applications as app
+import time as time
 from scipy import sparse
 
 ###################
@@ -112,14 +114,31 @@ def hamiltonian_derivative(ax,ay,x,y,u,m,dt,dx,dy,time,i,j,I,J,ObstacleCourse,so
 		u4_y = 0
 	return u4_x+ax, u4_y+ay
 
-def Hamiltonian_vectorised(ax,ay,x,y,u,m,dx,dy,timez,I,J,Obstacles,U_south,U_north,U_west,U_east,U_crossup,U_crossdown): #spits out a 2D array of Hamiltonian values given arrays of inputs ax_array \times ay_array
+def Hamiltonian_vectorised(ax,ay,x,y,m,dx,dy,timez,I,J,Obstacles,U_south,U_north,U_west,U_east,U_crossup,U_crossdown,THREE_DEE): #spits out a 2D array of Hamiltonian values given arrays of inputs ax_array \times ay_array
 	#all arguments except the obvious are assumed to be two- or three-dimensional
-	zero = np.zeros(ax_array.shape)
+	zero = np.zeros(ax.shape)
+	#map everything to 3d
 	d11 = Sigma_D11_test(timez,x,y,ax,ay) #all these bitches return matrices now
 	d12 = Sigma_D12_test(timez,x,y,ax,ay) #all these bitches
 	d22 = Sigma_D22_test(timez,x,y,ax,ay)
+	#t0 = time.time()
+	if THREE_DEE:
+		Obstacles = app.map_2d_to_3d(Obstacles,ax)
+		U_south = app.map_2d_to_3d(U_south,ax)
+		U_north = app.map_2d_to_3d(U_north,ax)
+		U_west = app.map_2d_to_3d(U_west,ax)
+		U_east = app.map_2d_to_3d(U_east,ax)
+		U_crossup = app.map_2d_to_3d(U_crossup,ax)
+		U_crossdown = app.map_2d_to_3d(U_crossdown,ax)
+		d11 = app.map_2d_to_3d(d11,ax)
+		d12 = app.map_2d_to_3d(d12,ax)
+		d22 = app.map_2d_to_3d(d22,ax)
+	#print "Time to map to 4D:", time.time()-t0
+	#and do function calls
 	f1,f2 = f_global(timez,x,y,ax,ay) #and these also
 	L = L_global(timez,x,y,ax,ay,m,Obstacles)
+	#print L
+	#print ss
 	return L + np.maximum(f1,zero)*U_west + np.minimum(f1,zero)*U_east + np.maximum(f2,zero)*U_south + np.minimum(f2,zero)*U_north + .5*d11*(U_east-U_west)/dx + .5*d22*(U_north-U_south)/dy + .5*np.maximum(d12,zero)*U_crossup + .5*np.minimum(d12,zero)*U_crossdown
 
 ###################
@@ -160,6 +179,7 @@ def L_global(time,x,y,a1,a2,m_array,G): #general cost
 #	print a1.shape
 #	print G.shape
 	#return 0.5*(a1**2 + a2**2)*(1+x1) + G*(5 +x2) # + F_global(x,y,x,time)
+	#G_big = app.map_2d_to_3d(G,a1)
 	return 0.5*(a1**2+a2**2) + G#F_global(x_array,y_array,m_array,time)
 
 def xenophobia(a,b,c,m):

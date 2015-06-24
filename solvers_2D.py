@@ -7,6 +7,7 @@ import applications as app
 import scipy.optimize as opt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+import time as time
 import matplotlib.pyplot as plt
 #these functions complete 1 iteration of the explicit schemes
 
@@ -99,64 +100,106 @@ def control_general(search_x,search_y,x,y,u0,m,dt,dx,dy,time,I,J,tol,scatters,N,
 			a2[i,j] = tmp_y
 	#print "Found optimal control!"
 	return a1,a2
-
-def control_general_vectorised(search_x,search_y,x,y,u,m,dt,dx,dy,time,I,J,tol,scatters,N,nulled,Obstacles,south,north,west,east):
+#(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,0*ObstacleCourse,south,north,west,east)
+def control_general_vectorised(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,tol,scatters,N,nulled,Obstacles,south,north,west,east):
 	ax = search_x[1]-search_x[0]
 	ay = search_y[1]-search_y[0]
-	Search_x,X = np.meshgrid(search_x,x) #pls be 3D
-	Search_x,Y = np.meshgrid(search_y,y) #pls be 3D
+	#search_x,search_y = np.meshgrid(search_x,search_y)
+	Search_x,Search_y,X,Y = np.meshgrid(search_x,search_y,x,y) #pls be 3D
+	bounds = [search_x[0], search_x[-1], search_y[0], search_y[-1]]
+	A1_read,A2_read = np.meshgrid(search_x,search_y)
+	#Search_y,X,Y = np.meshgrid(search_y,x,y) #pls be 3D
 	#make the things
-	u_south = np.zeros((I,J))
-	u_north = np.zeros((I,J))
-	u_west = np.zeros((I,J))
-	u_east = np.zeros((I,J))
-	u_east[:-1,:] = (u[1:,:]-u[:-1,:])/dx
-	u_west[1:,:] = (u[1:,:]-u[:-1,:])/dx
-	u_north[:,:-1] = (u[:,1:]-u[:,:-1])/dy
-	u_south[:,1:] = (u[:,1:]-u[:,:-1])/dy
-	u_crossup[1:-1,1:-1] = .5*( u[2:,1:-1] + u[:-2,1:-1] + u[1:-1,2:] + u[1:-1,:-2] - 2*u[1:-1,1:-1] - u[2:,:-2] - u[:-2,2:] )/(dx*dy)
-	u_crossdown[1:-1,1:-1] = .5*( 2*u[1:-1,1:-1] + u[2:,2:] + u[:-2,:-2] - u[2:,1:-1] - u[:-2,1:-1] - u[1:-1,2:] - u[1:-1,:-2] )/(dx*dy)
+	u_south = np.zeros((J,I))
+	u_north = np.zeros((J,I))
+	u_west = np.zeros((J,I))
+	u_east = np.zeros((J,I))
+	u_crossup = np.zeros((J,I))
+	u_crossdown = np.zeros((J,I))
+	u = (np.reshape(u,(J,I)))
+	#Obstacles = np.transpose(Obstacles)
+	#this does not pay heed to obstacles... fuck it; also, east/west behave like north/south, and vica versa, this is bad
+#	u_east[:-1,:] = (u[1:,:]-u[:-1,:])/dx
+#	u_west[1:,:] = (u[1:,:]-u[:-1,:])/dx
+#	u_north[:,:-1] = (u[:,1:]-u[:,:-1])/dy
+#	u_south[:,1:] = (u[:,1:]-u[:,:-1])/dy
+#	u_crossup[1:-1,1:-1] = .5*( u[2:,1:-1] + u[:-2,1:-1] + u[1:-1,2:] + u[1:-1,:-2] - 2*u[1:-1,1:-1] - u[2:,:-2] - u[:-2,2:] )/(dx*dy)
+#	u_crossdown[1:-1,1:-1] = .5*( 2*u[1:-1,1:-1] + u[2:,2:] + u[:-2,:-2] - u[2:,1:-1] - u[:-2,1:-1] - u[1:-1,2:] - u[1:-1,:-2] )/(dx*dy)
+	u_north[:-1,:] = (u[1:,:]-u[:-1,:])/dx
+	u_south[1:,:] = (u[1:,:]-u[:-1,:])/dx
+	u_east[:,:-1] = (u[:,1:]-u[:,:-1])/dy
+	u_west[:,1:] = (u[:,1:]-u[:,:-1])/dy
+	u_crossup[1:-1,1:-1] = .5*( u[1:-1,2:] + u[1:-1,:-2] + u[2:,1:-1] + u[:-2,1:-1] - 2*u[1:-1,1:-1] - u[:-2,2:] - u[2:,:-2] )/(dx*dy)
+	u_crossdown[1:-1,1:-1] = .5*( 2*u[1:-1,1:-1] + u[2:,2:] + u[:-2,:-2] - u[1:-1,2:] - u[1:-1,:-2] - u[2:,1:-1] - u[:-2,1:-1] )/(dx*dy)
 	#boundary condition on u
-	u_east[-1,:] = (u[-2,:]-u[-1,:])/dx
-	u_west[0,:] = (u[0,:]-u[1,:])/dx
-	u_north[:,-1] = (u[:,-2]-u[:,-1])/dy
-	u_south[:,0] = (u[:,0]-u[:,1])/dy
-	u_crossup[0,1:-1] = .5*( 2*u[1,1:-1] + u[0,2:] + u[0,:-2] - 2*u[0,1:-1] - u[1,:-2] - u[1,2:] )/(dx*dy) #west
-	u_crossup[-1:,1:-1] = .5*( 2*u[-2,1:-1] + u[-1,2:] + u[-1,:-2] - 2*u[-1,1:-1] - u[-2,:-2] - u[-2,2:] )/(dx*dy) #east
-	u_crossup[1:-1,0] = .5*( u[2:,0] + u[:-2,0] + 2*u[1:-1,1] - 2*u[1:-1,0] - u[2:,1] - u[:-2,1] )/(dx*dy) #south
-	u_crossup[1:-1,-1] = .5*( u[2:,0] + u[:-2,0] + 2*u[1:-1,-2] - 2*u[1:-1,1:-1] - u[2:,-2] - u[:-2,-2] )/(dx*dy) #north
-	u_crossdown[0,1:-1] = .5*( 2*u[0,1:-1] + u[1,2:] + u[1,:-2] - 2*u[1,1:-1] - u[0,2:] - u[0,:-2] )/(dx*dy) #west
-	u_crossdown[-1,1:-1] = .5*( 2*u[-1,1:-1] + u[-2,2:] + u[-2,:-2] - 2*u[-2,1:-1] - u[-1,2:] - u[-1,:-2] )/(dx*dy)#east
-	u_crossdown[1:-1,0] = .5*( 2*u[1:-1,0] + u[2:,1] + u[:-2,1] - u[2:,0] - u[:-2,0] - 2*u[1:-1,1])/(dx*dy)#south
-	u_crossdown[1:-1,-1] = .5*( 2*u[1:-1,-1] + u[2:,-2] + u[:-2,-2] - u[2:,-1] - u[:-2,-1] - 2*u[1:-1,-2])/(dx*dy) #north
+#	u_east[-1,:] = (u[-2,:]-u[-1,:])/dx
+#	u_west[0,:] = (u[0,:]-u[1,:])/dx
+#	u_north[:,-1] = (u[:,-2]-u[:,-1])/dy
+#	u_south[:,0] = (u[:,0]-u[:,1])/dy
+#	u_crossup[0,1:-1] = .5*( 2*u[1,1:-1] + u[0,2:] + u[0,:-2] - 2*u[0,1:-1] - u[1,:-2] - u[1,2:] )/(dx*dy) #west
+#	u_crossup[-1:,1:-1] = .5*( 2*u[-2,1:-1] + u[-1,2:] + u[-1,:-2] - 2*u[-1,1:-1] - u[-2,:-2] - u[-2,2:] )/(dx*dy) #east
+#	u_crossup[1:-1,0] = .5*( u[2:,0] + u[:-2,0] + 2*u[1:-1,1] - 2*u[1:-1,0] - u[2:,1] - u[:-2,1] )/(dx*dy) #south
+#	u_crossup[1:-1,-1] = .5*( u[2:,-1] + u[:-2,-1] + 2*u[1:-1,-2] - 2*u[1:-1,-1] - u[2:,-2] - u[:-2,-2] )/(dx*dy) #north
+#	u_crossdown[0,1:-1] = .5*( 2*u[0,1:-1] + u[1,2:] + u[1,:-2] - 2*u[1,1:-1] - u[0,2:] - u[0,:-2] )/(dx*dy) #west
+#	u_crossdown[-1,1:-1] = .5*( 2*u[-1,1:-1] + u[-2,2:] + u[-2,:-2] - 2*u[-2,1:-1] - u[-1,2:] - u[-1,:-2] )/(dx*dy)#east
+#	u_crossdown[1:-1,0] = .5*( 2*u[1:-1,0] + u[2:,1] + u[:-2,1] - u[2:,0] - u[:-2,0] - 2*u[1:-1,1])/(dx*dy)#south
+#	u_crossdown[1:-1,-1] = .5*( 2*u[1:-1,-1] + u[2:,-2] + u[:-2,-2] - u[2:,-1] - u[:-2,-1] - 2*u[1:-1,-2])/(dx*dy) #north
+	u_north[-1,:] = (u[-2,:]-u[-1,:])/dx
+	u_south[0,:] = (u[0,:]-u[1,:])/dx
+	u_east[:,-1] = (u[:,-2]-u[:,-1])/dy
+	u_west[:,0] = (u[:,0]-u[:,1])/dy
+	u_crossup[1:-1,0] = .5*( 2*u[1:-1,1] + u[2:,0] + u[:-2,0] - 2*u[1:-1,0] - u[:-2,1] - u[2:,1] )/(dx*dy) #west
+	u_crossup[1:-1,-1] = .5*( 2*u[1:-1,-2] + u[2:,-1] + u[:-2,-1] - 2*u[1:-1,-1] - u[:-2,-2] - u[2:,-2] )/(dx*dy) #east
+	u_crossup[0,1:-1] = .5*( u[0,2:] + u[0,:-2] + 2*u[1,1:-1] - 2*u[0,1:-1] - u[1,2:] - u[1,:-2] )/(dx*dy) #south
+	u_crossup[-1,1:-1] = .5*( u[-1,2:] + u[-1,:-2] + 2*u[-2,1:-1] - 2*u[-1,1:-1] - u[-2,2:] - u[-2,:-2] )/(dx*dy) #north
+	u_crossdown[1:-1,0] = .5*( 2*u[1:-1,0] + u[2:,1] + u[:-2,1] - 2*u[1:-1,1] - u[2:,0] - u[:-2,0] )/(dx*dy) #west
+	u_crossdown[1:-1,-1] = .5*( 2*u[1:-1,-1] + u[2:,-2] + u[:-2,-2] - 2*u[1:-1,-2] - u[2:,-1] - u[:-2,-1] )/(dx*dy)#east
+	u_crossdown[0,1:-1] = .5*( 2*u[0,1:-1] + u[1,2:] + u[1,:-2] - u[0,2:] - u[0,:-2] - 2*u[1,1:-1])/(dx*dy)#south
+	u_crossdown[-1,1:-1] = .5*( 2*u[-1,1:-1] + u[-2,2:] + u[-2,:-2] - u[-1,2:] - u[-1,:-2] - 2*u[-2,1:-1])/(dx*dy) #north
 	#continued boundary conditions; four corners of crossterms
+#	u_crossup[0,0] = .5*( 2*u[1,0] + 2*u[0,1] - 2*u[0,0] - 2*u[1,1])/(dx*dy) #southwest
+#	u_crossup[0,-1] = .5*( 2*u[1,-1] + 2*u[0,-2] - 2*u[0,-1] - 2*u[1,-2])/(dx*dy) #northwest
+#	u_crossup[-1,0] = .5*( 2*u[-2,0] + 2*u[-1,1] - 2*u[-1,-1] - 2*u[-2,1])/(dx*dy) #southeast
+#	u_crossup[-1,-1] = .5*( 2*u[-2,-1] + 2*u[-1,-2] - 2*u[-1,-1] - 2*u[-2,-2])/(dx*dy)#northeast
+#	u_crossdown[0,0] = .5*( 2*u[0,0] + 2*u[1,1] - 2*u[1,0] - 2*u[0,1])/(dx*dy)
+#	u_crossdown[0,-1] = .5*( 2*u[0,-1] + 2*u[1,-2] - 2*u[1,-1] - 2*u[0,-2])/(dx*dy)
+#	u_crossdown[-1,0] = .5*( 2*u[-1,0] + 2*u[-2,1] - 2*u[-2,0] - 2*u[-1,1])/(dx*dy)
+#	u_crossdown[-1,-1] = .5*( 2*u[-1,-1] + 2*u[-2,-2] - 2*u[-2,-1] - 2*u[-1,-2])/(dx*dy)
 	u_crossup[0,0] = .5*( 2*u[1,0] + 2*u[0,1] - 2*u[0,0] - 2*u[1,1])/(dx*dy) #southwest
-	u_crossup[0,-1] = .5*( 2*u[1,-1] + 2*u[0,-2] - 2*u[0,-1] - 2*u[1,-2])/(dx*dy) #northwest
-	u_crossup[-1,0] = .5*( 2*u[-2,0] + 2*u[-1,1] - 2*u[-1,-1] - 2*u[-2,1])/(dx*dy) #southeast
-	u_crossup[-1,-1] = .5*( 2*u[-2,-1] + 2*u[-1,-2] - 2*u[-1,-1] - 2*u[-2,-2])/(dx*dy)#northeast
+	u_crossup[-1,0] = .5*( 2*u[-1,1] + 2*u[-2,0] - 2*u[-1,0] - 2*u[-2,1])/(dx*dy) #northwest
+	u_crossup[0,-1] = .5*( 2*u[0,-2] + 2*u[1,-1] - 2*u[-1,-1] - 2*u[1,-2])/(dx*dy) #southeast
+	u_crossup[-1,-1] = .5*( 2*u[-1,-2] + 2*u[-2,-1] - 2*u[-1,-1] - 2*u[-2,-2])/(dx*dy)#northeast
 	u_crossdown[0,0] = .5*( 2*u[0,0] + 2*u[1,1] - 2*u[1,0] - 2*u[0,1])/(dx*dy)
-	u_crossdown[0,-1] = .5*( 2*u[0,-1] + 2*u[1,-2] - 2*u[1,-1] - 2*u[0,-2])/(dx*dy)
-	u_crossdown[-1,0] = .5*( 2*u[-1,0] + 2*u[-2,1] - 2*u[-2,0] - 2*u[-1,1])/(dx*dy)
+	u_crossdown[-1,0] = .5*( 2*u[-1,0] + 2*u[-2,1] - 2*u[-1,1] - 2*u[-2,0])/(dx*dy)
+	u_crossdown[0,-1] = .5*( 2*u[0,-1] + 2*u[1,-2] - 2*u[0,-2] - 2*u[1,-1])/(dx*dy)
 	u_crossdown[-1,-1] = .5*( 2*u[-1,-1] + 2*u[-2,-2] - 2*u[-2,-1] - 2*u[-1,-2])/(dx*dy)
-	#print "Search",search
 	for i in range(scatters):
-		fpts = iF.Hamiltonian_vectorised(Search_x,Search_y,x,y,u,m,dx,dy,time,I,J,Obstacles,U_south,U_north,U_west,U_east,U_crossup,U_crossdown)
-		(xi,yi) = np.unravel_index(np.argmin(fpts),fpts.shape)
-		tmp_x,tmp_y = app.scatter_search(iF.hamiltonian,(x,y,np.ravel(u),np.ravel(m),dt,dx,dy,time,i,j,I,J,Obstacles,south,north,west,east),dxs,dys,search_x[xi,yi],search_y[xi,yi],N,scatters,xmin,xmax,ymin,ymax)
-		a1[i,j] = tmp_x
-		a2[i,j] = tmp_y
-	#print "Found optimal control!"
-	return a1,a2
+		t0 = time.time()
+		VALUEGRID = iF.Hamiltonian_vectorised(Search_x,Search_y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+		t1 = time.time()-t0
+		t0 = time.time()
+		ind0 = np.argmin(VALUEGRID,axis=0)
+		ind1,ind2,ind3 = np.indices(ind0.shape)
+		ind00 = Search_y[ind0,ind1,ind2,ind3].argmin(axis=0)
+		ind11,ind22 = np.indices(ind00.shape)
+		BESTBUYS_Y = Search_y[ind0,ind1,ind2,ind3][ind00,ind11,ind22]
+		ind1 = np.argmin(VALUEGRID,axis=1)
+		ind0,ind2,ind3 = np.indices(ind1.shape)
+		ind00 = Search_x[ind0,ind1,ind2,ind3].argmin(axis=0)
+		ind11,ind22 = np.indices(ind00.shape)
+		BESTBUYS_X = Search_x[ind0,ind1,ind2,ind3][ind00,ind11,ind22]
+		if i-1 is not scatters:
+			for j in range(Search_x.shape[2]):
+				for k in range(Search_x.shape[3]):
+					Search_x[:,:,j,k] , Search_y[:,:,j,k] = np.meshgrid( np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ay,N[0]), np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) )
+			ay = Search_y[1,0,0,0]-Search_y[0,0,0,0]
+			ax = Search_y[0,1,0,0]-Search_y[0,0,0,0]
+		t2 = time.time()-t0
+		print "Function call:", t1
+		print "The rest:", t2
+	return BESTBUYS_X,BESTBUYS_Y
 
 #def control_general_vectorised_optimised(x,time,u,m,dx,xpts_search,N,scatters):
-#	ax = xpts_search[1]-xpts_search[0]
-#	u_down = np.zeros(x.size)
-#	u_up = np.zeros(x.size)
-#	X,Xpts_search = np.meshgrid(x,xpts_search)
-#	u_down[1:] = (u[1:]-u[:-1])/dx
-#	u_up[:-1] = (u[1:]-u[:-1])/dx
-#	u_down[0] = (u[0]-u[1])/dx
-#	u_up[-1] = (u[-2]-u[-1])/dx
 #	for i in range(scatters):
 #		VALUEGRID = iF.Hamiltonian_array(Xpts_search,time,x,u_up,u_down,m,dx) #evaluate
 #		BEST_BUYS = Xpts_search[np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])] #pick least values by row
