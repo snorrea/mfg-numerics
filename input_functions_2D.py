@@ -141,6 +141,25 @@ def Hamiltonian_vectorised(ax,ay,x,y,m,dx,dy,timez,I,J,Obstacles,U_south,U_north
 	#print ss
 	return L + np.maximum(f1,zero)*U_west + np.minimum(f1,zero)*U_east + np.maximum(f2,zero)*U_south + np.minimum(f2,zero)*U_north + .5*d11*(U_east-U_west)/dx + .5*d22*(U_north-U_south)/dy + .5*np.maximum(d12,zero)*U_crossup + .5*np.minimum(d12,zero)*U_crossdown
 
+
+def Hamiltonian_derivative_vectorised(ax,ay,x,y,m,dx,dy,timez,I,J,Obstacles,U_south,U_north,U_west,U_east,U_crossup,U_crossdown,THREE_DEE): #spits out a 2D array of Hamiltonian values given arrays of inputs ax_array \times ay_array
+	#all arguments except the obvious are assumed to be two- or three-dimensional
+	zero = np.zeros(ax.shape)
+	#map everything to 3d
+	if THREE_DEE:
+		U_south = app.map_2d_to_3d(U_south,ax)
+		U_north = app.map_2d_to_3d(U_north,ax)
+		U_west = app.map_2d_to_3d(U_west,ax)
+		U_east = app.map_2d_to_3d(U_east,ax)
+		U_crossup = app.map_2d_to_3d(U_crossup,ax)
+		U_crossdown = app.map_2d_to_3d(U_crossdown,ax)
+	#print "Time to map to 4D:", time.time()-t0
+	#and do function calls
+	#print L
+	#print ss
+	return ax + ay + np.sign(np.maximum(ax,zero))*U_west + np.sign(np.minimum(ax,zero))*U_east + np.sign(np.maximum(ay,zero))*U_south + np.sign(np.minimum(ay,zero))*U_north
+	#return L + np.maximum(f1,zero)*U_west + np.minimum(f1,zero)*U_east + np.maximum(f2,zero)*U_south + np.minimum(f2,zero)*U_north
+
 ###################
 #RUNNING COST
 ###################

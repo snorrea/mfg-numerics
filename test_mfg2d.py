@@ -14,14 +14,15 @@ import scipy.interpolate as intpol
 import applications as app
 
 #INPUTS
+scatter_test = 5
 NONLINEAR = False
 PLOT_DEBUG = False
 NICE_DIFFUSION = 1
-POINTSx = 5*2 #points in x-direction
-POINTSy = 5*2 #points in y-direction
+POINTSx = 5*2*2 #points in x-direction
+POINTSy = 5*2*2 #points in y-direction
 REFINEMENTS = 1
 NITERATIONS = 1
-DT = .4#ratio as in dt = DT*dx(**2)
+DT = .1#ratio as in dt = DT*dx(**2)
 cutoff = 0 #for convergence slope
 grid = [0, 1, 0, 1]
 xmax = grid[1]
@@ -36,7 +37,7 @@ obstacle_x_min = [.0, .6]#[.0]#
 obstacle_x_max = [.4, 1.]#[.05]#
 obstacle_y_min = [.4, .4]#[.0]#
 obstacle_y_max = [.6, .6]#[.05]#
-KILL = 1 #set 0 if you don't want this to matter
+KILL = 2 #set 0 if you don't want this to matter
 
 #GOALS
 #goals_x = [.0,.1,.2,.8,.9,1.]#[.2,.4,.6,.8]
@@ -201,6 +202,7 @@ for N in range(REFINEMENTS):
 	ypts_scatter = np.linspace(alpha_lower[1],alpha_upper[1],Ns_y)
 	Ns = [Ns_x,Ns_y]
 	scatters = int(np.ceil( np.log((max(alpha_upper-alpha_lower))/(min_tol*min(Ns)))/np.log(min(Ns)/2) ))
+	#min_tol = .5*abs(max(alpha_upper-alpha_lower))*(2/min(Ns))**scatters
 	print "Scatters:",scatters,Ns
 
 	Mass = np.zeros(Nt)
@@ -213,20 +215,41 @@ for N in range(REFINEMENTS):
 		m_arr[k] = m0
 	m_last_solution = None
 
-	###################################
-	ObstacleCourse = KILL*ObstacleCourse
-	###################################
 	for ITERATION in range(NITERATIONS):
 		#m_last_solution = np.copy(m_arr[-1])
 		m_last_solution = np.copy(m_arr)
 		u = np.zeros(I*J)
+		t_naive = 0
+		t_3d = 0
+		t_4d = 0
+		t_hybrid = 0
+		t_hybrido = 0
 		for k in range(Nt-1,-1,-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
 			print k
-			m_tmp = np.copy(m_arr[k])
-			a1,a2 = opt_cont_cmfg(u)
-			#a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
-			a1,a2 = solve.control_general_vectorised(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
-			#a1,a2 = solve.control_general_vectorised(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.transpose(ObstacleCourse),south,north,west,east)
+			tBALLS = time.time()
+			for BALLS in range(scatter_test):
+				m_tmp = np.copy(m_arr[k])
+			#	a1,a2 = opt_cont_cmfg(u)
+			#	t0 = time.time()
+			#	a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
+			#	t_naive += time.time()-t0
+			#	print "Naive done"
+				t0 = time.time()
+				a1,a2 = solve.control_general_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+				t_3d += time.time()-t0
+				#print "3D done"
+			#	t0 = time.time()
+			#	a1,a2 = solve.control_general_vectorised_4D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#	t_4d += time.time()-t0
+				#print "4D done"
+				t0 = time.time()
+				a1,a2 = solve.control_hybridC_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+				t_hybrid += time.time()-t0
+				#print "HybridC done"
+				t0 = time.time()
+				a1,a2 = solve.control_hybridO_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+				t_hybrido += time.time()-t0
+				#print "HybridO done"
 			#t0 = time.time()
 			#a1_,a2_ = solve.control_general(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#t0 = time.time()-t0
@@ -274,7 +297,7 @@ for N in range(REFINEMENTS):
 				#plot it plz
 				if PLOT_DEBUG:# and k<140:
 					X,Y = np.meshgrid(x,y)
-					print u.shape
+					#print u.shape
 					fig1 = plt.figure(1)
 					ax1 = fig1.add_subplot(111, projection='3d')
 					ax1.plot_surface(X,Y,(a1),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
@@ -295,6 +318,14 @@ for N in range(REFINEMENTS):
 					fig3.suptitle("u")	
 					plt.show()
 				t2 += time.time()-t2_tmp
+			tBALLS = time.time()-tBALLS
+			print "Estimated remaining time in minutes:", tBALLS*k*scatter_test/60
+		print "Naive:", t_naive/(Nt*scatter_test)
+		print "3d:", t_3d/(Nt*scatter_test)
+		print "4d:", t_4d/(Nt*scatter_test)
+		print "Hybrid_c:", t_hybrid/(Nt*scatter_test)
+		print "Hybrid_o:", t_hybrido/(Nt*scatter_test)
+	#	print ss
 		t0 = time.time()-t0
 		print "Time spent:",t0
 		print "\tGenerating matrices:",t1/t0*100
