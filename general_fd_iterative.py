@@ -20,10 +20,10 @@ NICE_DIFFUSION = 0 #1 if diffusion indep of t,m,alpha
 LOAD_WRITE = True#True
 SHOW_ALL = True
 LOAD_LAST = False
-TEST_NAME = "mfg1d#retest#diff#damp#vectorised"
+TEST_NAME = "optimisation#3x3"
 #dx = 0.1**2/2
 dx = 1/160#0.01#0.025
-DT = .5
+DT = .2
 dt = DT*dx
 #dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
@@ -35,12 +35,12 @@ tolerance = 1e-4
 min_exp = 2
 min_coef = 0.01
 quad_order = 20
-alpha_upper = 2
-alpha_lower = -.5
+alpha_upper = 1
+alpha_lower = -1
 start_eps = .000
 deps = 0.005
 THE_DAMPENING = dx*10
-scatter_test = 20
+scatter_test = 5
 
 #STUFF TO MINIMIZE
 #min_tol = min_coef*dx**min_exp#tolerance#1e-5 #tolerance for minimum
@@ -84,7 +84,7 @@ if LOAD_WRITE and not LOAD_LAST: #load best solution with parameters
 		m = np.loadtxt("./" + TEST_NAME + "_" + dx_string + "_" + DT_string + "_" + eps_string + "_" + ".txt")
 		print "Loading successful! Plotting solution..."
 		x = np.linspace(xmin,xmax,round(abs(xmax-xmin)/best_dx+1))
-		t = np.linspace(0,T,round(abs(T)/(best_DT*best_dx))+1)
+		t = np.linspace(0,T,round(abs(T)/(best_DT*best_dx))+0)
 		Xplot,Tplot = np.meshgrid(x,t)
 		#print Xplot.shape,Tplot.shape,m.shape
 		fig1 = plt.figure(1)
@@ -123,21 +123,21 @@ if LOAD_WRITE and not LOAD_LAST: #load best solution with parameters
 				test_timer = time.time()
 				for RING in range(scatter_test):
 					print k,RING
-					t0 = time.time()
-					a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,Ns,scatters)
-					t_scatter += time.time()-t0
-					t0 = time.time()
-					a_tmp = solve.control_general_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
-					t_vector += time.time()-t0
+				#	t0 = time.time()
+				#	a_tmp = solve.control_general(x,k*dt,u_last,THE_DAMPENING_S*m_last,dt,dx,xpts_scatter,Ns,scatters)
+				#	t_scatter += time.time()-t0
+				#	t0 = time.time()
+				#	a_tmp = solve.control_general_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
+				#	t_vector += time.time()-t0
 					t0 = time.time()
 					a_tmp = solve.control_scipy(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,min_tol)
 					t_scipy += time.time()-t0
-					t0 = time.time()
-					a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
-					t_hybrid += time.time()-t0
-					t0 = time.time()
-					a_tmp2 = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
-					t_hybrido += time.time()-t0
+				#	t0 = time.time()
+				#	a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
+				#	t_hybrid += time.time()-t0
+				#	t0 = time.time()
+				#	a_tmp2 = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
+				#	t_hybrido += time.time()-t0
 				print "Estimated time remaining in minutes: %.2f" %(k*scatter_test*(time.time()-test_timer)/60)
 				#t0 = time.time()
 				#a_tmp4 = solve.control_scipy_vectorised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,min_tol)
@@ -168,11 +168,11 @@ if LOAD_WRITE and not LOAD_LAST: #load best solution with parameters
 					u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*np.ravel(Ltmp))
 				u[(k*I-I):(k*I)] = np.copy(u_tmp)
 				a[(k*I-I):(k*I)] = np.copy(a_tmp)			
-			print "Scatter:\t", t_scatter/(K*scatter_test)
-			print "Vector:\t\t",t_vector/(K*scatter_test)
-			print "Scipy:\t\t",t_scipy/(K*scatter_test)
-			print "Hybrid:\t\t",t_hybrid/(K*scatter_test)
-			print "Hybrido:\t",t_hybrido/(K*scatter_test)
+			print "Scatter:\t%.6f" %(t_scatter/(K*scatter_test))
+			print "Vector:\t\t%.6f"%(t_vector/(K*scatter_test))
+			print "Scipy:\t\t%.6f"%(t_scipy/(K*scatter_test))
+			print "Hybrid:\t\t%.6f"%(t_hybrid/(K*scatter_test))
+			print "Hybrido:\t%.6f"%(t_hybrido/(K*scatter_test))
 			print ss
 			fig2 = plt.figure(2)
 			#ax2 = fig2.add_subplot(111, projection='3d')
@@ -308,6 +308,7 @@ kMax = 0
 m_best = np.copy(m)
 
 total_time2 = time.time()
+print "Commence computing!"
 for NN in range(epses):
 	#eps_thing = np.linspace(epsel[NN],0,Nt)
 	#eps_thing = np.linspace(0,epsel[NN],Nt)
@@ -330,7 +331,8 @@ for NN in range(epses):
 			#a_tmp = solve.control_general_vectorised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,scatters) #hybrid
 			#a_tmp = solve.control_general_vectorised_optimised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,scatters) #hybrid
 			#a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
-			a_tmp = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters,min_tol) #hybrid
+			a_tmp = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
+			print k
 			#print a_tmp
 			#print ss
 			#print time.time()-t0
@@ -342,6 +344,7 @@ for NN in range(epses):
 				#RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
 				#u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*np.ravel(Ltmp))
 				u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)))
+				#u_tmp = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)) #no diffusion
 				#u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING)))
 			else:
 				if n==0 and k==K-1:
@@ -352,6 +355,7 @@ for NN in range(epses):
 				Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)
 				#Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,10*dx) #scaled
 				u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*Ltmp)
+				#u_tmp 
 			u[(k*I-I):(k*I)] = np.copy(u_tmp)
 			a[(k*I-I):(k*I)] = np.copy(a_tmp)
 		

@@ -14,7 +14,7 @@ import scipy.interpolate as intpol
 import applications as app
 
 #INPUTS
-scatter_test = 5
+scatter_test = 2
 NONLINEAR = False
 PLOT_DEBUG = False
 NICE_DIFFUSION = 1
@@ -22,7 +22,7 @@ POINTSx = 5*2*2 #points in x-direction
 POINTSy = 5*2*2 #points in y-direction
 REFINEMENTS = 1
 NITERATIONS = 1
-DT = .1#ratio as in dt = DT*dx(**2)
+DT = .2#ratio as in dt = DT*dx(**2)
 cutoff = 0 #for convergence slope
 grid = [0, 1, 0, 1]
 xmax = grid[1]
@@ -71,8 +71,8 @@ conv_plot_m = np.zeros(NITERATIONS)
 
 #Searching stuff
 min_tol = 1e-6#tolerance#1e-5 #tolerance for minimum
-alpha_upper = np.array([1, 1]) #search region left
-alpha_lower = np.array([-1, -1]) #search region right
+alpha_upper = np.array([3, 3]) #search region left
+alpha_lower = np.array([-3, -3]) #search region right
 
 def opt_cont_cmfg(u):
 	ush = np.transpose(np.reshape(u,(I,J)))
@@ -201,7 +201,8 @@ for N in range(REFINEMENTS):
 	xpts_scatter = np.linspace(alpha_lower[0],alpha_upper[0],Ns_x)
 	ypts_scatter = np.linspace(alpha_lower[1],alpha_upper[1],Ns_y)
 	Ns = [Ns_x,Ns_y]
-	scatters = int(np.ceil( np.log((max(alpha_upper-alpha_lower))/(min_tol*min(Ns)))/np.log(min(Ns)/2) ))
+	#scatters = int(np.ceil( np.log((max(alpha_upper-alpha_lower))/(min_tol*min(Ns)))/np.log(min(Ns)/2) ))
+	scatters = 4
 	#min_tol = .5*abs(max(alpha_upper-alpha_lower))*(2/min(Ns))**scatters
 	print "Scatters:",scatters,Ns
 
@@ -230,26 +231,26 @@ for N in range(REFINEMENTS):
 			for BALLS in range(scatter_test):
 				m_tmp = np.copy(m_arr[k])
 			#	a1,a2 = opt_cont_cmfg(u)
-			#	t0 = time.time()
-			#	a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
-			#	t_naive += time.time()-t0
-			#	print "Naive done"
 				t0 = time.time()
-				a1,a2 = solve.control_general_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
-				t_3d += time.time()-t0
-				#print "3D done"
+				a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
+				t_naive += time.time()-t0
+				print "Naive done"
+			#	t0 = time.time()
+			#	a1,a2 = solve.control_general_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#	t_3d += time.time()-t0
+			#	print "3D done"
 			#	t0 = time.time()
 			#	a1,a2 = solve.control_general_vectorised_4D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#	t_4d += time.time()-t0
-				#print "4D done"
-				t0 = time.time()
-				a1,a2 = solve.control_hybridC_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
-				t_hybrid += time.time()-t0
-				#print "HybridC done"
-				t0 = time.time()
-				a1,a2 = solve.control_hybridO_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
-				t_hybrido += time.time()-t0
-				#print "HybridO done"
+			#	print "4D done"
+			#	t0 = time.time()
+			#	a1,a2 = solve.control_hybridC_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#	t_hybrid += time.time()-t0
+			#	print "HybridC done"
+			#	t0 = time.time()
+			#	a1,a2 = solve.control_hybridO_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#	t_hybrido += time.time()-t0
+			#	print "HybridO done"
 			#t0 = time.time()
 			#a1_,a2_ = solve.control_general(xpts_scatter,xpts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#t0 = time.time()-t0
@@ -320,12 +321,12 @@ for N in range(REFINEMENTS):
 				t2 += time.time()-t2_tmp
 			tBALLS = time.time()-tBALLS
 			print "Estimated remaining time in minutes:", tBALLS*k*scatter_test/60
-		print "Naive:", t_naive/(Nt*scatter_test)
-		print "3d:", t_3d/(Nt*scatter_test)
-		print "4d:", t_4d/(Nt*scatter_test)
-		print "Hybrid_c:", t_hybrid/(Nt*scatter_test)
-		print "Hybrid_o:", t_hybrido/(Nt*scatter_test)
-	#	print ss
+		print "Naive: %.6f" % (t_naive/(Nt*scatter_test))
+		print "4d: %.6f" % (t_4d/(Nt*scatter_test))
+		print "3d: %.6f" % (t_3d/(Nt*scatter_test))
+		print "Hybrid_c: %.6f" % (t_hybrid/(Nt*scatter_test))
+		print "Hybrid_o: %.6f" % (t_hybrido/(Nt*scatter_test))
+		print ss
 		t0 = time.time()-t0
 		print "Time spent:",t0
 		print "\tGenerating matrices:",t1/t0*100
