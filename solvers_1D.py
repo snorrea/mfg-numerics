@@ -200,11 +200,18 @@ def control_general_vectorised(x,time,u,m,dx,xpts_search,N,scatters):
 	for i in range(scatters):
 		VALUEGRID = iF.Hamiltonian_array(Xpts_search,time,x,u_up,u_down,m,dx) #evaluate
 		BEST_BUYS = Xpts_search[np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])] #pick least values by row
+		#print ss
+	#	fig1 = plt.figure(1)
+	#	plot_ind = 0
+	#	plt.plot(Xpts_search[:,plot_ind],VALUEGRID[:,plot_ind])
+	#	plt.plot(BEST_BUYS[plot_ind],iF.Hamiltonian_array(BEST_BUYS[plot_ind],time,x[plot_ind],u_up[plot_ind],u_down[plot_ind],m[plot_ind],dx),'*')
+	#	plt.show()
 		if i-1 is not scatters:
 			for j in range(BEST_BUYS.size):
 				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax,BEST_BUYS[j]+ax,N)
 			#Xpts_search[:,range(BEST_BUYS.size)] = np.transpose([np.linspace(BEST_BUYS[j]-ax,BEST_BUYS[j]+ax,N) for j in range(BEST_BUYS.size)])
 			ax = Xpts_search[1,0]-Xpts_search[0,0]
+	
 	return BEST_BUYS
 
 def control_hybrid_vectorised(x,timez,u,m,dx,xpts_search,N,scatters): #does pretty much the same as the others

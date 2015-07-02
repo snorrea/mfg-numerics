@@ -203,6 +203,7 @@ def Hamiltonian_array(alphas,time,x,U_up,U_down,m,dx):
 	#for every value in alphas, give a 2D array for the entire x-alpha plane
 	#assumes that alphas,x are meshgrid'ed
 	s2 = Sigma_global(time,x,alphas)**2
+	#print x.shape,alphas.shape
 	f = f_global(time,x,alphas)
 	L = L_global(time,x,alphas,m,dx)
 	dx2 = dx**2
@@ -263,7 +264,7 @@ def L_global(time,x_array,a_array,m_array,damp): #general cost
 	#one = np.ones(x_array.size)
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
 	#return np.exp(-time)*abs(x_array) + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
-	return (0.5*a_array**2+.4*x_array)/(1+.1*m_array*damp) + 2*powerbill(time)*(1-.95*x_array)
+	return (0.5*a_array**2+.4*x_array)/(1+m_array*damp) + 2*powerbill(time)*(1-.95*x_array)
 	#return (0.5*a_array**2+.4*x_array) + 2*powerbill(time)*(1-.95*x_array)
 	#return 0.5*a_array**2 + F_global(x_array,m_array,time,damp) #HJB test and "nice" MFG
 	
@@ -275,14 +276,23 @@ def f_global(time,x_array,a_array):
 	#print x_array.shape,a_array.shape
 	#print type(a_array)
 	#print a_array
-	if isinstance(a_array, numpy.float64):
-		return max(a_array,0)*np.exp(-time) + min(a_array,0)*0.1
+	if isinstance(a_array, np.float64):
+		#return max(a_array,0)*np.exp(-time) + min(a_array,0)*0.1
+		return max(a_array,0)*(1-0.5*np.sin(np.pi*time)-0.25*x_array) + min(a_array,0)*0.1
 	output = np.zeros(a_array.shape)
 	#print output.shape
 	pos_ind = np.nonzero(np.maximum(np.sign(a_array),output))
 	neg_ind = np.nonzero(np.minimum(np.sign(a_array),output))
-	output[pos_ind] = a_array[pos_ind]*np.exp(-time)
-	output[neg_ind] = .1*a_array[neg_ind]
+	#print "Here goes"
+	#print a_array
+	#print pos_ind
+	if pos_ind[0].size is not 0:
+		if len(pos_ind)==2:
+			output[pos_ind] = a_array[pos_ind]*(1-0.5*np.sin(np.pi*time)-0.25*x_array[pos_ind[1]])
+		else:
+			output[pos_ind] = a_array[pos_ind]*(1-0.5*np.sin(np.pi*time)-0.25*x_array[pos_ind])
+	if neg_ind[0].size is not 0:
+		output[neg_ind] = .1*a_array[neg_ind]
 	#tmp = np.maximum(np.sign(a_array),output) 
 	#for i in range(0,output.size):
 	#	if a_array[i]>=0:
@@ -292,7 +302,7 @@ def f_global(time,x_array,a_array):
 	#print output
 	#print ss
 	return output
-	#return a_array #standard MFG, HJB test
+#	return a_array #standard MFG, HJB test
 
 def Sigma_global(time,x_array,a_array): #any of these will do for the HJB test
 	#return 0.*x_array
@@ -300,7 +310,7 @@ def Sigma_global(time,x_array,a_array): #any of these will do for the HJB test
 	#return 0.1*x_array+(1-x_array)*0.3
 	#one = np.ones(x_array.size)
 	#return .05*one
-	return 0.1*abs(a_array)
+	return 0.1*abs(a_array)+0.01
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
 	#return 0.5*a_array**2# + xenophobia #brutal test
 	#return .1*np.ones(x_array.size)
@@ -339,7 +349,8 @@ def Hamiltonian_Derivative_vectorised(alphas,time,x,u_up,u_down,m,dx):
 	#f = f_global(time,x,alphas)
 	#L = L_global(time,x,alphas,m,dx)
 	zero = np.zeros(alphas.shape)
-	return alphas/(1+0.1*m) + np.exp(-time)*u_down*np.maximum(np.sign(alphas),zero) + .1*u_up*np.minimum(np.sign(alphas),zero) + .01*alphas*(u_up-u_down)/dx 
+	#return alphas + u_down*np.maximum(np.sign(alphas),zero) + u_up*np.minimum(np.sign(alphas),zero) #isolation game, cmfg
+	return alphas/(1+0.1*m) + np.exp(-time)*u_down*np.maximum(np.sign(alphas),zero) + .1*u_up*np.minimum(np.sign(alphas),zero) + .01*alphas*(u_up-u_down)/dx  #isolation game, mfg
 
 #def max_or_if(val,valif):
 #	if valif>0:

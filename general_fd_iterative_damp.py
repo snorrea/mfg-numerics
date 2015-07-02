@@ -16,25 +16,26 @@ import scipy.interpolate as intpol
 import glob,os,sys
 
 #INPUTS
-NICE_DIFFUSION = 1 #1 if diffusion indep of t,m,alpha
-LOAD_WRITE = False#True
+NICE_DIFFUSION = 0 #1 if diffusion indep of t,m,alpha
+TESTNAME = "mfg1d#finaltest#damp"
+LOAD_WRITE = True#True
 BETTER = False
 #dx = 0.1**2/2
-dx = 1/10#0.01#0.025
-DT = .001
+dx = 1/40#0.01#0.025
+DT = .25
 dt = DT*dx
 #dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
 xmin = 0#-2
 xmax = 1#+.2
 T = 1
-Niter = 1000#5000 #maximum number of iterations
+Niter = 400#5000 #maximum number of iterations
 tolerance = 1e-4
 quad_order = 20
 alpha_upper = 3
 alpha_lower = -3
-start_eps = .001
-deps = 0.001
+start_eps = dx
+deps = dx*2
 
 
 if LOAD_WRITE: #load best solution with parameters
@@ -46,20 +47,20 @@ if LOAD_WRITE: #load best solution with parameters
 		pop_dx = float(pop[1])
 		pop_DT = float(pop[2])
 		pop_eps = float(pop[3])
-		if abs(pop_dx-dx)<1e-6 and pop_DT==DT and pop[0]=="damp":
+		if abs(pop_dx-dx)<1e-6 and pop_DT==DT and pop[0]==TESTNAME:
 			print "Pepe",pop_eps
 			if pop_eps > best_eps:
 				best_dx = pop_dx
 				best_DT = pop_DT
 				best_eps = pop_eps
 	if best_eps is not -1 and start_eps < best_eps:
-		start_eps = best_eps+deps
+		start_eps = min(1,best_eps+deps)
 		BETTER = True
 		dx_string = "%.8f" % best_dx
 		DT_string = "%.8f" % best_DT
 		eps_string = "%.8f" % best_eps
 		print "Loading previous computation result..."
-		m = np.loadtxt("./damp_" + dx_string + "_" + DT_string + "_" + eps_string + "_" + ".txt")
+		m = np.loadtxt("./" + TESTNAME + "_" + dx_string + "_" + DT_string + "_" + eps_string + "_" + ".txt")
 		print "Loading successful! Plotting solution..."
 		x = np.linspace(xmin,xmax,round(abs(xmax-xmin)/best_dx+1))
 		t = np.linspace(0,T,round(abs(T)/(best_DT*best_dx)+1))
@@ -67,7 +68,6 @@ if LOAD_WRITE: #load best solution with parameters
 		print best_dx,best_DT,best_eps
 		print (1/best_dx+1), (1/(1/40)+1), (1/(best_DT*best_dx)+1)
 		print x.size,t.size,x.size*t.size,m.shape
-		print "cocksucker"
 		print Xplot.shape, Tplot.shape, np.reshape(m,(t.size,x.size)).shape
 		fig1 = plt.figure(1)
 		ax1 = fig1.add_subplot(111, projection='3d')
@@ -93,13 +93,14 @@ print epsel
 #print ss
 
 #STUFF TO MINIMIZE
-min_tol = 0.01*dx**2#tolerance#1e-5 #tolerance for minimum
+min_tol = 1e-6#0.01*dx**2#tolerance#1e-5 #tolerance for minimum
 min_left = alpha_lower #search region left
 min_right = alpha_upper #search region right
-Ns = int(np.ceil(abs(alpha_upper-alpha_lower)/(dx)) + 1)
+Ns = int(np.ceil(abs(alpha_upper-alpha_lower)/(.5*dx)) + 1)
 xpts_scatter = np.linspace(alpha_lower,alpha_upper,Ns)
 scatters = int(np.ceil( np.log((alpha_upper-alpha_lower)/(min_tol*Ns))/np.log(Ns/2) ))
-	
+#scatters = 4
+
 dx_scatter = xpts_scatter[1]-xpts_scatter[0]
 print scatters
 #print ss
@@ -175,13 +176,20 @@ for NN in range(epses):
 		for k in range (K-1,0,-1):  #this is how it has to be...
 			u_last = np.copy(u[((k+1)*I-I):((k+1)*I)]) #this one to keep
 			m_last = np.copy(m[((k+1)*I-I):((k+1)*I)]) #only actually need this, amirite?
-			a_tmp = -np.gradient(u[((k+1)*I-I):((k+1)*I)],dx)
+			a_tmp = solve.control_general_vectorised(x,k*dt,u_last,epsel[NN]*m_last,dx,xpts_scatter,Ns,scatters)
+			#a_tmp = solve.control_general_vectorised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,scatters)
+			#a_tmp = -np.gradient(u[((k+1)*I-I):((k+1)*I)],dx)
 			#a_tmp = iF.opt_cmfg(u[((k+1)*I-I):((k+1)*I)],dx)
 			#a_tmp = iF.mollify_array(a_tmp,epsel[NN],x,gll_x,gll_w)
 			#a_tmp = np.maximum(-np.gradient(u_last,dx),np.zeros(u_last.size))
 			#a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,Ns,scatters) #hybrid
 			if NICE_DIFFUSION==0:
-				u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,a_tmp,dt,dx) #implicit
+				#LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,1-epsel[NN])
+				LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,0)
+				RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
+				Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,epsel[NN])
+				u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*Ltmp)
+				#u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,a_tmp,dt,dx) #implicit
 			else:
 				#if n==0 and k==K-1:
 				#	LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
@@ -215,7 +223,10 @@ for NN in range(epses):
 			a_tmp = a[(k*I):(k*I+I)]
 			m_tmp = m[(k*I):(k*I+I)]
 			if NICE_DIFFUSION==0:
-				m_update = solve.fp_fv(x,k*dt,a_tmp,dt,dx)
+				#LHS_FP = mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,1-epsel[NN])
+				LHS_FP = mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,0)
+				RHS_FP = mg.fp_fv_convection_interpol(k*dt,x,a_tmp,dt,dx)
+				m_update = sparse.linalg.spsolve(LHS_FP,RHS_FP*m_tmp)
 			else:
 				#if n==0 and k==0:
 				#	LHS_FP = mg.fp_fv_diffusion(0,x,a_tmp,dt,dx)
@@ -260,14 +271,16 @@ if LOAD_WRITE: #load best solution with parameters
 		dx_string = "%.8f" % dx
 		dt_string = "%.8f" % DT
 		eps_string = "0"
-		filename = "damp_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
+		#filename = "damp_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
+		filename = "./" + TESTNAME + "_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
 		np.savetxt(filename, m_best, fmt='%.18e', delimiter=' ', newline='\n', header='', footer='', comments='# ')
 	else: #write NN-1 to file
 		#check if other files with these parameters exist
 		dx_string = "%.8f" % dx
 		dt_string = "%.8f" % DT
 		eps_string = "%.8f" % epsel[NN-1]
-		filename = "damp_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
+		#filename = "damp_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
+		filename = "./" + TESTNAME + "_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
 		np.savetxt(filename, m_best, fmt='%.18e', delimiter=' ', newline='\n', header='', footer='', comments='# ')
 
 M_ends = M_ends[:,:(NN+1)]
