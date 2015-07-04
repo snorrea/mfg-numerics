@@ -224,7 +224,7 @@ def tau_second_order(alpha,i,v_array,x_array,dt,noise):
 #RUNNING COST
 ###################
 def F_global(x_array,m_array,time,damp): #more effective running cost function
-	#return (x_array-0.5)**2 #Carlini's no-game
+	return (x_array-0.5)**2 #Carlini's no-game
 	#dx=1
 	#tau = 1
 	#omega = 1
@@ -244,7 +244,7 @@ def F_global(x_array,m_array,time,damp): #more effective running cost function
 	#plt.show()
 	#return m_array #shyness game
 	#return .1*m_array/sum(m_array) #modified shyness game
-	return 2*powerbill(time)*(1-.95*x_array)+ .4*x_array/((1+damp*m_array)**(1.))
+	#return 2*powerbill(time)*(1-.95*x_array)+ .4*x_array/((1+damp*m_array)**(1.))
 	#return 0*x_array#no-game
 
 def powerbill(time):
@@ -265,7 +265,7 @@ def L_global(time,x_array,a_array,m_array,damp): #general cost
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), one )
 	#return np.exp(-time)*abs(x_array) + 0.5*a_array**2 - 0.2*a_array# +xenophobia#brutal test
 	return (0.5*a_array**2+.4*x_array)/(1+m_array*damp) + 2*powerbill(time)*(1-.95*x_array)
-	#return (0.5*a_array**2+.4*x_array) + 2*powerbill(time)*(1-.95*x_array)
+	#return (a_array**2+.4*x_array)/(1+m_array*damp) + 2*powerbill(time)*(1-.95*x_array)
 	#return 0.5*a_array**2 + F_global(x_array,m_array,time,damp) #HJB test and "nice" MFG
 	
 def f_global(time,x_array,a_array):
@@ -276,6 +276,7 @@ def f_global(time,x_array,a_array):
 	#print x_array.shape,a_array.shape
 	#print type(a_array)
 	#print a_array
+	#return a_array
 	if isinstance(a_array, np.float64):
 		#return max(a_array,0)*np.exp(-time) + min(a_array,0)*0.1
 		return max(a_array,0)*(1-0.5*np.sin(np.pi*time)-0.25*x_array) + min(a_array,0)*0.1
@@ -310,7 +311,8 @@ def Sigma_global(time,x_array,a_array): #any of these will do for the HJB test
 	#return 0.1*x_array+(1-x_array)*0.3
 	#one = np.ones(x_array.size)
 	#return .05*one
-	return 0.1*abs(a_array)+0.1
+	#return 0.1*abs(a_array)#+0.1 #mfg1d
+	return 0.1*(1+(1-x_array)*abs(a_array))#+0.1 #mfg1d
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
 	#return 0.5*a_array**2# + xenophobia #brutal test
 	#return .1*np.ones(x_array.size)

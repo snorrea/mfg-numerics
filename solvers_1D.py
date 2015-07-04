@@ -195,17 +195,25 @@ def control_general_vectorised(x,time,u,m,dx,xpts_search,N,scatters):
 	X,Xpts_search = np.meshgrid(x,xpts_search)
 	u_down[1:] = (u[1:]-u[:-1])/dx
 	u_up[:-1] = (u[1:]-u[:-1])/dx
-	u_down[0] = (u[0]-u[1])/dx
-	u_up[-1] = (u[-2]-u[-1])/dx
+	u_down[0] = u_down[1]#(u[0]-u[1])/dx
+	u_up[-1] = u_up[-2]#(u[-2]-u[-1])/dx
 	for i in range(scatters):
 		VALUEGRID = iF.Hamiltonian_array(Xpts_search,time,x,u_up,u_down,m,dx) #evaluate
 		BEST_BUYS = Xpts_search[np.argmin(VALUEGRID,axis=0),range(0,VALUEGRID.shape[1])] #pick least values by row
 		#print ss
-	#	fig1 = plt.figure(1)
-	#	plot_ind = 0
-	#	plt.plot(Xpts_search[:,plot_ind],VALUEGRID[:,plot_ind])
-	#	plt.plot(BEST_BUYS[plot_ind],iF.Hamiltonian_array(BEST_BUYS[plot_ind],time,x[plot_ind],u_up[plot_ind],u_down[plot_ind],m[plot_ind],dx),'*')
-	#	plt.show()
+		if time<0.2 and i==0 and False:
+			fig1 = plt.figure(1)
+			plot_ind = 0
+			plt.plot(Xpts_search[:,plot_ind],VALUEGRID[:,plot_ind])
+			plt.plot(BEST_BUYS[plot_ind],iF.Hamiltonian_array(BEST_BUYS[plot_ind],time,x[plot_ind],u_up[plot_ind],u_down[plot_ind],m[plot_ind],dx),'*')
+			fig2 = plt.figure(2)
+			plt.plot(x,u,label="u")
+			plt.plot(x,u_up,label="u_up")
+			plt.plot(x,u_down,label="u_down")
+			plt.plot(x,(u_up-u_down),label="u_xx")
+			plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+			plt.show()
+			
 		if i-1 is not scatters:
 			for j in range(BEST_BUYS.size):
 				Xpts_search[:,j] = np.linspace(BEST_BUYS[j]-ax,BEST_BUYS[j]+ax,N)

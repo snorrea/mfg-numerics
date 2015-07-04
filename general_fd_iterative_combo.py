@@ -18,35 +18,36 @@ import scipy.interpolate as intpol
 #INPUTS
 NICE_DIFFUSION = 0 #1 if diffusion indep of t,m,alpha
 LOAD_WRITE = True#True
-SHOW_ALL = True #print last solutions
+SHOW_ALL = False #print last solutions
 LOAD_LAST = False
-TEST_NAME = "mfg1d#finaltests#try1337"
+TEST_NAME = "mfg1d#finaltests#combo#try1337"
 #dx = 0.1**2/2
-dx = 1/10#1280#0.01#0.025
+dx = 1/80#1280#0.01#0.025
 DT = .5
 dt = DT*dx
+#dt = dx**2/(0.3**2 + dx*2) # dt = dx**2/(max(sigma)**2 + dx*max(f))
 print dx,dt
 xmin = 0#-2
 xmax = 1#+.2
 T = 1
 Niter = 200#5000 #maximum number of iterations
 tolerance = 1e-4
-min_exp = 3
+min_exp = 2
 min_coef = 0.01
 quad_order = 20
-alpha_upper = 1
-alpha_lower = -1
-start_eps = .00
-deps = .025
-THE_DAMPENING = 1#dx*10
-scatter_test = 1
+alpha_upper = 5.5
+alpha_lower = -.5
+start_eps = .05
+deps = .01#1
+start_damp = .5#dx*10
+ddamp = dx*10
 
 #STUFF TO MINIMIZE
 #min_tol = min_coef*dx**min_exp#tolerance#1e-5 #tolerance for minimum
 min_tol = min_coef*dx*min_exp
 min_left = alpha_lower #search region left
 min_right = alpha_upper #search region right
-Ns = int(np.ceil(abs(alpha_upper-alpha_lower)/(1*dx)) + 1)
+Ns = int(np.ceil(abs(alpha_upper-alpha_lower)/(1.*dx)) + 1)
 xpts_scatter = np.linspace(alpha_lower,alpha_upper,Ns)
 scatters = 2
 min_tol = .5*abs(alpha_upper-alpha_lower)*(2/Ns)**scatters
@@ -60,27 +61,36 @@ if LOAD_WRITE and not LOAD_LAST: #load best solution with parameters
 	best_dx = None
 	best_DT = None
 	best_eps = 42
+	best_damp = 0
 	for file in glob.glob("*.txt"):
 		pop = file.split("_")
 		pop_dx = float(pop[1])
 		pop_DT = float(pop[2])
 		pop_eps = float(pop[3])
+		if pop[4] != ".txt":
+			pop_damp = float(pop[4])
+		else:
+			pop_damp = None
 		if abs(pop_dx-dx)<1e-8 and pop_DT==DT and pop[0]==TEST_NAME:
 			if pop_eps < best_eps:
 				best_dx = pop_dx
 				best_DT = pop_DT
 				best_eps = pop_eps
+				if pop_damp > best_damp:
+					best_damp = pop_damp
 	if best_eps is not 42 and start_eps >= best_eps:
-		start_eps = max(0,best_eps-deps)
+		start_eps = .05#max(0,best_eps-deps)
+		start_damp = min(1,best_damp+ddamp)
 		BETTER = True
 		dx_string = "%.8f" % best_dx
 		DT_string = "%.8f" % best_DT
+		damp_string = "%.8f" % best_damp
 		if best_eps==0:
 			eps_string = "0"
 		else:
 			eps_string = "%.8f" % best_eps
 		print "Loading previous computation result..."
-		m = np.loadtxt("./" + TEST_NAME + "_" + dx_string + "_" + DT_string + "_" + eps_string + "_" + ".txt")
+		m = np.loadtxt("./" + TEST_NAME + "_" + dx_string + "_" + DT_string + "_" + eps_string + "_" + damp_string + "_" + ".txt")
 		print "Loading successful! Plotting solution..."
 		x = np.linspace(xmin,xmax,round(abs(xmax-xmin)/best_dx+1))
 		t = np.linspace(0,T,round(abs(T)/(best_DT*best_dx))+1)
@@ -103,64 +113,38 @@ if LOAD_WRITE and not LOAD_LAST: #load best solution with parameters
 		cbar = plt.colorbar(fig1)
 		if SHOW_ALL:
 			I = x.size
-			if THE_DAMPENING is not 1:
-				THE_DAMPENING_S = np.ones(x.size)*THE_DAMPENING
-				THE_DAMPENING_S[0] = .5*THE_DAMPENING_S[0]
-				THE_DAMPENING_S[-1] = .5*THE_DAMPENING_S[-1]
-			else:
-				THE_DAMPENING_S = np.ones(x.size) #do nothing
 			K = t.size
 			u = np.zeros((I*K)) #potential
 			a = np.zeros((I*K))
 			u[I*K-I:I*K] = iF.G(x,x)
-			t_scatter = 0
-			t_vector = 0
-			t_scipy = 0
-			t_hybrid = 0
-			t_hybrido = 0
 			for k in range (K-1,0,-1):  #this is how it has to be...
 				u_last = np.copy(u[((k+1)*I-I):((k+1)*I)])
 				m_last = np.copy(m[((k+1)*I-I):((k+1)*I)])
 				#a_tmp = -np.gradient(u[((k+1)*I-I):((k+1)*I)],dx)
-				test_timer = time.time()
-				for RING in range(scatter_test):
-				#	a_tmp = -np.gradient(u[((k+1)*I-I):((k+1)*I)],dx)
-				#	print k,RING
-				#	t0 = time.time()
-				#	a_tmp = solve.control_general(x,k*dt,u_last,THE_DAMPENING_S*m_last,dt,dx,xpts_scatter,Ns,scatters)
-				#	t_scatter += time.time()-t0
-				#	t0 = time.time()
-					a_tmp = solve.control_general_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
-				#	t_vector += time.time()-t0
-				#	t0 = time.time()
-				#	a_tmp = solve.control_scipy(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,min_tol)
-				#	t_scipy += time.time()-t0
-				#	t0 = time.time()
-				#	a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
-				#	t_hybrid += time.time()-t0
-				#	t0 = time.time()
-				#	a_tmp = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
-				#	t_hybrido += time.time()-t0
-				#print "Estimated time remaining in minutes: %.2f" %(k*scatter_test*(time.time()-test_timer)/60)
-				#t0 = time.time()
-				#a_tmp4 = solve.control_scipy_vectorised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,min_tol)
-				#print "Scipy_vectorised:\t\t", time.time()-t0
-				#print sum(abs(a_tmp-a_tmp2))#*dx
-				#print sum(a_tmp1-a_tmp3)
-				#print sum(a_tmp1-a_tmp4)
-				#print sum(a_tmp2-a_tmp3)
-				#print sum(a_tmp2-a_tmp4)
-				#print sum(a_tmp3-a_tmp4)
-				#print a_tmp
-				#print ss
-				#a_tmp = a_tmp2
+			#	a_tmp = -np.gradient(u[((k+1)*I-I):((k+1)*I)],dx)
+			#	print k,RING
+			#	t0 = time.time()
+			#	a_tmp = solve.control_general(x,k*dt,u_last,THE_DAMPENING_S*m_last,dt,dx,xpts_scatter,Ns,scatters)
+			#	t_scatter += time.time()-t0
+			#	t0 = time.time()
+				a_tmp = solve.control_general_vectorised(x,k*dt,u_last,best_damp*m_last,dx,xpts_scatter,Ns,scatters)
+			#	t_vector += time.time()-t0
+			#	t0 = time.time()
+			#	a_tmp = solve.control_scipy(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,min_tol)
+			#	t_scipy += time.time()-t0
+			#	t0 = time.time()
+			#	a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
+			#	t_hybrid += time.time()-t0
+			#	t0 = time.time()
+			#	a_tmp = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters)
+			#	t_hybrido += time.time()-t0
 				if NICE_DIFFUSION==0:
 					#u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,a_tmp,dt,dx) #implicit
 					#LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
 					#Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,1)
 					#RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
 					#u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*np.ravel(Ltmp))
-					u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)))
+					u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,best_damp)))
 					#u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING)))
 				else:
 					if k==K-1:
@@ -248,6 +232,13 @@ epsel = start_eps*np.linspace(1,0,epses)**1
 print epsel.size
 print epsel
 
+dampses = int(np.round((1-start_damp)/ddamp))+1
+#epses = 40
+dampsel = np.linspace(start_damp,1,dampses)**1
+
+#print epsel
+#print ss
+
 
 	
 dx_scatter = xpts_scatter[1]-xpts_scatter[0]
@@ -263,26 +254,20 @@ I = x.size #space
 K = t.size #time
 gll_x = qn.GLL_points(quad_order) #quadrature nodes
 gll_w = qn.GLL_weights(quad_order,gll_x) #quadrature weights
-if THE_DAMPENING is not 1:
-	THE_DAMPENING_S = np.ones(x.size)*THE_DAMPENING
-	THE_DAMPENING_S[0] = .5*THE_DAMPENING_S[0]
-	THE_DAMPENING_S[-1] = .5*THE_DAMPENING_S[-1]
-else:
-	THE_DAMPENING_S = np.ones(x.size) #do nothing
 #INITIALISE STORAGE
 u = np.zeros((I*K)) #potential
 a = np.zeros((I*K)) #control
 u_old = np.zeros((I*K))
 a_old = np.zeros((I*K))
-ul1 = -1*np.ones((Niter*epses,1))
-ul2 = -1*np.ones((Niter*epses,1))
-ulinfty = -1*np.ones((Niter*epses,1))
-ml1 = -1*np.ones((Niter*epses,1))
-ml2 = -1*np.ones((Niter*epses,1))
-mlinfty = -1*np.ones((Niter*epses,1))
-al1 = -1*np.ones((Niter*epses,1))
-al2 = -1*np.ones((Niter*epses,1))
-alinfty = -1*np.ones((Niter*epses,1))
+ul1 = -1*np.ones((Niter*epses*dampses,1))
+ul2 = -1*np.ones((Niter*epses*dampses,1))
+ulinfty = -1*np.ones((Niter*epses*dampses,1))
+ml1 = -1*np.ones((Niter*epses*dampses,1))
+ml2 = -1*np.ones((Niter*epses*dampses,1))
+mlinfty = -1*np.ones((Niter*epses*dampses,1))
+al1 = -1*np.ones((Niter*epses*dampses,1))
+al2 = -1*np.ones((Niter*epses*dampses,1))
+alinfty = -1*np.ones((Niter*epses*dampses,1))
 def index(i,k): 
 	return int(i+(I)*k)
 Xplot, Tplot = np.meshgrid(x,t)
@@ -316,130 +301,115 @@ m_best = np.copy(m)
 total_time2 = time.time()
 print "Commence computing!"
 for NN in range(epses):
-	#eps_thing = np.linspace(epsel[NN],0,Nt)
-	#eps_thing = np.linspace(0,epsel[NN],Nt)
-	for n in range (0,Niter):
-		titer = time.time()
-		#print "Computing iteration",n+1,"of u..."
-		temptime = time.time()
-		#Compute u
-		u[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)])
-		#print u[]
-		for k in range (K-1,0,-1):  #this is how it has to be...
-			u_last = np.copy(u[((k+1)*I-I):((k+1)*I)]) #this one to keep
-			#print u_last[0]==u_last[1]
-			#print u_last[-1]==u_last[-2]
-			m_last = np.copy(m[((k+1)*I-I):((k+1)*I)]) #only actually need this, amirite?
-			#a_tmp = -np.gradient(u[((k+1)*I-I):((k+1)*I)],dx)
-			#a_tmp = iF.opt_cmfg(u[((k+1)*I-I):((k+1)*I)],dx)
-			#a_tmp = iF.mollify_array(a_tmp,epsel[NN],x,gll_x,gll_w)
-			#a_tmp = np.maximum(-np.gradient(u_last,dx),np.zeros(u_last.size))
-			#t0 = time.time()	
-			#a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,Ns,scatters) #hybrid
-			a_tmp = solve.control_general_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
-			#a_tmp = solve.control_general_vectorised_optimised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,scatters) #hybrid
-			#a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
-			#a_tmp = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
-			#print k
-			#print a_tmp
-			#print ss
-			#print time.time()-t0
-			#print ss
-			if NICE_DIFFUSION==0:
-				#u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,a_tmp,dt,dx) #implicit
-				#LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
-				#Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,1)
-				#RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
-				#u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*np.ravel(Ltmp))
-				LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN])
-				RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
-				#print RHS_HJB.sum(axis=0)
-				Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)
-				#Ltmp[0] = Ltmp[1]
-				#Ltmp[-1] = Ltmp[-2]
-				u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*Ltmp)
-				#print u_tmp[0] == u_tmp[1],u_tmp[-1] == u_tmp[-2]
-				#u_tmp[0] = u_tmp[1]
-				#u_tmp[-1] = u_tmp[-2]
-				#u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)))
-				#u_tmp = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)) #no diffusion
-				#u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING)))
-			else:
-				if n==0 and k==K-1:
+	for KK in range(dampses):
+#for KK in range(dampses):
+#	for NN in range(epses):
+		for n in range (0,Niter):
+			titer = time.time()
+			#print "Computing iteration",n+1,"of u..."
+			temptime = time.time()
+			#Compute u
+			u[(I*K-I):(I*K)] = iF.G(x,m[(I*K-I):(I*K)])
+			#print u[]
+			for k in range (K-1,0,-1):  #this is how it has to be...
+				u_last = np.copy(u[((k+1)*I-I):((k+1)*I)]) #this one to keep
+				m_last = np.copy(m[((k+1)*I-I):((k+1)*I)]) #only actually need this, amirite?
+				#a_tmp = -np.gradient(u[((k+1)*I-I):((k+1)*I)],dx)
+				#a_tmp = iF.opt_cmfg(u[((k+1)*I-I):((k+1)*I)],dx)
+				#a_tmp = iF.mollify_array(a_tmp,epsel[NN],x,gll_x,gll_w)
+				#a_tmp = np.maximum(-np.gradient(u_last,dx),np.zeros(u_last.size))
+				#t0 = time.time()	
+				#a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,Ns,scatters) #hybrid
+				#a_tmp = solve.control_general_vectorised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,scatters) #hybrid
+				#a_tmp = solve.control_general_vectorised_optimised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,scatters) #hybrid
+				a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,dampsel[KK]*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
+				#a_tmp = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
+				#print k
+				#print a_tmp
+				#print ss
+				#print time.time()-t0
+				#print ss
+				if NICE_DIFFUSION==0:
+					#u_tmp = solve.hjb_kushner_mod(x,k*dt,u_last,a_tmp,dt,dx) #implicit
 					#LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
-					LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN])
-					#LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,eps_thing[k])
-				RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
-				Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)
-				#enforce stuff in a hack
-				#Ltmp[0] = Ltmp[1]
-				#Ltmp[-1] = Ltmp[-2]
-				#Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,10*dx) #scaled
-				u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*Ltmp)
-				u_tmp[0] = u_tmp[1]
-				u_tmp[-1] = u_tmp[-2]
+					#Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,1)
+					#RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
+					#u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*np.ravel(Ltmp))
+					u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,dampsel[KK])))
+					#u_tmp = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)) #no diffusion
+					#u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING)))
+				else:
+					if n==0 and k==K-1:
+						#LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
+						LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN])
+						#LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,eps_thing[k])
+					RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
+					Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,dampsel[KK])
+					#Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,10*dx) #scaled
+					u_tmp = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*u_last+dt*Ltmp)
 				#u_tmp 
-			u[(k*I-I):(k*I)] = np.copy(u_tmp)
-			a[(k*I-I):(k*I)] = np.copy(a_tmp)
+				u[(k*I-I):(k*I)] = np.copy(u_tmp)
+				a[(k*I-I):(k*I)] = np.copy(a_tmp)
 		
 		#print "Spent time", time.time()-temptime, "on computing u"
 		#store changes in norms
-		uchange = np.copy(u-u_old)
-		ul1[kMax+n] = np.sum(abs(uchange))*dx
-		ul2[kMax+n] = np.sqrt(np.sum(abs(uchange)**2))*np.sqrt(dx)
-		ulinfty[kMax+n] = max(abs(uchange))
-		achange = np.copy(a-a_old)
-		al1[kMax+n] = np.sum(abs(achange))*dx
-		al2[kMax+n] = np.sqrt(np.sum(abs(achange)**2))*np.sqrt(dx)
-		alinfty[kMax+n] = max(abs(achange) )
-	#GET GOING WITH M
-		#print "Computing iteration", n+1, "of m..."
-		m[0:I] = np.copy(m0)
-		#print m0
-		#print ss
-		temptime = time.time()
-		for k in range(0,K-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-			a_tmp = a[(k*I):(k*I+I)]
-			m_tmp = m[(k*I):(k*I+I)]
-			if NICE_DIFFUSION==0:
-				#m_update = solve.fp_fv(x,k*dt,a_tmp,dt,dx)
-				m_update = sparse.linalg.spsolve(mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.fp_fv_convection_interpol(k*dt,x,a_tmp,dt,dx)*m_tmp)
-			else:
-				if n==0 and k==0:
-					#LHS_FP = mg.fp_fv_diffusion(0,x,a_tmp,dt,dx)
-					LHS_FP = mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN])
-					#LHS_FP = mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,eps_thing[k])
-				#RHS_FP = mg.fp_fv_convection_classic(k*dt,x,a_tmp,dt,dx)
-				RHS_FP = mg.fp_fv_convection_interpol(k*dt,x,a_tmp,dt,dx)
-				m_update = sparse.linalg.spsolve(LHS_FP,RHS_FP*m_tmp)
-			m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
-		#print "Spent time", time.time()-temptime, "on computing m"
-	#compute norms of stuff
-		mchange = np.copy(m-m_old)
-		ml1[kMax+n] = np.sum(abs(mchange))*dx
-		ml2[kMax+n] = np.sqrt(np.sum(abs(mchange)**2))*np.sqrt(dx)
-		mlinfty[kMax+n] = max(abs( mchange) ) 
-		if (ml1[n+kMax] < tolerance):
-			print "Method converged with final change" , ml1[n+kMax]
-			print "Time spent:", time.time()-time_total
-			m_best = np.copy(m)
-			break
-	#Evaluate iteration
-		m_old = np.copy(m)
-		u_old = np.copy(u)
-		a_old = np.copy(a)
-		print "Iteration number", n+1, "completed. Viscosity:",epsel[NN], "-", NN, "/", epsel.size-1, "\nUsed time", time.time()-titer, "\nChange in (a,u,m)=(",  alinfty[n+kMax][0], ",", ulinfty[n+kMax][0], ",", mlinfty[n+kMax][0], ")"
-	#check if iteration was unsuccessful
-	print "Time spent:", time.time()-time_total
-	#store info on the last thing
-	M_ends[:,NN] = m[(I*K-I):(I*K)]
-	if (ml1[n+kMax] >= tolerance):	
-		Success = False #this will only fall out of the loop if the complete thing was a success
-		break
-	kMax += n
-	#print kMax
+			uchange = np.copy(u-u_old)
+			ul1[kMax+n] = np.sum(abs(uchange))*dx
+			ul2[kMax+n] = np.sqrt(np.sum(abs(uchange)**2))*np.sqrt(dx)
+			ulinfty[kMax+n] = max(abs(uchange))
+			achange = np.copy(a-a_old)
+			al1[kMax+n] = np.sum(abs(achange))*dx
+			al2[kMax+n] = np.sqrt(np.sum(abs(achange)**2))*np.sqrt(dx)
+			alinfty[kMax+n] = max(abs(achange) )
+		#GET GOING WITH M	
+			#print "Computing iteration", n+1, "of m..."
+			m[0:I] = np.copy(m0)
+			#print m0
+			#print ss
+			temptime = time.time()
+			for k in range(0,K-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
+				a_tmp = a[(k*I):(k*I+I)]
+				m_tmp = m[(k*I):(k*I+I)]
+				if NICE_DIFFUSION==0:
+					#m_update = solve.fp_fv(x,k*dt,a_tmp,dt,dx)
+					m_update = sparse.linalg.spsolve(mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.fp_fv_convection_interpol(k*dt,x,a_tmp,dt,dx)*m_tmp)
+				else:
+					if n==0 and k==0:
+						#LHS_FP = mg.fp_fv_diffusion(0,x,a_tmp,dt,dx)
+						LHS_FP = mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN])
+						#LHS_FP = mg.fp_fv_diffusion_av(k*dt,x,a_tmp,dt,dx,eps_thing[k])
+					#RHS_FP = mg.fp_fv_convection_classic(k*dt,x,a_tmp,dt,dx)
+					RHS_FP = mg.fp_fv_convection_interpol(k*dt,x,a_tmp,dt,dx)
+					m_update = sparse.linalg.spsolve(LHS_FP,RHS_FP*m_tmp)
+				m[I*(k+1):(I+I*(k+1))] = np.copy(m_update)
+			#print "Spent time", time.time()-temptime, "on computing m"
+		#compute norms of stuff
+			mchange = np.copy(m-m_old)
+			ml1[kMax+n] = np.sum(abs(mchange))*dx
+			ml2[kMax+n] = np.sqrt(np.sum(abs(mchange)**2))*np.sqrt(dx)
+			mlinfty[kMax+n] = max(abs( mchange) ) 
+			if (ml1[n+kMax] < tolerance):
+				print "Method converged with final change" , ml1[n+kMax]
+				print "Time spent:", time.time()-time_total
+				m_best = np.copy(m)
+				break
+		#Evaluate iteration
+			m_old = np.copy(m)
+			u_old = np.copy(u)
+			a_old = np.copy(a)
+			print "Iteration number", n+1, "completed. \nViscosity:",epsel[NN], "-", NN, "/", epsel.size-1, "\nDampening:",dampsel[KK],"-", KK, "/", dampsel.size-1, "\nUsed time", time.time()-titer, "\nChange in (a,u,m)=(",  alinfty[n+kMax][0], ",", ulinfty[n+kMax][0], ",", mlinfty[n+kMax][0], ")"
+		#check if iteration was unsuccessful
+		print "Time spent:", time.time()-time_total
+		#store info on the last thing
+		M_ends[:,NN] = m[(I*K-I):(I*K)]
+		if (ml1[n+kMax] >= tolerance):	
+			Success = False #this will only fall out of the loop if the complete thing was a success
+			#break
+		kMax += n
+		#print kMax
 print "Total time spent:", time.time()-total_time2
 #NN = NN + 1
+
 if LOAD_WRITE: #load best solution with parameters
 	if NN==0 and not Success:
 		sys.error("No convergence reached")
@@ -448,14 +418,16 @@ if LOAD_WRITE: #load best solution with parameters
 		dx_string = "%.8f" % dx
 		dt_string = "%.8f" % DT
 		eps_string = "0"
-		filename = TEST_NAME + "_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
+		damp_string = "1"
+		filename = TEST_NAME + "_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + damp_string + "_" + ".txt"
 		np.savetxt(filename, m_best, fmt='%.18e', delimiter=' ', newline='\n', header='', footer='', comments='# ')
 	else: #write NN-1 to file
 		#check if other files with these parameters exist
 		dx_string = "%.8f" % dx
 		dt_string = "%.8f" % DT
 		eps_string = "%.8f" % epsel[NN-1]
-		filename = TEST_NAME + "_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
+		damp_string = "%.8f" % dampsel[KK-1]
+		filename = TEST_NAME + "_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + damp_string + "_" + ".txt"
 		np.savetxt(filename, m_best, fmt='%.18e', delimiter=' ', newline='\n', header='', footer='', comments='# ')
 
 M_ends = M_ends[:,:(NN+1)]
