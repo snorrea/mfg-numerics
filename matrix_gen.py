@@ -208,6 +208,11 @@ def FP_convection_explicit_interpol(time,x,y,a1,a2,dx,dt,south,north,west,east,n
 	D22x,D22y = np.gradient(D22,dx,dx)
 	D12x,D12y = np.gradient(D12,dx,dx)
 	#make the fluxes
+	
+	#print f1.shape,f2.shape
+	#print D11.shape,D11x.shape,D11y.shape
+	#print D22.shape,D22x.shape,D22y.shape
+
 	F1 = np.ravel(f1 - 0.5*D11x-0.5*D12y)#,order='F')
 	F2 = np.ravel(f2 - 0.5*D12x-0.5*D22y)#,order='F')
 	zero = np.zeros(F1.size)
@@ -457,16 +462,20 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT,south,north,w
 		output = ass.FVL2G(np.dot(R,T),output,i,I,J)
 	return output
 
-def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dt,south,north,west,east,nulled): #this is implicit
+def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled): #this is implicit
 	I,J = x.size,y.size
 	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
 	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
 	D12 = iF.Sigma_D12_test(time,x,y,a1,a2)
 	dx2 = dx**2
+	dy2 = dy**2
+	dxy = dx*dy
 	#flatten out D12, D11, D22, f1_array, f2_array
 	D11 = np.ravel(D11)
 	D12 = np.ravel(D12)
 	D22 = np.ravel(D22)
+	#print D11
+	#print ss
 	indices = np.array([n for n in list(range(I*J)) if n not in list(nulled)])
 	not_south = np.array([n for n in indices if n not in list(south)])
 	not_north = np.array([n for n in indices if n not in list(north)])
@@ -501,14 +510,17 @@ def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dt,south,north,west,east,nulled)
 	D_sw = np.zeros(I*J)
 	here = np.zeros(I*J)
 	#need the intersection between not_north and not_east, etc...
-	D_ne[not_ne] += .25*(D12[not_ne+I]+D12[not_ne+1])*dt/dx2
-	D_se[not_se] += -.25*(D12[not_se-I]+D12[not_se+1])*dt/dx2
-	D_sw[not_sw] += .25*(D12[not_sw-I]+D12[not_sw-1])*dt/dx2
-	D_nw[not_nw] += -.25*(D12[not_nw+I]+D12[not_nw-1])*dt/dx2
-	D_north[not_north] += app.hmean(D22[not_north],D22[not_north+I])*dt/dx2
-	D_south[not_south] += app.hmean(D22[not_south],D22[not_south-I])*dt/dx2
+	D_ne[not_ne] += .25*(D12[not_ne+I]+D12[not_ne+1])*dt/dxy
+	D_se[not_se] += -.25*(D12[not_se-I]+D12[not_se+1])*dt/dxy
+	D_sw[not_sw] += .25*(D12[not_sw-I]+D12[not_sw-1])*dt/dxy
+	D_nw[not_nw] += -.25*(D12[not_nw+I]+D12[not_nw-1])*dt/dxy
+	D_north[not_north] += app.hmean(D22[not_north],D22[not_north+I])*dt/dy2
+	D_south[not_south] += app.hmean(D22[not_south],D22[not_south-I])*dt/dy2
 	D_west[not_west] += app.hmean(D11[not_west],D11[not_west-1])*dt/dx2
 	D_east[not_east] += app.hmean(D11[not_east],D11[not_east+1])*dt/dx2
+
+	#print D_north
+	#print ss
 	#boundary stuff
 	#D_north[south] += app.hmean(D22[south],D22[south+I])*dt/dx2
 	#D_south[north] += app.hmean(D22[north],D22[north-I])*dt/dx2

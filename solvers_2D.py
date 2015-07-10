@@ -5,6 +5,7 @@ import matrix_gen as mg
 import scipy.sparse as sparse
 import applications as app
 import scipy.optimize as opt
+import itertools as itertools
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import time as time
@@ -175,7 +176,6 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 	bounds = [search_x[0], search_x[-1], search_y[0], search_y[-1]]
 	Search_x,X,Y = np.meshgrid(search_x,x,y) #this is 3D
 	Search_y,X,Y = np.meshgrid(search_y,x,y) #this is also 3D
-	FOUR_DEE = False
 	#make the things
 	u_south = np.zeros((J,I))
 	u_north = np.zeros((J,I))
@@ -184,6 +184,7 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 	u_crossup = np.zeros((J,I))
 	u_crossdown = np.zeros((J,I))
 	u = (np.reshape(u,(J,I)))
+	m = (np.reshape(m,(J,I)))
 	u_north[:-1,:] = (u[1:,:]-u[:-1,:])/dx
 	u_south[1:,:] = (u[1:,:]-u[:-1,:])/dx
 	u_east[:,:-1] = (u[:,1:]-u[:,:-1])/dy
@@ -215,15 +216,20 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 	BESTBUYS_Y = np.zeros((I,J))
 	BBX_old = np.zeros((I,J))
 	BBY_old = np.zeros((I,J))
+	#stuff
+	#m = app.map_2d_to_3d(m,Search_x)
 	for i in range(scatters):
 		cnt = 0
 		while cnt < 10:
-			VALUEGRID = iF.Hamiltonian_vectorised(Search_x,app.map_2d_to_3d(BESTBUYS_Y,Search_x),x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			#VALUEGRID = iF.Hamiltonian_vectorised(Search_x,app.map_2d_to_3d(BESTBUYS_Y,Search_x),x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID = iF.Hamiltonian_vectorised(Search_x,app.map_2d_to_3d(BESTBUYS_Y,Search_x),x,y,app.map_2d_to_3d(m,Search_x),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			#print Search_x.shape
 			ind1 = VALUEGRID.argmin(axis=1)
 			ind0,ind2 = np.indices(ind1.shape)
 			BBX_old = np.copy(BESTBUYS_X)
 			BESTBUYS_X = Search_x[ind0,ind1,ind2]
-			VALUEGRID = iF.Hamiltonian_vectorised(app.map_2d_to_3d(BESTBUYS_X,Search_y),Search_y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			#VALUEGRID = iF.Hamiltonian_vectorised(app.map_2d_to_3d(BESTBUYS_X,Search_y),Search_y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID = iF.Hamiltonian_vectorised(app.map_2d_to_3d(BESTBUYS_X,Search_y),Search_y,x,y,app.map_2d_to_3d(m,Search_y),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
 			ind1 = VALUEGRID.argmin(axis=1)
 			ind0,ind2 = np.indices(ind1.shape)
 			BBY_old = np.copy(BESTBUYS_Y)
@@ -236,15 +242,70 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 				#print BBX_old
 				#print BESTBUYS_X
 				#print BESTBUYS_X==BBX_old
-			if cnt>10:
-				print cnt#,dev
+		#	if cnt>10:
+		#		print cnt#,dev
 		if i-1 is not scatters:
 			x_ind = range(Search_x.shape[0])
 			y_ind = range(Search_x.shape[2])
-			Search_x[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)])
-			Search_y[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)])
+		#	print "Yolo"
+		#	print zip(x_ind,y_ind)
+		#	print BESTBUYS_X.shape
+		#	print BESTBUYS_Y.shape
+		#	print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)]).shape
+		#	print np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)]).shape
+			#print Search_x.shape
+			#print Search_x[y_ind,:,x_ind].shape
+			#Search_x[j,:,x_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(y_ind,x_ind)])
+			#Search_y[y_ind,:,k] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(y_ind,x_ind)])
+			#Search_x[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)])
+			#Search_y[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)])
+			Sex = np.copy(Search_x)
+			Sey = np.copy(Search_y)
+			t0 = time.time()
+			for j in range(Search_x.shape[0]):
+				for k in range(Search_x.shape[2]):
+					Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0])
+					Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1])
+			t1 = time.time()-t0
+			#print itertools.product(x_ind,y_ind)[0]
+			#print [j for j in x_ind, [k for k in y_ind]]
+			 #this has all the arg things
+			#print len(mylist)
+			#print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)]).shape
+			#print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind]).shape
+			#Sex[j,:,k] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
+			t0 = time.time()
+			mylist = [(j,k) for j in x_ind for k in y_ind]
+			myxlist = [x[0] for x in mylist]
+			myylist = [x[1] for x in mylist]
+			t2 = time.time()-t0
+			t0 = time.time()
+			#print Sex[myxlist,:,myylist].shape
+			#print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind]).shape
+			Sex[myxlist,:,myylist] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
+			Sey[myxlist,:,myylist] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j in x_ind for k in y_ind])
+			t3 = time.time()-t0
+			print t1
+			print t2
+			print t3
+			print ss
+			#Sex[[j in myxlist],:,[k in myylist]] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
+			#print Sex[myxlist,:,myylist].shape
+			#print np.linspace(BESTBUYS_X[mylist[:]]-ax,BESTBUYS_X[mylist[:]]+ax,N[0]).shape
+		#	print Search_x==Sey
+		#	print t1
+		#	print t2
+			#Sex[myxlist,:,myylist][:] = np.linspace(BESTBUYS_X[mylist[:]]-ax,BESTBUYS_X[mylist[:]]+ax,N[0])
+			#print Sex[mylist[:][0],:,mylist[:][1]].shape
+			#Sex[mylist[:][0],:,mylist[:][1]] = np.linspace(BESTBUYS_X[mylist[:]]-ax,BESTBUYS_X[mylist[:]]+ax,N[0])
+			#Sex[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
+		#	print ss
+			#Sey[j,:,k] = np.array()
+
+			#Search_x[j,:,k] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)])
+			#Search_y[j,:,k] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)])
 			ay = Search_y[0,1,0]-Search_y[0,0,0]
-			ax = Search_y[0,1,0]-Search_y[0,0,0]
+			ax = Search_x[0,1,0]-Search_x[0,0,0]
 	return BESTBUYS_X,BESTBUYS_Y
 
 def control_hybridC_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,tol,scatters,N,nulled,Obstacles,south,north,west,east):
@@ -262,6 +323,7 @@ def control_hybridC_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 	u_crossup = np.zeros((J,I))
 	u_crossdown = np.zeros((J,I))
 	u = (np.reshape(u,(J,I)))
+	m = (np.reshape(m,(J,I)))
 	u_north[:-1,:] = (u[1:,:]-u[:-1,:])/dx
 	u_south[1:,:] = (u[1:,:]-u[:-1,:])/dx
 	u_east[:,:-1] = (u[:,1:]-u[:,:-1])/dy
@@ -299,13 +361,13 @@ def control_hybridC_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 		while cnt<10:
 			argument = app.map_2d_to_3d(BESTBUYS_Y,Search_x)
 			#VALUEGRID = iF.Hamiltonian_vectorised(Search_x,argument,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
-			VALUEGRID_X = iF.Hamiltonian_vectorised(Search_x,argument,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID_X = iF.Hamiltonian_vectorised(Search_x,argument,x,y,app.map_2d_to_3d(m,Search_x),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
 			ind1x = VALUEGRID_X.argmin(axis=1)
 			ind0x,ind2x = np.indices(ind1x.shape)
 			BBX_old = np.copy(BESTBUYS_X)
 			BESTBUYS_X = Search_x[ind0x,ind1x,ind2x]
 			argument = app.map_2d_to_3d(BESTBUYS_X,Search_y)
-			VALUEGRID_Y = iF.Hamiltonian_vectorised(argument,Search_y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID_Y = iF.Hamiltonian_vectorised(argument,Search_y,x,y,app.map_2d_to_3d(m,Search_y),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
 			ind1y = VALUEGRID_Y.argmin(axis=1)
 			ind0y,ind2y = np.indices(ind1y.shape)
 			BBY_old = np.copy(BESTBUYS_Y)
@@ -324,27 +386,23 @@ def control_hybridC_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 			first = False
 		if i-1 is not scatters:
 			Gradx = np.gradient(VALUEGRID_X)[1][ind0x,ind1x,ind2x] #gradients of control1
-			indx_p = np.nonzero(np.maximum(Gradx,zero)) #returns 2 arrays, such that positive elements are accessed by Grad[ind_p[0],ind_p[1]]
-			indx_n = np.nonzero(np.minimum(Gradx,zero))
-			indx_z = np.where(Gradx==0)
-			if indx_p[0].size is not 0:
-				Search_x[indx_p[0],:,indx_p[1]] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k],N[0]/2) for j,k in zip(indx_p[0],indx_p[1])])
-			if indx_n[0].size is not 0:
-				Search_x[indx_n[0],:,indx_n[1]] = np.array([np.linspace(BESTBUYS_X[j,k],BESTBUYS_X[j,k]+ax,N[0]/2) for j,k in zip(indx_n[0],indx_n[1])])
-			if indx_z[0].size is not 0:
-				Search_x[indx_z[0],:,indx_z[1]] = np.array([np.linspace(BESTBUYS_X[j,k]-ax/2,BESTBUYS_X[j,k]+ax/2,N[0]/2) for j,k in zip(indx_z[0],indx_z[1])])
-			ax = Search_x[0,1,0]-Search_x[0,0,0]
 			Grady = np.gradient(VALUEGRID_Y)[1][ind0y,ind1y,ind2y] #gradients of control1
-			indy_p = np.nonzero(np.maximum(Grady,zero)) #returns 2 arrays, such that positive elements are accessed by Grad[ind_p[0],ind_p[1]]
-			indy_n = np.nonzero(np.minimum(Grady,zero))
-			indy_z = np.where(Grady==0)
-			if indy_p[0].size is not 0:
-				Search_y[indy_p[0],:,indy_p[1]] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k],N[1]/2) for j,k in zip(indy_p[0],indy_p[1])])
-			if indy_n[0].size is not 0:
-				Search_y[indy_n[0],:,indy_n[1]] = np.array([np.linspace(BESTBUYS_Y[j,k],BESTBUYS_Y[j,k]+ay,N[1]/2) for j,k in zip(indy_n[0],indy_n[1])])
-			if indy_z[0].size is not 0:
-				Search_y[indy_z[0],:,indy_z[1]] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay/2,BESTBUYS_Y[j,k]+ay/2,N[1]/2) for j,k in zip(indy_z[0],indy_z[1])])
-			ay = Search_y[0,1,0]-Search_y[0,0,0]			
+			for j in range(x.size):
+				for k in range(y.size):
+					if Gradx[j,k] > 0:
+						Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k],N[0]/2)
+					elif Gradx[j,k] < 0:
+						Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax/2,BESTBUYS_X[j,k]+ax/2,N[0]/2)
+					else:
+						Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax/2,BESTBUYS_X[j,k]+ax/2,N[0]/2)
+					if Grady[j,k] > 0:
+						Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k],N[0]/2)
+					elif Grady[j,k] < 0:
+						Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay/2,BESTBUYS_Y[j,k]+ay/2,N[0]/2)
+					else:
+						Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay/2,BESTBUYS_Y[j,k]+ay/2,N[0]/2)
+			ax = Search_x[0,1,0]-Search_x[0,0,0]
+			ay = Search_y[0,1,0]-Search_y[0,0,0]
 	return BESTBUYS_X,BESTBUYS_Y
 
 def control_hybridO_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,tol,scatters,N,nulled,Obstacles,south,north,west,east):
@@ -362,6 +420,7 @@ def control_hybridO_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 	u_crossup = np.zeros((J,I))
 	u_crossdown = np.zeros((J,I))
 	u = (np.reshape(u,(J,I)))
+	m = (np.reshape(m,(J,I)))
 	u_north[:-1,:] = (u[1:,:]-u[:-1,:])/dx
 	u_south[1:,:] = (u[1:,:]-u[:-1,:])/dx
 	u_east[:,:-1] = (u[:,1:]-u[:,:-1])/dy
@@ -398,13 +457,13 @@ def control_hybridO_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 		cnt = 0
 		while cnt<10:
 			argument = app.map_2d_to_3d(BESTBUYS_Y,Search_x)
-			VALUEGRID_X = iF.Hamiltonian_vectorised(Search_x,argument,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID_X = iF.Hamiltonian_vectorised(Search_x,argument,x,y,app.map_2d_to_3d(m,Search_x),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
 			ind1x = VALUEGRID_X.argmin(axis=1)
 			ind0x,ind2x = np.indices(ind1x.shape)
 			BBX_old = np.copy(BESTBUYS_X)
 			BESTBUYS_X = Search_x[ind0x,ind1x,ind2x]
 			argument = app.map_2d_to_3d(BESTBUYS_X,Search_y)
-			VALUEGRID_Y = iF.Hamiltonian_vectorised(argument,Search_y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID_Y = iF.Hamiltonian_vectorised(argument,Search_y,x,y,app.map_2d_to_3d(m,Search_y),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
 			ind1y = VALUEGRID_Y.argmin(axis=1)
 			ind0y,ind2y = np.indices(ind1y.shape)
 			BBY_old = np.copy(BESTBUYS_Y)
@@ -423,26 +482,22 @@ def control_hybridO_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 			first = False
 		if i-1 is not scatters:
 			Gradx = iF.Hamiltonian_derivative_vectorised(BESTBUYS_X,BESTBUYS_Y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,False)
-			indx_p = np.nonzero(np.maximum(Gradx,zero)) #returns 2 arrays, such that positive elements are accessed by Grad[ind_p[0],ind_p[1]]
-			indx_n = np.nonzero(np.minimum(Gradx,zero))
-			indx_z = np.where(Gradx==0)
-			if indx_p[0].size is not 0:
-				Search_x[indx_p[0],:,indx_p[1]] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k],N[0]/2) for j,k in zip(indx_p[0],indx_p[1])])
-			if indx_n[0].size is not 0:
-				Search_x[indx_n[0],:,indx_n[1]] = np.array([np.linspace(BESTBUYS_X[j,k],BESTBUYS_X[j,k]+ax,N[0]/2) for j,k in zip(indx_n[0],indx_n[1])])
-			if indx_z[0].size is not 0:
-				Search_x[indx_z[0],:,indx_z[1]] = np.array([np.linspace(BESTBUYS_X[j,k]-ax/2,BESTBUYS_X[j,k]+ax/2,N[0]/2) for j,k in zip(indx_z[0],indx_z[1])])
-			ax = Search_x[0,1,0]-Search_x[0,0,0]
 			Grady = iF.Hamiltonian_derivative_vectorised(BESTBUYS_X,BESTBUYS_Y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,False)
-			indy_p = np.nonzero(np.maximum(Grady,zero)) #returns 2 arrays, such that positive elements are accessed by Grad[ind_p[0],ind_p[1]]
-			indy_n = np.nonzero(np.minimum(Grady,zero))
-			indy_z = np.where(Grady==0)
-			if indy_p[0].size is not 0:
-				Search_y[indy_p[0],:,indy_p[1]] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k],N[1]/2) for j,k in zip(indy_p[0],indy_p[1])])
-			if indy_n[0].size is not 0:
-				Search_y[indy_n[0],:,indy_n[1]] = np.array([np.linspace(BESTBUYS_Y[j,k],BESTBUYS_Y[j,k]+ay,N[1]/2) for j,k in zip(indy_n[0],indy_n[1])])
-			if indy_z[0].size is not 0:
-				Search_y[indy_z[0],:,indy_z[1]] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay/2,BESTBUYS_Y[j,k]+ay/2,N[1]/2) for j,k in zip(indy_z[0],indy_z[1])])
+			for j in range(x.size):
+				for k in range(y.size):
+					if Gradx[j,k] > 0:
+						Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k],N[0]/2)
+					elif Gradx[j,k] < 0:
+						Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax/2,BESTBUYS_X[j,k]+ax/2,N[0]/2)
+					else:
+						Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax/2,BESTBUYS_X[j,k]+ax/2,N[0]/2)
+					if Grady[j,k] > 0:
+						Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k],N[0]/2)
+					elif Grady[j,k] < 0:
+						Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay/2,BESTBUYS_Y[j,k]+ay/2,N[0]/2)
+					else:
+						Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay/2,BESTBUYS_Y[j,k]+ay/2,N[0]/2)
+			ax = Search_x[0,1,0]-Search_x[0,0,0]
 			ay = Search_y[0,1,0]-Search_y[0,0,0]
 	return BESTBUYS_X,BESTBUYS_Y
 

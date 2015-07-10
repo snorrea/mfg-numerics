@@ -130,9 +130,9 @@ def Hamiltonian_vectorised(ax,ay,x,y,m,dx,dy,timez,I,J,Obstacles,U_south,U_north
 		U_east = app.map_2d_to_3d(U_east,ax)
 		U_crossup = app.map_2d_to_3d(U_crossup,ax)
 		U_crossdown = app.map_2d_to_3d(U_crossdown,ax)
-		d11 = app.map_2d_to_3d(d11,ax)
-		d12 = app.map_2d_to_3d(d12,ax)
-		d22 = app.map_2d_to_3d(d22,ax)
+		#d11 = app.map_2d_to_3d(d11,ax)
+		#d12 = app.map_2d_to_3d(d12,ax)
+		#d22 = app.map_2d_to_3d(d22,ax)
 	#print "Time to map to 4D:", time.time()-t0
 	#and do function calls
 	f1,f2 = f_global(timez,x,y,ax,ay) #and these also
@@ -177,18 +177,13 @@ def L_global(time,x,y,a1,a2,m_array,G): #general cost
 	#print a1
 	#print a2
 	#print ss
-	b1 = .00
-	b2 = 4
-	b3 = .5
-	c1 = .00
-	c2 = 4
-	c3 = .5
-	x1 = xenophobia(b1,b2,b3,m_array)
-	x2 = xenophobia(c1,c2,c3,m_array)
 	#print a1.shape
 	#print m_array.shape
 	#(I,J) = a1.shape
-	#m_array = np.reshape(m_array,(I,J))
+	#if len(m_array.shape) == 1 and len(a1.shape)==3:
+	#	
+	if len(m_array.shape) == 1:
+		m_array = np.reshape(m_array,(y.size,x.size))
 	#G = np.reshape(G,(I,J))
 	#a1 = np.ravel(a1)
 	#a2 = np.ravel(a2)
@@ -199,28 +194,36 @@ def L_global(time,x,y,a1,a2,m_array,G): #general cost
 #	print G.shape
 	#return 0.5*(a1**2 + a2**2)*(1+x1) + G*(5 +x2) # + F_global(x,y,x,time)
 	#G_big = app.map_2d_to_3d(G,a1)
-	return 0.5*(a1**2+a2**2) + G#F_global(x_array,y_array,m_array,time)
-
-def xenophobia(a,b,c,m):
-	return a*(1+b*m)**c
+	eps = 100
+#	return 0.5*(a1**2+a2**2) + G
+	#return 0.5*(a1**2+a2**2) + 10/eps*m_array*(1+G)
+	#return 0.5*(a1**2+a2**2) + G + 1/eps*m_array #cmfg evacuation
+	#return 0.5*(a1**2+a2**2)*(1 + 1/eps*m_array) + 1/eps*m_array + 10*G #mfg evacuation
+	return 0.5*(a1**2+a2**2)*(1 + 1/eps*m_array) + G #mfg evacuation
+	#return 0.5*(a1**2+a2**2) + G*(1 + 1/eps * m_array)
 
 
 def f_global(time,x_array,y_array,ax_array,ay_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#x,y = np.meshgrid(x_array,y_array)
 	#return [.1*x_array*y_array,.1*x_array*y_array] #FP test
-	#c = .5
+	c = .2
 	#return [c*x,c*y]
 	#return [c*x*np.exp(-time),c*y*np.exp(-time)] #FP test
-	return [ax_array, ay_array] #standard MFG
-	#return [ax_array*np.exp(-time), ay_array*np.exp(-time)] #standard MFG
+	#return [ax_array, ay_array] #standard MFG
+	return [ax_array*np.exp(-c*time), ay_array*np.exp(-c*time)] #standard MFG
 
 def Sigma_D11_test(time,x,y,ax_array,ay_array):
 	I = x.size
 	J = y.size
 	x,y = np.meshgrid(x,y)
 	#return .5**2*np.ones(x.shape)
-	out = .01*np.ones(x.shape)
+	if ax_array.shape != x.shape:
+		#print ax_array.shape,x.shape
+	#	print x.shape, ax_array.shape
+	#	print x.shape==ax_array.shape
+		x = app.map_2d_to_3d(x,ax_array)
+	out = .5*np.ones(x.shape) + .1*ax_array**2
 	#for i in range(0,I):
 	#	for j in range(0,J):
 	#		if x[i,j] >= .5:
@@ -232,7 +235,9 @@ def Sigma_D22_test(time,x,y,ax_array,ay_array):
 	J = y.size
 	x,y = np.meshgrid(x,y)
 	#return .5**2*np.ones(x.shape)
-	out = .01*np.ones(x.shape)
+	if ax_array.shape != x.shape:
+		x = app.map_2d_to_3d(x,ax_array)
+	out = .5*np.ones(x.shape) + .1*ay_array**2
 	#for i in range(0,I):
 	#	for j in range(0,J):
 	#		if y[i,j] >= .5:
@@ -241,9 +246,10 @@ def Sigma_D22_test(time,x,y,ax_array,ay_array):
 	#return abs(ay_array)*(.01 + h2(y))
 def Sigma_D12_test(time,x,y,ax_array,ay_array):
 	#I,J = x.size,y.size
-	D11 = Sigma_D11_test(time,x,y,ax_array,ay_array)
-	D22 = Sigma_D22_test(time,x,y,ax_array,ay_array)
-	return 0*np.sqrt(D11*D22)
+	#D11 = Sigma_D11_test(time,x,y,ax_array,ay_array)
+	#D22 = Sigma_D22_test(time,x,y,ax_array,ay_array)
+	return 0.05*abs(ax_array*ay_array)#.01*abs(ax_array*ay_array)
+	#return 0*np.ones(ax_array.shape)
 	#out = 0.00125*(2+x+y)#+1e-3 #FP test mean
 	#out = 0.0001*np.ones(x.shape)
 	#for i in range(0,I):
@@ -252,22 +258,6 @@ def Sigma_D12_test(time,x,y,ax_array,ay_array):
 	#			out[i,j] = 2*out[i,j]
 	#return out
 	#return .0**2*np.ones(x.shape) #FP test nice
-
-def h1(x):
-	out = np.zeros(x.shape)
-	for i in range(x.shape[0]):
-		for j in range(x.shape[1]):
-			if x[i,j] < .5:
-				out[i,j] = .01
-	return out
-
-def h2(x):
-	out = np.zeros(x.shape)
-	for i in range(x.shape[0]):
-		for j in range(x.shape[1]):
-			if x[i,j] < .5:
-				out[i,j] = .01
-	return out
 
 ##################
 #TERMINAL COST
@@ -288,7 +278,7 @@ def initial_distribution(x,y): #this now works
 	m0 = np.zeros((x.size,y.size))
 	for i in range(x.size):
 		for j in range(y.size):
-			if x[i] <= .9 and y[j] <= .3 and x[i] >= 0.1 and y[j] >=0.1:
+			if x[i] <= 1.9 and y[j] <= .2 and x[i] >= 1.1 and y[j] >=0.1:
 				m0[i,j] = .1
 	return np.transpose(m0)
 	#return np.exp( -(x-0.5)**2/(0.1**2) - (y-0.5)**2/(0.1**2) )

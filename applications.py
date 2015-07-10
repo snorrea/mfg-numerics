@@ -356,8 +356,13 @@ def map_2d_to_3d(arr2d,arr3d):
 	#print arr3d.shape
 	#print output.shape
 	#output[:,0:arr3d.shape[1],:] = np.transpose(arr2d)[:]
+	#print output.shape
+	#print arr2d.shape
 	for i in range(arr3d.shape[1]):
-		output[:,i,:] = np.transpose(arr2d)
+		if output.shape[0]==arr2d.shape[0]:
+			output[:,i,:] = (arr2d)
+		else:
+			output[:,i,:] = np.transpose(arr2d)
 	return output
 
 def gimme_gradient_points(minis,index_max):
