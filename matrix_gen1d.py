@@ -157,6 +157,9 @@ def fp_fd_centered_convection(time,x,a_tmp,dt,dx): #for explicit
 	here = np.ones(I)
 	east = -dt/dx*movement[1:]/2
 	west = dt/dx*movement/2
+	#reflective boundary
+	east[0] = 0
+	west[-2] = 0
 	output = sparse.diags([here, east, west[0:-1]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
@@ -168,6 +171,8 @@ def fp_fd_centered_diffusion(time,x,a_tmp,dt,dx): #for implicit
 	here = 1+dt/dx2*sigma2
 	east = -dt/dx2*sigma2[1:]/2
 	west = -dt/dx2*sigma2/2
+	east[0] = 2*east[0]
+	west[-2] = 2*west[-2]
 	output = sparse.diags([here, east, west[0:-1]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 
@@ -180,6 +185,8 @@ def fp_fd_upwind_convection(time,x,a_tmp,dt,dx): #for explicit
 	here = 1-dt/dx*abs(movement) - dt/dx*np.append(movement[1:],0)/2+dt/dx*np.insert(movement[0:-1],0,0)/2
 	east = -dt/dx*np.minimum(movement,zerohero)
 	west = dt/dx*np.maximum(movement,zerohero)
+	#reflective boundary
+	east[0] = dt/dx*abs(movement[0])
 	output = sparse.diags([here, east[0:-1], west[1:]],[0, 1, -1])
 	return sparse.csr_matrix(output)
 

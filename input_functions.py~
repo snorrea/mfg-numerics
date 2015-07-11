@@ -271,7 +271,7 @@ def L_global(time,x_array,a_array,m_array,damp): #general cost
 def f_global(time,x_array,a_array):
 	#return 0.1*a_array*x_array #Classic Robstad
 	#return -1*np.ones(x_array.size) #FP test, constant coefficients
-	#return 2.5*x_array #Ornstein FP test
+#	return 2.5*x_array #Ornstein FP test
 	#return x_array*np.sin(a_array) #brutal test
 	#print x_array.shape,a_array.shape
 	#print type(a_array)
@@ -309,10 +309,32 @@ def Sigma_global(time,x_array,a_array): #any of these will do for the HJB test
 	#return 0.*x_array
 	#return 4+a_array*x_array #Classic Robstad
 	#return 0.1*x_array+(1-x_array)*0.3
-	#one = np.ones(x_array.size)
-	#return .05*one
+	return .1*one
 	#return 0.1*abs(a_array)#+0.1 #mfg1d
-	return 0.05*(1+(1-x_array)*abs(a_array))#+0.1 #mfg1d
+	if isinstance(a_array, np.float64):
+		#return max(a_array,0)*np.exp(-time) + min(a_array,0)*0.1
+		if a_array > 0:
+			return 0.1*(1+max(a_array,0)*(1-x_array))
+		else:
+			return 0
+	#one = np.ones(a_array.shape)
+	output = np.zeros(a_array.shape)
+	pos_ind = np.nonzero(np.maximum(np.sign(a_array),output))
+	neg_ind = np.nonzero(np.minimum(np.sign(a_array),output))
+	if pos_ind[0].size is not 0:
+		if len(pos_ind)==2:
+			#output[pos_ind] = a_array[pos_ind]*(1-0.5*np.sin(np.pi*time)-0.25*x_array[pos_ind[1]])
+			#output[pos_ind] = 2*0.05*(1+a_array[pos_ind]*(1-x_array[pos_ind[1]]))
+			output[pos_ind] = 0.1*(1+a_array[pos_ind]*(1-x_array[pos_ind[1]]))
+		else:
+			#output[pos_ind] = a_array[pos_ind]*(1-0.5*np.sin(np.pi*time)-0.25*x_array[pos_ind])
+			output[pos_ind] = 0.1*(1+a_array[pos_ind]*(1-x_array[pos_ind]))
+	#if neg_ind[0].size is not 0:
+	#	output[neg_ind] = .0*one[neg_ind]
+	#print output
+	#print ss
+	return output
+#	return 0.05*(1+4*(1-x_array)*abs(a_array))#+0.1 #mfg1d
 	#xenophobia = np.minimum( np.maximum(m_array,0.2*one), 0*one )
 	#return 0.5*a_array**2# + xenophobia #brutal test
 	#return .1*np.ones(x_array.size)

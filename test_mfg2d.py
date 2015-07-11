@@ -18,10 +18,10 @@ scatter_test = 1
 NONLINEAR = False
 PLOT_DEBUG = False#True
 NICE_DIFFUSION = 0
-POINTSx = 5*2*2*2#*2*4#*2#*4# #points in x-direction
-POINTSy = 5*2*2#*2#*4#*2#*4# #points in y-direction
+POINTSx = 5*2*2#*2#*2*4#*2#*4# #points in x-direction
+POINTSy = 5*2#*2#*2#*4#*2#*4# #points in y-direction
 REFINEMENTS = 1
-NITERATIONS = 50
+NITERATIONS = 10
 DT = .25#ratio as in dt = DT*dx(**2)
 cutoff = 0 #for convergence slope
 grid = [0, 2, 0, 1]
