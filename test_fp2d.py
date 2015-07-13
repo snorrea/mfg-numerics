@@ -13,14 +13,13 @@ import scipy.interpolate as intpol
 import matrix_gen as mg
 
 #INPUTS
-NONLINEAR = True
+NONLINEAR = False
 POINTSx = 5 #points in x-direction
 POINTSy = 5 #points in y-direction
-REFINEMENTS = 3
+REFINEMENTS = 2
 X_NAUGHT = 0.0
 DT = .2#ratio as in dt = DT*dx(**2)
 NICE_DIFFUSION = 1
-n = 2 #must be integer greater than 0
 cutoff = 0 #for convergence slope
 xmax = 1
 xmin = 0
@@ -63,6 +62,11 @@ for N in range(0,REFINEMENTS):
 	t = np.linspace(0,T,Nt)
 	I = x.size #space
 	J = y.size
+	south = range(0,I) #ok
+	west = range(0,I*J,I) #ok
+	north = range(I*J-I,I*J) #ok 
+	east = range(I-1,I*J+1,I) #ok
+	nulled = []#
 	m = iF.initial_distribution(x,y)
 	m = m/(sum(sum(m))*dx*dy)#normalise
 	m_solns_dims[N] = (I,J)
@@ -74,13 +78,13 @@ for N in range(0,REFINEMENTS):
 	Mass = np.zeros(Nt)
 	for k in range(1,Nt): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
 		t1_tmp = time.time()
-		if k==1:
-			LHS = mg.FP_diffusion_implicit_Ometh(k*dt,x,y,x,y,dx,dt)
-			#LHS = mg.FP_diffusion_flux_Diamond(time,x,y,x,y,dx,dt)
+		if k==1 and not NONLINEAR:
+			LHS = mg.FP_diffusion_implicit_Ometh(k*dt,x,y,x,y,dx,dt,south,north,west,east,nulled)
+			#LHS = mg.FP_diffusion_flux_Diamond(time,x,y,x,y,dx,dy,dt,south,north,west,east,nulled)
 			#print LHS
 			#LHS = mg.FP_diffusion_Nonlinear(k*dt,x,y,x,y,dx,dt,m)
 			#print LHS.sum(0)
-			RHS = mg.FP_convection_explicit_interpol(k*dt,x,y,x,y,dx,dt)
+			RHS = mg.FP_convection_explicit_interpol(k*dt,x,y,x,y,dx,dt,south,north,west,east,nulled)
 		#RHS = mg.FP_convection_explicit_interpol(k*dt,x,y,x,y,dx,dt)
 		#RHS = mg.FP_convection_explicit_classic(k*dt,x,y,x,y,dx,dt)
 		#print RHS.sum(1)
@@ -88,11 +92,13 @@ for N in range(0,REFINEMENTS):
 		t1 += time.time() - t1_tmp
 		t2_tmp = time.time()
 		if NONLINEAR:
+			if k==1:
+				RHS = mg.FP_convection_explicit_interpol(k*dt,x,y,x,y,dx,dt,south,north,west,east,nulled)
 			m_old = np.ravel(np.copy(m))
 			while True:
 				m_tmp = np.ravel(np.copy(m))
 				#LHS = mg.FP_diffusion_implicit_Nonlinear(k*dt,x,y,x,y,dx,dt,m)
-				LHS = mg.FP_diffusion_Nonlinear(k*dt,x,y,x,y,dx,dt,m)
+				LHS = mg.FP_diffusion_Nonlinear(k*dt,x,y,x,y,dx,dt,m,south,north,west,east,nulled)
 				#print LHS
 				#print LHS.sum(0)
 				#print ss

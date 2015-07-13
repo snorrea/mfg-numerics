@@ -322,10 +322,10 @@ def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m,south,north,west,east,nulled):
 	length_updown = np.sqrt(D12**2 + D22**2)
 	length_rightleft = np.sqrt(D11**2 + D12**2)
 	#length of intersection vectors, ex KO1
-	intersect_up = .5*dx*np.sqrt(1+ratio_up) #|OP1| for upwards
-	intersect_right = .5*dx*np.sqrt(1+ratio_right) #|OP1| for rightwards
-	intersect_down = .5*dx*np.sqrt(1+ratio_down) #|OP2| for downwards
-	intersect_left = .5*dx*np.sqrt(1+ratio_left) #|OP2| for leftwards
+	intersect_up = .5*dx*np.sqrt(1+ratio_up**2) #|OP1| for upwards
+	intersect_right = .5*dx*np.sqrt(1+ratio_right**2) #|OP1| for rightwards
+	intersect_down = .5*dx*np.sqrt(1+ratio_down**2) #|OP2| for downwards
+	intersect_left = .5*dx*np.sqrt(1+ratio_left**2) #|OP2| for leftwards
 	#cell areas
 	mK = np.ravel(np.ones(I*J)*dx2)
 	mK[south] = mK[south]#*2
@@ -457,8 +457,11 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT,south,north,w
 			C = np.array([[a1,0,c1,0],[0,-a4,0,-c4],[0,c3,-b3,0],[-c2,0,0,b2]])
 			F = np.array([[-a1-c1,0,0,0],[0,0,0,a4+c4],[0,0,-c3+b3,0],[0,c2-b2,0,0]])
 		#finish up
+		#m_vec = np.array([ m[i], m[i+1], m[i+I], m[i+I+1]])
+		#m_tmp = np.linalg.solve(A,np.dot(B,m_vec))
 		T = np.dot(C,np.dot(np.linalg.inv(A),B))+F #transmission coefficient matrix
 		R = np.array([[1,0,1,0],[-1,0,0,1],[0,1,-1,0],[0,-1,0,-1]]) #contribution matrix
+		print T
 		output = ass.FVL2G(np.dot(R,T),output,i,I,J)
 	return output
 

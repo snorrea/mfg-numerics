@@ -15,13 +15,15 @@ import applications as app
 
 #INPUTS
 scatter_test = 1
+TEST_NAME = "mfg2d#moar0"
 NONLINEAR = False
+LOAD_WRITE = True
 PLOT_DEBUG = False#True
-NICE_DIFFUSION = 0
-POINTSx = 5*2*2#*2#*2*4#*2#*4# #points in x-direction
-POINTSy = 5*2#*2#*2#*4#*2#*4# #points in y-direction
+NICE_DIFFUSION = 1
+POINTSx = 5*2*2*2#*2*4#*2#*4# #points in x-direction
+POINTSy = 5*2*2#*2#*4#*2#*4# #points in y-direction
 REFINEMENTS = 1
-NITERATIONS = 10
+NITERATIONS = 100
 DT = .25#ratio as in dt = DT*dx(**2)
 cutoff = 0 #for convergence slope
 grid = [0, 2, 0, 1]
@@ -82,6 +84,8 @@ def opt_cont_cmfg(u):
 	#a1 = -(a1)
 	#a2 = -(a2)
 	return a1,a2		
+
+Success = False
 
 for N in range(REFINEMENTS):
 	t1,t2=0,0
@@ -244,7 +248,7 @@ for N in range(REFINEMENTS):
 			tBALLS = time.time()
 			for BALLS in range(scatter_test):
 				m_tmp = np.copy(m_arr[k])
-			#	a1,a2 = opt_cont_cmfg(u)
+				a1,a2 = opt_cont_cmfg(u)
 			#	t0 = time.time()
 			#	a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
 			#	t_naive += time.time()-t0
@@ -258,15 +262,15 @@ for N in range(REFINEMENTS):
 			#	t_4d += time.time()-t0
 			#	print "4D done"
 			#	t0 = time.time()
-				a1,a2 = solve.control_hybridC_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#	a1,a2 = solve.control_hybridC_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#	t_hybrid += time.time()-t0
 			#	print "HybridC done"
 			#	t0 = time.time()
 			#	a1,a2 = solve.control_hybridO_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#	t_hybrido += time.time()-t0
 			#	print "HybridO done"
-			a1 = np.transpose(a1)
-			a2 = np.transpose(a2)
+			#a1 = np.transpose(a1)
+			#a2 = np.transpose(a2)
 			one = np.ones(a1.shape)
 			a1 = np.minimum(alpha_upper[0]*one,a1)
 			a1 = np.maximum(alpha_lower[0]*one,a1)
@@ -408,10 +412,28 @@ for N in range(REFINEMENTS):
 		kMax = ITERATION
 		if tmp<1e-3:#temp < 1e-3:
 			print "Converged! Used iterations:", ITERATION
+			Success = True
 			break
 		else:
 			print "Still crunching:", tmp, ITERATION, "/", NITERATIONS
 	#evaluate iteration
+
+if LOAD_WRITE and Success: #load best solution with parameters
+	print "Writing to file..."
+	if Success: #write NN to file
+		dx_string = "%.8f" % dx
+		dt_string = "%.8f" % DT
+		filename = TEST_NAME + "_" + dx_string + "_" + dt_string + "_" + ".txt"
+		np.savetxt(filename, m_arr[-1], fmt='%.18e', delimiter=' ', newline='\n', header='', footer='', comments='# ')
+		print "Written!"
+#	else: #write NN-1 to file
+#		#check if other files with these parameters exist
+#		dx_string = "%.8f" % dx
+#		dt_string = "%.8f" % DT
+#		eps_string = "%.8f" % epsel[NN-1]
+#		filename = TEST_NAME + "_" + dx_string + "_" + dt_string + "_" + eps_string + "_" + ".txt"
+#		np.savetxt(filename, m_best, fmt='%.18e', delimiter=' ', newline='\n', header='', footer='', comments='# ')
+
 
 conv_plot_m = conv_plot_m[:kMax]
 m_interpolates = np.zeros((REFINEMENTS-1,x.size*y.size))

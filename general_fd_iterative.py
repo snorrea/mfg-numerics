@@ -20,24 +20,24 @@ NICE_DIFFUSION = 0 #1 if diffusion indep of t,m,alpha
 LOAD_WRITE = True#True
 SHOW_ALL = True #print last solutions
 LOAD_LAST = False
-TEST_NAME = "mfg1d#finaltests#try1337"
+TEST_NAME = "mfg1d#moar0"
 #dx = 0.1**2/2
-dx = 1/10#1280#0.01#0.025
-DT = .5
+dx = 1/80#1280#0.01#0.025
+DT = .25
 dt = DT*dx
 print dx,dt
 xmin = 0#-2
 xmax = 1#+.2
 T = 1
-Niter = 200#5000 #maximum number of iterations
+Niter = 100#5000 #maximum number of iterations
 tolerance = 1e-4
 min_exp = 3
 min_coef = 0.01
 quad_order = 20
-alpha_upper = 1
-alpha_lower = -1
-start_eps = .00
-deps = .025
+alpha_upper = 2
+alpha_lower = -.1
+start_eps = .05#5
+deps = .025#*.5#*.125*.25#*25
 THE_DAMPENING = 1#dx*10
 scatter_test = 1
 
@@ -46,9 +46,9 @@ scatter_test = 1
 min_tol = min_coef*dx*min_exp
 min_left = alpha_lower #search region left
 min_right = alpha_upper #search region right
-Ns = int(np.ceil(abs(alpha_upper-alpha_lower)/(1*dx)) + 1)
+Ns = int(np.ceil(abs(alpha_upper-alpha_lower)/(.5*dx)) + 1)
 xpts_scatter = np.linspace(alpha_lower,alpha_upper,Ns)
-scatters = 2
+scatters = 3
 min_tol = .5*abs(alpha_upper-alpha_lower)*(2/Ns)**scatters
 #scatters = int(np.ceil( np.log((alpha_upper-alpha_lower)/(min_tol*Ns))/np.log(Ns/2) ))
 #print Ns,1/dx+1,min_tol_actual
@@ -93,7 +93,7 @@ if LOAD_WRITE and not LOAD_LAST: #load best solution with parameters
 		#ax1.set_ylabel('t')
 		#ax1.set_zlabel('m(x,t)')
 		#fig1.suptitle('Solution of the density m(x,t)', fontsize=14)
-		levels = max(m)*np.arange(0,1,.01)**2
+		levels = max(m)*np.arange(0,1,.01)
 		#print levels
 		#print ss
 		norm = cm.colors.Normalize(vmax=abs(m).max(), vmin=0)
@@ -224,8 +224,8 @@ if LOAD_LAST: #load last solution of coarser resolution
 			if pop[0]==TEST_NAME and pop_eps==0 and pop_dx<best_dx:
 				best_dx = pop_dx
 				best_dt = pop_DT
-	print "Chose resolution:", best_dx
 	if best_dx is not 1000: #load 
+		print "Chose resolution:", best_dx
 		dx_string = "%.8f" % best_dx
 		DT_string = "%.8f" % best_dt
 		print "Loading previous computation result..."
@@ -239,6 +239,8 @@ if LOAD_LAST: #load last solution of coarser resolution
 		t_finest = np.linspace(0,1,1/(DT*dx)+1)
 		m = np.ravel(tmp(t_finest,x_finest))
 		BETTER = True
+	else:
+		print "No better solutions to load, proceeding as usual"
 #print ss
 
 epses = int(np.round(start_eps/deps))+1
@@ -336,9 +338,9 @@ for NN in range(epses):
 			#a_tmp = np.maximum(-np.gradient(u_last,dx),np.zeros(u_last.size))
 			#t0 = time.time()	
 			#a_tmp = solve.control_general(x,k*dt,u_last,m_last,dt,dx,xpts_scatter,Ns,scatters) #hybrid
-			a_tmp = solve.control_general_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
+			#a_tmp = solve.control_general_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
 			#a_tmp = solve.control_general_vectorised_optimised(x,k*dt,u_last,m_last,dx,xpts_scatter,Ns,scatters) #hybrid
-			#a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
+			a_tmp = solve.control_hybrid_vectorised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
 			#a_tmp = solve.control_hybrid_vectorised_optimised(x,k*dt,u_last,THE_DAMPENING_S*m_last,dx,xpts_scatter,Ns,scatters) #hybrid
 			#print k
 			#print a_tmp
@@ -366,8 +368,8 @@ for NN in range(epses):
 				#u_tmp = sparse.linalg.spsolve(mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN]),mg.hjb_convection(k*dt,x,a_tmp,dt,dx)*u_last+dt*np.ravel(iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING)))
 			else:
 				if n==0 and k==K-1:
-					#LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
-					LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN])
+					LHS_HJB = mg.hjb_diffusion(k*dt,x,a_tmp,dt,dx)
+					#LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,epsel[NN])
 					#LHS_HJB = mg.hjb_diffusion_av(k*dt,x,a_tmp,dt,dx,eps_thing[k])
 				RHS_HJB = mg.hjb_convection(k*dt,x,a_tmp,dt,dx)
 				Ltmp = iF.L_global(k*dt,x,a_tmp,m_last,THE_DAMPENING_S)

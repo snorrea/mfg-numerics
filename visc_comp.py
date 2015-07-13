@@ -15,11 +15,11 @@ import scipy.interpolate as intpol
 import glob,os,sys
 
 dexes = [1/10, 1/20, 1/40, 1/80, 1/160, 1/320]
-DT = .5
+DT = .25
 DEX_LEN = len(dexes)
 epses = [None]*DEX_LEN
 solutions = [None]*DEX_LEN
-TEST_NAME = "mfg1d#finaltests#try1337"
+TEST_NAME = "mfg1d#moar0"
 
 for i in range(len(dexes)): #load best solution with parameters
 	best_eps = 42
@@ -83,7 +83,7 @@ ax1.set_xlabel('Log10 of dx')
 ax1.set_ylabel('Log10 of error')
 plt.grid(True,which="both",ls="-")
 ax1.invert_xaxis()
-fig1.suptitle('Convergence rates of u(x,t)', fontsize=14)
+fig1.suptitle('Convergence rates of m(x,t)', fontsize=14)
 
 fig3 = plt.figure(3)
 for i in range(DEX_LEN-1):
