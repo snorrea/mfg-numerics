@@ -365,6 +365,24 @@ def map_2d_to_3d(arr2d,arr3d):
 			output[:,i,:] = np.transpose(arr2d)
 	return output
 
+
+def map_2d_to_3dij(arr2d,arr3d):
+	#kinda broadcast the 2d-array into a 3d-shape
+	#assumes that two of the dimensions match
+	output = np.zeros(arr3d.shape)
+	#print arr2d.shape
+	#print arr3d.shape
+	#print output.shape
+	#output[:,0:arr3d.shape[1],:] = np.transpose(arr2d)[:]
+	#print output.shape
+	#print arr2d.shape
+	for i in range(arr3d.shape[1]):
+		if output.shape[0]==arr2d.shape[0]:
+			output[i,:,:] = (arr2d)
+		else:
+			output[i,:,:] = np.transpose(arr2d)
+	return output
+
 def gimme_gradient_points(minis,index_max):
 	my_list_x = []
 	my_list_y = []	

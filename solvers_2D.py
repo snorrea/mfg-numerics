@@ -175,7 +175,14 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 	ay = search_y[1]-search_y[0]
 	bounds = [search_x[0], search_x[-1], search_y[0], search_y[-1]]
 	Search_x,X,Y = np.meshgrid(search_x,x,y) #this is 3D
+	#Search_x,X,Y = np.meshgrid(search_x,x,y,indexing='ij') #this is 3D
+#	print X
+#	print Search_x.shape
+#	print ss
+	#print X
 	Search_y,X,Y = np.meshgrid(search_y,x,y) #this is also 3D
+	#print X
+#	print ss
 	#make the things
 	u_south = np.zeros((J,I))
 	u_north = np.zeros((J,I))
@@ -222,20 +229,38 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 		cnt = 0
 		while cnt < 10:
 			#VALUEGRID = iF.Hamiltonian_vectorised(Search_x,app.map_2d_to_3d(BESTBUYS_Y,Search_x),x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
-			VALUEGRID = iF.Hamiltonian_vectorised(Search_x,app.map_2d_to_3d(BESTBUYS_Y,Search_x),x,y,app.map_2d_to_3d(m,Search_x),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			#print Search_x.shape,x.shape,y.shape,m.shape
+		#	VALUEGRID = iF.Hamiltonian_vectorised(Search_x,app.map_2d_to_3d(BESTBUYS_Y,Search_x),x,y,app.map_2d_to_3d(m,Search_x),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID = iF.Hamiltonian_vectorised(Search_x,app.map_2d_to_3d(BESTBUYS_Y,Search_x),X,Y,app.map_2d_to_3d(m,Search_x),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+		#	print VALUEGRID.shape
+		#	print Search_x
+		#	print ss
+			#print Search_x
 			#print Search_x.shape
+			#print VALUEGRID.shape
 			ind1 = VALUEGRID.argmin(axis=1)
+		#	print VALUEGRID
+		#	print ind1
+		#	print ss
 			ind0,ind2 = np.indices(ind1.shape)
+			#print VALUEGRID[ind0,ind1,ind2]==np.amin(VALUEGRID,axis=1)
+			#print ss
 			BBX_old = np.copy(BESTBUYS_X)
 			BESTBUYS_X = Search_x[ind0,ind1,ind2]
+			#print Search_x[ind0,ind1,ind2]
+			#print np.where(Search_x == Search_x.min())
+			#print ss
+		#	print ind1
 			#VALUEGRID = iF.Hamiltonian_vectorised(app.map_2d_to_3d(BESTBUYS_X,Search_y),Search_y,x,y,m,dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
-			VALUEGRID = iF.Hamiltonian_vectorised(app.map_2d_to_3d(BESTBUYS_X,Search_y),Search_y,x,y,app.map_2d_to_3d(m,Search_y),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			#VALUEGRID = iF.Hamiltonian_vectorised(app.map_2d_to_3d(BESTBUYS_X,Search_y),Search_y,x,y,app.map_2d_to_3d(m,Search_y),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			VALUEGRID = iF.Hamiltonian_vectorised(app.map_2d_to_3d(BESTBUYS_X,Search_y),Search_y,X,Y,app.map_2d_to_3d(m,Search_y),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
 			ind1 = VALUEGRID.argmin(axis=1)
 			ind0,ind2 = np.indices(ind1.shape)
 			BBY_old = np.copy(BESTBUYS_Y)
 			BESTBUYS_Y = Search_y[ind0,ind1,ind2]
 			dev = np.linalg.norm(BBX_old-BESTBUYS_X)+np.linalg.norm(BBY_old-BESTBUYS_Y)
 			if dev < 1e-6:
+				#print "Dev:",dev
 				break
 			else:
 				cnt += 1
@@ -244,6 +269,8 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 				#print BESTBUYS_X==BBX_old
 		#	if cnt>10:
 		#		print cnt#,dev
+		if cnt==10:
+			print "Bad things happened"
 		if i-1 is not scatters:
 			x_ind = range(Search_x.shape[0])
 			y_ind = range(Search_x.shape[2])
@@ -259,54 +286,124 @@ def control_general_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,t
 			#Search_y[y_ind,:,k] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(y_ind,x_ind)])
 			#Search_x[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)])
 			#Search_y[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)])
-			Sex = np.copy(Search_x)
-			Sey = np.copy(Search_y)
-			t0 = time.time()
 			for j in range(Search_x.shape[0]):
 				for k in range(Search_x.shape[2]):
 					Search_x[j,:,k] = np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0])
 					Search_y[j,:,k] = np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1])
-			t1 = time.time()-t0
-			#print itertools.product(x_ind,y_ind)[0]
-			#print [j for j in x_ind, [k for k in y_ind]]
-			 #this has all the arg things
-			#print len(mylist)
-			#print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)]).shape
-			#print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind]).shape
-			#Sex[j,:,k] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
-			t0 = time.time()
-			mylist = [(j,k) for j in x_ind for k in y_ind]
-			myxlist = [x[0] for x in mylist]
-			myylist = [x[1] for x in mylist]
-			t2 = time.time()-t0
-			t0 = time.time()
-			#print Sex[myxlist,:,myylist].shape
-			#print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind]).shape
-			Sex[myxlist,:,myylist] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
-			Sey[myxlist,:,myylist] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j in x_ind for k in y_ind])
-			t3 = time.time()-t0
-			print t1
-			print t2
-			print t3
-			print ss
-			#Sex[[j in myxlist],:,[k in myylist]] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
-			#print Sex[myxlist,:,myylist].shape
-			#print np.linspace(BESTBUYS_X[mylist[:]]-ax,BESTBUYS_X[mylist[:]]+ax,N[0]).shape
-		#	print Search_x==Sey
-		#	print t1
-		#	print t2
-			#Sex[myxlist,:,myylist][:] = np.linspace(BESTBUYS_X[mylist[:]]-ax,BESTBUYS_X[mylist[:]]+ax,N[0])
-			#print Sex[mylist[:][0],:,mylist[:][1]].shape
-			#Sex[mylist[:][0],:,mylist[:][1]] = np.linspace(BESTBUYS_X[mylist[:]]-ax,BESTBUYS_X[mylist[:]]+ax,N[0])
-			#Sex[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j in x_ind for k in y_ind])
-		#	print ss
-			#Sey[j,:,k] = np.array()
-
 			#Search_x[j,:,k] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)])
 			#Search_y[j,:,k] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)])
 			ay = Search_y[0,1,0]-Search_y[0,0,0]
 			ax = Search_x[0,1,0]-Search_x[0,0,0]
+#	print ss		
 	return BESTBUYS_X,BESTBUYS_Y
+
+
+def control_general_vectorised_3Dij(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,tol,scatters,N,nulled,Obstacles,south,north,west,east):
+	ax = search_x[1]-search_x[0]
+	ay = search_y[1]-search_y[0]
+	bounds = [search_x[0], search_x[-1], search_y[0], search_y[-1]]
+	Search_x,Xx,Yx = np.meshgrid(search_x,x,y,indexing='ij') #this is 3D
+	Search_y,Xy,Yy = np.meshgrid(search_y,x,y,indexing='ij')
+	#print X #this is also 3D
+	#print X
+#	print ss
+	#make the things
+	u_south = np.zeros((J,I))
+	u_north = np.zeros((J,I))
+	u_west = np.zeros((J,I))
+	u_east = np.zeros((J,I))
+	u_crossup = np.zeros((J,I))
+	u_crossdown = np.zeros((J,I))
+	u = (np.reshape(u,(J,I)))
+	m = (np.reshape(m,(J,I)))
+	u_north[:-1,:] = (u[1:,:]-u[:-1,:])/dx
+	u_south[1:,:] = (u[1:,:]-u[:-1,:])/dx
+	u_east[:,:-1] = (u[:,1:]-u[:,:-1])/dy
+	u_west[:,1:] = (u[:,1:]-u[:,:-1])/dy
+	u_crossup[1:-1,1:-1] = .5*( u[1:-1,2:] + u[1:-1,:-2] + u[2:,1:-1] + u[:-2,1:-1] - 2*u[1:-1,1:-1] - u[:-2,2:] - u[2:,:-2] )/(dx*dy)
+	u_crossdown[1:-1,1:-1] = .5*( 2*u[1:-1,1:-1] + u[2:,2:] + u[:-2,:-2] - u[1:-1,2:] - u[1:-1,:-2] - u[2:,1:-1] - u[:-2,1:-1] )/(dx*dy)
+	u_north[-1,:] = (u[-2,:]-u[-1,:])/dx
+	u_south[0,:] = (u[0,:]-u[1,:])/dx
+	u_east[:,-1] = (u[:,-2]-u[:,-1])/dy
+	u_west[:,0] = (u[:,0]-u[:,1])/dy
+	u_crossup[1:-1,0] = .5*( 2*u[1:-1,1] + u[2:,0] + u[:-2,0] - 2*u[1:-1,0] - u[:-2,1] - u[2:,1] )/(dx*dy) #west
+	u_crossup[1:-1,-1] = .5*( 2*u[1:-1,-2] + u[2:,-1] + u[:-2,-1] - 2*u[1:-1,-1] - u[:-2,-2] - u[2:,-2] )/(dx*dy) #east
+	u_crossup[0,1:-1] = .5*( u[0,2:] + u[0,:-2] + 2*u[1,1:-1] - 2*u[0,1:-1] - u[1,2:] - u[1,:-2] )/(dx*dy) #south
+	u_crossup[-1,1:-1] = .5*( u[-1,2:] + u[-1,:-2] + 2*u[-2,1:-1] - 2*u[-1,1:-1] - u[-2,2:] - u[-2,:-2] )/(dx*dy) #north
+	u_crossdown[1:-1,0] = .5*( 2*u[1:-1,0] + u[2:,1] + u[:-2,1] - 2*u[1:-1,1] - u[2:,0] - u[:-2,0] )/(dx*dy) #west
+	u_crossdown[1:-1,-1] = .5*( 2*u[1:-1,-1] + u[2:,-2] + u[:-2,-2] - 2*u[1:-1,-2] - u[2:,-1] - u[:-2,-1] )/(dx*dy)#east
+	u_crossdown[0,1:-1] = .5*( 2*u[0,1:-1] + u[1,2:] + u[1,:-2] - u[0,2:] - u[0,:-2] - 2*u[1,1:-1])/(dx*dy)#south
+	u_crossdown[-1,1:-1] = .5*( 2*u[-1,1:-1] + u[-2,2:] + u[-2,:-2] - u[-1,2:] - u[-1,:-2] - 2*u[-2,1:-1])/(dx*dy) #north
+	u_crossup[0,0] = .5*( 2*u[1,0] + 2*u[0,1] - 2*u[0,0] - 2*u[1,1])/(dx*dy) #southwest
+	u_crossup[-1,0] = .5*( 2*u[-1,1] + 2*u[-2,0] - 2*u[-1,0] - 2*u[-2,1])/(dx*dy) #northwest
+	u_crossup[0,-1] = .5*( 2*u[0,-2] + 2*u[1,-1] - 2*u[-1,-1] - 2*u[1,-2])/(dx*dy) #southeast
+	u_crossup[-1,-1] = .5*( 2*u[-1,-2] + 2*u[-2,-1] - 2*u[-1,-1] - 2*u[-2,-2])/(dx*dy)#northeast
+	u_crossdown[0,0] = .5*( 2*u[0,0] + 2*u[1,1] - 2*u[1,0] - 2*u[0,1])/(dx*dy)
+	u_crossdown[-1,0] = .5*( 2*u[-1,0] + 2*u[-2,1] - 2*u[-1,1] - 2*u[-2,0])/(dx*dy)
+	u_crossdown[0,-1] = .5*( 2*u[0,-1] + 2*u[1,-2] - 2*u[0,-2] - 2*u[1,-1])/(dx*dy)
+	u_crossdown[-1,-1] = .5*( 2*u[-1,-1] + 2*u[-2,-2] - 2*u[-2,-1] - 2*u[-1,-2])/(dx*dy)
+	#FixedPoint = False
+	BESTBUYS_X = np.zeros((I,J))
+	BESTBUYS_Y = np.zeros((I,J))
+	BBX_old = np.zeros((I,J))
+	BBY_old = np.zeros((I,J))
+	#stuff
+	#m = app.map_2d_to_3d(m,Search_x)
+	for i in range(scatters):
+		cnt = 0
+		while cnt < 10:
+			### XXXX
+			VALUEGRID = iF.Hamiltonian_vectorisedij(Search_x,app.map_2d_to_3dij(BESTBUYS_Y,Search_x),Xx,Yx,app.map_2d_to_3dij(m,Search_x),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			ind0 = VALUEGRID.argmin(axis=0)
+			ind1,ind2 = np.indices(ind0.shape)
+			BBX_old = np.copy(BESTBUYS_X)
+			BESTBUYS_X = Search_x[ind0,ind1,ind2]
+			### YYYY
+			VALUEGRID = iF.Hamiltonian_vectorisedij(app.map_2d_to_3dij(BESTBUYS_X,Search_y),Search_y,Xy,Yy,app.map_2d_to_3dij(m,Search_y),dx,dy,timez,I,J,Obstacles,u_south,u_north,u_west,u_east,u_crossup,u_crossdown,True)
+			ind0 = VALUEGRID.argmin(axis=0)
+			ind1,ind2 = np.indices(ind0.shape)
+			BBY_old = np.copy(BESTBUYS_Y)
+			BESTBUYS_Y = Search_y[ind0,ind1,ind2]
+			dev = np.linalg.norm(BBX_old-BESTBUYS_X)+np.linalg.norm(BBY_old-BESTBUYS_Y)
+			if dev < 1e-6:
+				#print "Dev:",dev
+				break
+			else:
+				#print cnt, dev
+				cnt += 1
+				#print BBX_old
+				#print BESTBUYS_X
+				#print BESTBUYS_X==BBX_old
+		#	if cnt>10:
+		#		print cnt#,dev
+		if cnt==10:
+			print "Bad things happened"
+		#	print dev
+		if i-1 is not scatters:
+		#	print "Yolo"
+		#	print zip(x_ind,y_ind)
+		#	print BESTBUYS_X.shape
+		#	print BESTBUYS_Y.shape
+		#	print np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)]).shape
+		#	print np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)]).shape
+			#print Search_x.shape
+			#print Search_x[y_ind,:,x_ind].shape
+			#Search_x[j,:,x_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(y_ind,x_ind)])
+			#Search_y[y_ind,:,k] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(y_ind,x_ind)])
+			#Search_x[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)])
+			#Search_y[x_ind,:,y_ind] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)])
+		#	print Search
+			for j in range(x.size):
+				for k in range(y.size):
+					Search_x[:,j,k] = np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0])
+					Search_y[:,j,k] = np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1])
+			#Search_x[j,:,k] = np.array([np.linspace(BESTBUYS_X[j,k]-ax,BESTBUYS_X[j,k]+ax,N[0]) for j,k in zip(x_ind,y_ind)])
+			#Search_y[j,:,k] = np.array([np.linspace(BESTBUYS_Y[j,k]-ay,BESTBUYS_Y[j,k]+ay,N[1]) for j,k in zip(x_ind,y_ind)])
+			ay = Search_y[1,0,0]-Search_y[0,0,0]
+			ax = Search_x[1,0,0]-Search_x[0,0,0]
+#	print ss		
+	return BESTBUYS_X,BESTBUYS_Y
+
 
 def control_hybridC_vectorised_3D(search_x,search_y,x,y,u,m,dt,dx,dy,timez,I,J,tol,scatters,N,nulled,Obstacles,south,north,west,east):
 	ax = search_x[1]-search_x[0]

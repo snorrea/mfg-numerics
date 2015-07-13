@@ -15,38 +15,38 @@ import applications as app
 
 #INPUTS
 scatter_test = 1
-TEST_NAME = "mfg2d#moar0"
+TEST_NAME = "mfg2d#moar1"
 NONLINEAR = False
-LOAD_WRITE = True
+LOAD_WRITE = False
 PLOT_DEBUG = False#True
 NICE_DIFFUSION = 1
-POINTSx = 5*2*2*2#*2*4#*2#*4# #points in x-direction
-POINTSy = 5*2*2#*2#*4#*2#*4# #points in y-direction
+POINTSx = 5#*2#*2*2#*2*4#*2#*4# #points in x-direction
+POINTSy = 5#*2#*2#*2#*4#*2#*4# #points in y-direction
 REFINEMENTS = 1
-NITERATIONS = 100
-DT = .25#ratio as in dt = DT*dx(**2)
+NITERATIONS = 1
+DT = .2#ratio as in dt = DT*dx(**2)
 cutoff = 0 #for convergence slope
-grid = [0, 2, 0, 1]
+grid = [0, 1, 0, 1]#[0, 2, 0, 1]
 xmax = grid[1]
 xmin = grid[0]
 ymax = grid[3]
 ymin = grid[2]
-T = 2.5
-PLOT_GRID = [3, 4] #what is this thing
+T = 1#2.5
+PLOT_GRID = [4, 5]
 
 #OBSTACLES
-obstacle_x_min = [.0, .5, 1.7]#[.0]#
-obstacle_x_max = [.2, 1.6, 2.0]#[.05]#
-obstacle_y_min = [.4, .4, .4]#[.0]#
-obstacle_y_max = [.5, .5, .5]#[.05]#
+obstacle_x_min = []#[.0, .5, 1.7]#[.0]#
+obstacle_x_max = []#[.2, 1.6, 2.0]#[.05]#
+obstacle_y_min = []#[.4, .4, .4]#[.0]#
+obstacle_y_max = []#[.5, .5, .5]#[.05]#
 KILL = 1 #set 0 if you don't want this to matter
 
 #GOALS
 #goals_x = [.0,.1,.2,.8,.9,1.]#[.2,.4,.6,.8]
 #goals_y = [.9,.9,.9,.9,.9,.9]#[.9,.9,.9,.9]
-goals_x = [1.]#np.linspace(.0,.2,50)
+goals_x = []#[1.]#np.linspace(.0,.2,50)
 #goals_x = np.concatenate([goals_x,np.linspace(.8,.9,25)])
-goals_y = [.95]#np.linspace(.8,.9,25)
+goals_y = []#[.95]#np.linspace(.8,.9,25)
 #goals_x,goals_y = np.meshgrid(goals_x,goals_y)
 goals_x = np.unique(np.ravel(goals_x))
 goals_y = np.unique(np.ravel(goals_y))
@@ -73,8 +73,8 @@ conv_plot_m = np.zeros(NITERATIONS)
 
 #Searching stuff
 min_tol = 1e-6#tolerance#1e-5 #tolerance for minimum
-alpha_upper = np.array([2, 2]) #search region left
-alpha_lower = np.array([-2, -2]) #search region right
+alpha_upper = np.array([3, 3]) #search region left
+alpha_lower = np.array([-3, -3]) #search region right
 
 def opt_cont_cmfg(u):
 	ush = np.transpose(np.reshape(u,(J,I)))
@@ -120,7 +120,11 @@ for N in range(REFINEMENTS):
 	north = range(I*J-I,I*J) #ok 
 	east = range(I-1,I*J+1,I) #ok
 	nulled = None
-	
+	se = [n for n in indices if n in south if n in east]
+	sw = [n for n in indices if n in south if n in west]
+	ne = [n for n in indices if n in north if n in east]
+	nw = [n for n in indices if n in north if n in west]
+
 	#print south
 	#print west
 	#print north
@@ -179,42 +183,47 @@ for N in range(REFINEMENTS):
 	#obstacle = np.concatenate([obstacle,north])
 	#obstacle = np.concatenate([obstacle,south])
 	#print obstacle
-	
-	not_nulled = [ item for i,item in enumerate(indices) if i not in nulled ]
-	not_obstacle = [ item for i,item in enumerate(indices) if i not in obstacle ]
-	ObstacleCourse = app.FMM(x,y,obstacle,goals_x,goals_y)
-	ObstacleCourse = (np.reshape(ObstacleCourse,(J,I)))
-	fig1 = plt.figure(1)
-	#ax1 = fig1.add_subplot(111, projection='3d')
-	#ax1.plot_surface(X,Y,Obs,rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
-	#levels = np.arange(np.amin(Obs),np.amax(Obs),0.5)
-	levels = np.arange(0,2.5,0.05)
-	norm = cm.colors.Normalize(vmax=abs(ObstacleCourse).max(), vmin=0)
-	cmap = cm.PRGn
-	#print X.shape,Y.shape,ObstacleCourse.shape
-	fig1 = plt.contourf(X,Y,ObstacleCourse,levels,cmap=plt.cm.Reds)
-	CS2 = plt.contour(fig1, levels=levels[:],colors = 'b')
-	#cbar = plt.colorbar(fig1)
-	#cbar.ax.set_ylabel('Distribution density')
-	#cbar.add_lines(CS2)
-	#fig1.suptitle("a1")
-	#ax1.set_xlabel('x')
-	#ax1.set_ylabel('y')
-#	plt.show()#[]#
-	#
-
+	if nulled is not None and obstacle is not None:
+		not_nulled = [ item for i,item in enumerate(indices) if i not in nulled ]
+		not_obstacle = [ item for i,item in enumerate(indices) if i not in obstacle ]
+		ObstacleCourse = app.FMM(x,y,obstacle,goals_x,goals_y)
+		ObstacleCourse = (np.reshape(ObstacleCourse,(J,I)))
+		fig1 = plt.figure(1)
+		#ax1 = fig1.add_subplot(111, projection='3d')
+		#ax1.plot_surface(X,Y,Obs,rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+		#levels = np.arange(np.amin(Obs),np.amax(Obs),0.5)
+		levels = np.arange(0,2.5,0.05)
+		norm = cm.colors.Normalize(vmax=abs(ObstacleCourse).max(), vmin=0)
+		cmap = cm.PRGn
+		#print X.shape,Y.shape,ObstacleCourse.shape
+		fig1 = plt.contourf(X,Y,ObstacleCourse,levels,cmap=plt.cm.Reds)
+		CS2 = plt.contour(fig1, levels=levels[:],colors = 'b')
+		#cbar = plt.colorbar(fig1)
+		#cbar.ax.set_ylabel('Distribution density')
+		#cbar.add_lines(CS2)
+		#fig1.suptitle("a1")
+		#ax1.set_xlabel('x')
+		#ax1.set_ylabel('y')
+#		plt.show()#[]#
+		#
+	else:
+		ObstacleCourse = 0
+		#se = []
+		#ne = []
+		#sw = []
+		#nw = []
 	#print ss
 	#print y
 	#print nulled
 	#print ss
 	#minimisation things
-	Ns_x = int(np.ceil(abs(alpha_upper[0]-alpha_lower[0])/(dx)) + 1)#*10
-	Ns_y = int(np.ceil(abs(alpha_upper[1]-alpha_lower[1])/(dy)) + 1)#*10
+	Ns_x = int(np.ceil(abs(alpha_upper[0]-alpha_lower[0])/(0.25*dx)) + 1)#*10
+	Ns_y = int(np.ceil(abs(alpha_upper[1]-alpha_lower[1])/(0.25*dy)) + 1)#*10
 	xpts_scatter = np.linspace(alpha_lower[0],alpha_upper[0],Ns_x)
 	ypts_scatter = np.linspace(alpha_lower[1],alpha_upper[1],Ns_y)
 	Ns = [Ns_x,Ns_y]
 	#scatters = int(np.ceil( np.log((max(alpha_upper-alpha_lower))/(min_tol*min(Ns)))/np.log(min(Ns)/2) ))
-	scatters = 2
+	scatters = 3
 	#min_tol = .5*abs(max(alpha_upper-alpha_lower))*(2/min(Ns))**scatters
 	print "Scatters:",scatters,Ns
 
@@ -227,6 +236,9 @@ for N in range(REFINEMENTS):
 	for k in range(0,Nt):
 		m_arr[k] = m0
 	m_last_solution = None
+
+	if nulled is None:
+		nulled = []
 	
 	#ObstacleCourse.transpose()
 
@@ -244,17 +256,18 @@ for N in range(REFINEMENTS):
 		t1=0
 		t2=0
 		for k in range(Nt-1,-1,-1): #COMPUTE M WHERE WE DO NOT ALLOW AGENTS TO LEAVE SUCH THAT m(-1) = m(N+1) = 1 ALWAYS
-			print k
+		#	print k
 			tBALLS = time.time()
 			for BALLS in range(scatter_test):
 				m_tmp = np.copy(m_arr[k])
-				a1,a2 = opt_cont_cmfg(u)
+			#	a1,a2 = opt_cont_cmfg(u)
 			#	t0 = time.time()
 			#	a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
 			#	t_naive += time.time()-t0
 			#	print "Naive done"
 			#	t0 = time.time()
-			#	a1,a2 = solve.control_general_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+			#	a1,a2 = solve.control_general_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east) #IT FUCKING WORKS
+				a1,a2 = solve.control_general_vectorised_3Dij(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
 			#	t_3d += time.time()-t0
 			#	print "3D done"
 			#	t0 = time.time()
@@ -295,7 +308,8 @@ for N in range(REFINEMENTS):
 				t1 += time.time() - t1_tmp
 				#Obs = np.reshape(ObstacleCourse,(I,J)).transpose()
 				#m_tmp = np.reshape(m_tmp,(I,J))
-				Ltmp = np.ravel(iF.L_global(k*dt,x,y,a1,a2,m_tmp,ObstacleCourse))
+				X,Y = np.meshgrid(x,y)
+				Ltmp = np.ravel(iF.L_global(k*dt,X,Y,a1,a2,m_tmp.reshape((J,I)),ObstacleCourse))
 				#plt.spy(RHS_HJB)
 				#plt.show()
 				#print ss
@@ -412,6 +426,7 @@ for N in range(REFINEMENTS):
 		kMax = ITERATION
 		if tmp<1e-3:#temp < 1e-3:
 			print "Converged! Used iterations:", ITERATION
+			print tmp
 			Success = True
 			break
 		else:
@@ -560,8 +575,18 @@ ax1.set_ylabel('y')
 ax1.set_zlabel('m(x,t)')
 
 fig8 = plt.figure(8)
-SOLN_NUMBER = range(1,Nt,int(round(Nt/TIME_PLOTS)))
+#SOLN_NUMBER = range(0,Nt,int(round(TIME_PLOTS/Nt)))
+SOLN_NUMBER = np.linspace(0,Nt-1,TIME_PLOTS).astype(int)
 
+#print SOLN_NUMBER
+
+#print np.array(m_arr).shape
+#print SOLN_NUMBER.shape
+#print ss
+
+print TIME_PLOTS
+print SOLN_NUMBER
+#print ss
 #max thing
 max_val = -1
 for i in range(Nt):
@@ -571,53 +596,58 @@ for i in range(Nt):
 print max_val
 #max_val = np.max(m_arr[range(TIME_PLOTS)])
 
-for tullball in range(TIME_PLOTS):
-	plt_number = int(str(PLOT_GRID[0]) + str(PLOT_GRID[1]) + str(tullball+1))
-	#ax8 = fig8.add_subplot(plt_number, projection='3d')
-	ax8 = fig8.add_subplot(PLOT_GRID[0], PLOT_GRID[1], tullball, projection='3d')
+number = 1#0
+for tullball in SOLN_NUMBER:
+	ax8 = fig8.add_subplot(PLOT_GRID[0], PLOT_GRID[1], number, projection='3d')
 	#get SOLN_NUMBER
-	#ax8.plot_surface(Xplot,Yplot,np.reshape(m_arr[SOLN_NUMBER[tullball]],(J,I)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, vmax=max_val, antialiased=False)
-	ax8.plot_surface(Xplot,Yplot,np.reshape(m_arr[SOLN_NUMBER[tullball]],(J,I)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+	ax8.plot_surface(Xplot,Yplot,np.reshape(m_arr[tullball],(J,I)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 	#ax8.set_zticks(np.linspace(0,max_val,5))
-	titleString = "Time: %.2f" % (SOLN_NUMBER[tullball]*dt)
+	titleString = "Time: %.2f" % (tullball*dt)
 	ax8.set_title(titleString)
+	number+=1
 
 fig9 = plt.figure(9)
-for tullball in range(TIME_PLOTS):
-	plt_number = int(str(PLOT_GRID[0]) + str(PLOT_GRID[1]) + str(tullball+1))
-	#ax8 = fig8.add_subplot(plt_number, projection='3d')
-	ax9 = fig9.add_subplot(PLOT_GRID[0], PLOT_GRID[1], tullball, projection='3d')
+number = 1#0
+for tullball in SOLN_NUMBER:
+	ax9 = fig9.add_subplot(PLOT_GRID[0], PLOT_GRID[1], number, projection='3d')
 	#get SOLN_NUMBER
 	#ax8.plot_surface(Xplot,Yplot,np.reshape(m_arr[SOLN_NUMBER[tullball]],(J,I)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, vmax=max_val, antialiased=False)
-	ax9.plot_surface(Xplot[:,:x.size/2],Yplot[:,:x.size/2],np.reshape(m_arr[SOLN_NUMBER[tullball]],(J,I))[:,:x.size/2],rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
+	ax9.plot_surface(Xplot[:,:x.size/2],Yplot[:,:x.size/2],np.reshape(m_arr[tullball],(J,I))[:,:x.size/2],rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 	#ax8.set_zticks(np.linspace(0,max_val,5))
-	titleString = "Time: %.2f. Agents: %.2f" % ((SOLN_NUMBER[tullball]*dt),sum(sum(np.reshape(m_arr[SOLN_NUMBER[tullball]],(J,I))[:,:x.size/2])))
+	titleString = "Time: %.2f. Agents: %.2f" % ((tullball*dt),sum(sum(np.reshape(m_arr[tullball],(J,I))[:,:x.size/2])))
 	ax9.set_title(titleString)
+	number+=1
 
 
-
-fig10 = plt.figure(10)
-for tullball in range(TIME_PLOTS): # make contour plots as well
+fig10 = plt.figure(10) 
+number = 1#0
+for tullball in SOLN_NUMBER: # make contour plots as well
 	#plt_number = int(str(PLOT_GRID[0]) + str(PLOT_GRID[1]) + str(tullball+1))
 	#print levels
 	#print ss
-	plt.subplot(PLOT_GRID[0],PLOT_GRID[1],tullball)
-	levels = max(m_arr[SOLN_NUMBER[tullball]])*np.arange(0,1,.05)
-	norm = cm.colors.Normalize(vmax=abs(m_arr[SOLN_NUMBER[tullball]]).max(), vmin=0)
+	plt.subplot(PLOT_GRID[0],PLOT_GRID[1],number)
+	levels = np.amax(np.reshape(m_arr[tullball],(J,I)))*np.arange(0,1,.05)
+	norm = cm.colors.Normalize(vmax=abs(m_arr[tullball]).max(), vmin=0)
 	cmap = cm.PRGn
-	fig1 = plt.contourf(Xplot,Yplot,np.reshape(m_arr[SOLN_NUMBER[tullball]],(J,I)),levels,cmap=plt.cm.pink)
+	fig1 = plt.contourf(Xplot,Yplot,np.reshape(m_arr[tullball],(J,I)),levels,cmap=plt.cm.pink)
 	#CS2 = plt.contour(fig1, levels=levels[::2],colors = 'b')
-	cbar = plt.colorbar(fig1)
-	titleString = "Time: %.2f" % (SOLN_NUMBER[tullball]*dt)
+	#cbar = plt.colorbar(fig1)
+	plt.colorbar(fig1)
+	#abs(x-np.cos(time)) + abs(y+np.sin(time))
+	time_temp = tullball*dt
+	plt.scatter(np.cos(.5*np.pi*time_temp), 1-1.00*np.sin(.5*np.pi*time_temp), marker='o', c='y', s=100, zorder=10)
+	#plt.scatter(x, y, marker='o', c='b', s=5, zorder=10)
+	titleString = "Time: %.2f" % time_temp
+	number+=1
 	#fig1.title(titleString)
 	#ax8 = fig8.add_subplot(PLOT_GRID[0], PLOT_GRID[1], tullball, projection='3d')
 	#ax8.plot_surface(Xplot,Yplot,np.reshape(m_arr[SOLN_NUMBER[tullball]],(J,I)),rstride=1,cstride=1,cmap=cm.coolwarm,linewidth=0, antialiased=False)
 	#titleString = "Time: %.2f" % (SOLN_NUMBER[tullball]*dt)
 	#ax8.set_title(titleString)
 
-
-fig10 = plt.figure(11)
-plt.loglog(range(kMax),conv_plot_m)
+if ITERATION > 1:
+	fig10 = plt.figure(11)
+	plt.loglog(range(kMax),conv_plot_m)
 
 plt.show()
 

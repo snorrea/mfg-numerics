@@ -31,6 +31,7 @@ def HJB_diffusion_implicit(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled,
 	sw = np.intersect1d(np.intersect1d(south,west),sw)
 	ne = np.intersect1d(np.intersect1d(north,east),ne)
 	nw = np.intersect1d(np.intersect1d(north,west),nw)
+	x,y = np.meshgrid(x,y)
 	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
 	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
 	D12 = iF.Sigma_D12_test(time,x,y,a1,a2)
@@ -200,10 +201,11 @@ def FP_convection_explicit_classic(time,x,y,a1,a2,dx,dt):
 	return sparse.csr_matrix(output)
 def FP_convection_explicit_interpol(time,x,y,a1,a2,dx,dt,south,north,west,east,nulled):
 	I,J = x.size,y.size
-	[f1, f2] = iF.f_global(time,x,y,a1,a2)
-	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
-	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
-	D12 = iF.Sigma_D12_test(time,x,y,a1,a2)
+	X,Y = np.meshgrid(x,y)
+	[f1, f2] = iF.f_global(time,X,Y,a1,a2)
+	D11 = iF.Sigma_D11_test(time,X,Y,a1,a2)
+	D22 = iF.Sigma_D22_test(time,X,Y,a1,a2)
+	D12 = iF.Sigma_D12_test(time,X,Y,a1,a2)
 	D11x,D11y = np.gradient(D11,dx,dx)
 	D22x,D22y = np.gradient(D22,dx,dx)
 	D12x,D12y = np.gradient(D12,dx,dx)
@@ -467,9 +469,10 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT,south,north,w
 
 def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled): #this is implicit
 	I,J = x.size,y.size
-	D11 = iF.Sigma_D11_test(time,x,y,a1,a2)
-	D22 = iF.Sigma_D22_test(time,x,y,a1,a2)
-	D12 = iF.Sigma_D12_test(time,x,y,a1,a2)
+	X,Y = np.meshgrid(x,y)
+	D11 = iF.Sigma_D11_test(time,X,Y,a1,a2)
+	D22 = iF.Sigma_D22_test(time,X,Y,a1,a2)
+	D12 = iF.Sigma_D12_test(time,X,Y,a1,a2)
 	dx2 = dx**2
 	dy2 = dy**2
 	dxy = dx*dy
