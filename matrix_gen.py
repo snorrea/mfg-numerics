@@ -214,7 +214,7 @@ def FP_convection_explicit_interpol(time,x,y,a1,a2,dx,dt,south,north,west,east,n
 	#print f1.shape,f2.shape
 	#print D11.shape,D11x.shape,D11y.shape
 	#print D22.shape,D22x.shape,D22y.shape
-
+	#print f1.shape,D11x.shape,D12y.shape
 	F1 = np.ravel(f1 - 0.5*D11x-0.5*D12y)#,order='F')
 	F2 = np.ravel(f2 - 0.5*D12x-0.5*D22y)#,order='F')
 	zero = np.zeros(F1.size)
@@ -282,9 +282,10 @@ def FP_diffusion_implicit_Nonlinear(time,x,y,a1,a2,dx,dt,m,south,north,west,east
 def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m,south,north,west,east,nulled): #tried to optimise
 	dx2 = dx**2
 	I,J = x.size,y.size
-	D11 = np.ravel(iF.Sigma_D11_test(time,x,y,a1,a2))
-	D22 = np.ravel(iF.Sigma_D22_test(time,x,y,a1,a2))
-	D12 = np.ravel(iF.Sigma_D12_test(time,x,y,a1,a2))
+	X,Y = np.meshgrid(x,y)
+	D11 = np.ravel(iF.Sigma_D11_test(time,X,Y,a1,a2))
+	D22 = np.ravel(iF.Sigma_D22_test(time,X,Y,a1,a2))
+	D12 = np.ravel(iF.Sigma_D12_test(time,X,Y,a1,a2))
 	m = np.ravel(m)
 	#initialise shitloads of stuff
 	indices = [n for n in list(range(I*J)) if n not in list(nulled)]
@@ -294,6 +295,7 @@ def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m,south,north,west,east,nulled):
 	#east = range(I-1,I*J,I)#in the future, we load these guys
 	not_south = np.array([ item for i,item in enumerate(range(I*J)) if i not in south ])
 	not_north = np.array([ item for i,item in enumerate(range(I*J)) if i not in north ])
+	#print not_north
 	not_west = np.array([ item for i,item in enumerate(range(I*J)) if i not in west ])
 	not_east = np.array([ item for i,item in enumerate(range(I*J)) if i not in east ])
 	not_ne = np.intersect1d(not_north,not_east)
@@ -315,6 +317,7 @@ def FP_diffusion_Nonlinear(time,x,y,a1,a2,dx,dt,m,south,north,west,east,nulled):
 	a1_rightleft = np.zeros(I*J)
 	a2_updown = np.zeros(I*J)
 	a2_rightleft = np.zeros(I*J)
+	
 	#ratios
 	ratio_up = np.minimum(D12,D22)/np.maximum(D12,D22)
 	ratio_down = np.maximum(-D12,-D22)/np.minimum(-D12,-D22)
@@ -467,12 +470,12 @@ def add_diffusion_flux_Ometh(output,D11,D22,D12,I,J,dx,dt,EXPLICIT,south,north,w
 		output = ass.FVL2G(np.dot(R,T),output,i,I,J)
 	return output
 
-def FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled): #this is implicit
+def FP_diffusion_flux_Diamond(timez,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled): #this is implicit
 	I,J = x.size,y.size
 	X,Y = np.meshgrid(x,y)
-	D11 = iF.Sigma_D11_test(time,X,Y,a1,a2)
-	D22 = iF.Sigma_D22_test(time,X,Y,a1,a2)
-	D12 = iF.Sigma_D12_test(time,X,Y,a1,a2)
+	D11 = iF.Sigma_D11_test(timez,X,Y,a1,a2)
+	D22 = iF.Sigma_D22_test(timez,X,Y,a1,a2)
+	D12 = iF.Sigma_D12_test(timez,X,Y,a1,a2)
 	dx2 = dx**2
 	dy2 = dy**2
 	dxy = dx*dy

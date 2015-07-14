@@ -15,16 +15,17 @@ import applications as app
 
 #INPUTS
 scatter_test = 1
-TEST_NAME = "mfg2d#moar1"
-NONLINEAR = False
+TEST_NAME = "mfg2d#JUSTIN9000hard"
+NONLINEAR = True
 LOAD_WRITE = False
 PLOT_DEBUG = False#True
-NICE_DIFFUSION = 1
-POINTSx = 5#*2#*2*2#*2*4#*2#*4# #points in x-direction
-POINTSy = 5#*2#*2#*2#*4#*2#*4# #points in y-direction
+NICE_DIFFUSION = 0
+SEARCHRATIO = 1.0
+POINTSx = 10#12.5#*2*2#*2*4#*2#*4# #points in x-direction
+POINTSy = 10#12.5#*2#*2#*4#*2#*4# #points in y-direction
 REFINEMENTS = 1
-NITERATIONS = 1
-DT = .2#ratio as in dt = DT*dx(**2)
+NITERATIONS = 20
+DT = .3#ratio as in dt = DT*dx(**2)
 cutoff = 0 #for convergence slope
 grid = [0, 1, 0, 1]#[0, 2, 0, 1]
 xmax = grid[1]
@@ -84,6 +85,19 @@ def opt_cont_cmfg(u):
 	#a1 = -(a1)
 	#a2 = -(a2)
 	return a1,a2		
+
+def potential_object(x,y):
+	#x,y = np.meshgrid(x,y)
+	output = np.zeros((x.size,y.size))
+	for k in range(len(obstacle_x_max)):
+		for i in range(x.size):
+			for j in range(y.size):
+				if x[i] >= obstacle_x_min[k] and y[j] >= obstacle_y_min[k] and x[i] <= obstacle_x_max[k] and y[j] <=obstacle_y_max[k]: #jb1
+					output[i,j] = 1
+	return output
+def reach_goal(x,y):
+	x,y = np.meshgrid(x,y)
+	return abs(x-goals_x[0]) + abs(y-goals_y[0])
 
 Success = False
 
@@ -217,13 +231,13 @@ for N in range(REFINEMENTS):
 	#print nulled
 	#print ss
 	#minimisation things
-	Ns_x = int(np.ceil(abs(alpha_upper[0]-alpha_lower[0])/(0.25*dx)) + 1)#*10
-	Ns_y = int(np.ceil(abs(alpha_upper[1]-alpha_lower[1])/(0.25*dy)) + 1)#*10
+	Ns_x = int(np.ceil(abs(alpha_upper[0]-alpha_lower[0])/(SEARCHRATIO*dx)) + 1)#*10
+	Ns_y = int(np.ceil(abs(alpha_upper[1]-alpha_lower[1])/(SEARCHRATIO*dy)) + 1)#*10
 	xpts_scatter = np.linspace(alpha_lower[0],alpha_upper[0],Ns_x)
 	ypts_scatter = np.linspace(alpha_lower[1],alpha_upper[1],Ns_y)
 	Ns = [Ns_x,Ns_y]
 	#scatters = int(np.ceil( np.log((max(alpha_upper-alpha_lower))/(min_tol*min(Ns)))/np.log(min(Ns)/2) ))
-	scatters = 3
+	scatters = 2
 	#min_tol = .5*abs(max(alpha_upper-alpha_lower))*(2/min(Ns))**scatters
 	print "Scatters:",scatters,Ns
 
@@ -248,6 +262,7 @@ for N in range(REFINEMENTS):
 		u = np.zeros(I*J) #terminal cost
 		#u = ObstacleCourse
 		t_naive = 0
+		t_naive_hybrid = 0
 		t_3d = 0
 		t_4d = 0
 		t_hybrid = 0
@@ -260,15 +275,17 @@ for N in range(REFINEMENTS):
 			tBALLS = time.time()
 			for BALLS in range(scatter_test):
 				m_tmp = np.copy(m_arr[k])
-			#	a1,a2 = opt_cont_cmfg(u)
-			#	t0 = time.time()
-			#	a1,a2 = solve.control_general(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
-			#	t_naive += time.time()-t0
+		#		t0 = time.time()
+		#		a1,a2 = solve.control_sequential_scatter_1D(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
+		#		t_naive += time.time()-t0
+		#		t0 = time.time()
+		#		a1,a2 = solve.control_sequential_hybrid_1D(xpts_scatter,ypts_scatter,x,y,u,m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,np.ravel(ObstacleCourse),south,north,west,east) #must be transposed
+		#		t_naive_hybrid += time.time()-t0
 			#	print "Naive done"
-			#	t0 = time.time()
-			#	a1,a2 = solve.control_general_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east) #IT FUCKING WORKS
-				a1,a2 = solve.control_general_vectorised_3Dij(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
-			#	t_3d += time.time()-t0
+		#		t0 = time.time()
+				a1,a2 = solve.control_general_vectorised_3D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east) #IT FUCKING WORKS
+			#	a1,a2 = solve.control_general_vectorised_3Dij(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
+		#		t_3d += time.time()-t0
 			#	print "3D done"
 			#	t0 = time.time()
 			#	a1,a2 = solve.control_general_vectorised_4D(xpts_scatter,ypts_scatter,x,y,(u),m_tmp,dt,dx,dy,k*dt,I,J,min_tol,scatters,Ns,nulled,ObstacleCourse,south,north,west,east)
@@ -297,7 +314,9 @@ for N in range(REFINEMENTS):
 				#u = solve.hjb_kushner_mod(k*dt,x,y,a1,a2,m_tmp,dx,dy,dt)
 				LHS_HJB = mg.HJB_diffusion_implicit(k*dt,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled,se,sw,ne,nw)
 				RHS_HJB = mg.HJB_convection_explicit(k*dt,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled)
-				Ltmp = np.ravel(iF.L_global(k*dt,x,y,a1,a2,m_tmp,ObstacleCourse))
+				#Ltmp = np.ravel(iF.L_global(k*dt,x,y,a1,a2,m_tmp,ObstacleCourse))
+				X,Y = np.meshgrid(x,y)
+				Ltmp = np.ravel(iF.L_global(k*dt,X,Y,a1,a2,m_tmp.reshape((J,I)),ObstacleCourse))
 				u = sparse.linalg.spsolve(LHS_HJB,RHS_HJB*np.ravel(u)+dt*np.ravel(Ltmp))
 			else:
 				if k==Nt-1:
@@ -349,6 +368,8 @@ for N in range(REFINEMENTS):
 	#	print "Naive: %.6f" % (t_naive/(Nt*scatter_test))
 	#	print "4d: %.6f" % (t_4d/(Nt*scatter_test))
 	#	print "3d: %.6f" % (t_3d/(Nt*scatter_test))
+	#	print "Nav: %.6f" %(t_naive/(Nt*scatter_test))
+	#	print "NavH: %.6f" %(t_naive_hybrid/(Nt*scatter_test))
 	#	print "Hybrid_c: %.6f" % (t_hybrid/(Nt*scatter_test))
 	#	print "Hybrid_o: %.6f" % (t_hybrido/(Nt*scatter_test))
 	#	print ss
@@ -363,12 +384,11 @@ for N in range(REFINEMENTS):
 			#print k
 			t1_tmp = time.time()
 			m = np.zeros(I*J)
-			m_last = np.copy(m_arr[k-1])
-			a1 = a1_arr[k-1]
-			a2 = a2_arr[k-1]
+			a1 = a1_arr[k]#[k-1]
+			a2 = a2_arr[k]#[k-1]
 			if k==1 and NICE_DIFFUSION==1:
 				#LHS = mg.FP_diffusion_implicit_Ometh(k*dt,x,y,a1,a2,dx,dt)
-				LHS = mg.FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled)
+				LHS = mg.FP_diffusion_flux_Diamond(k*dt,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled)
 				#LHS = mg.FP_diffusion_Nonlinear(k*dt,x,y,x,y,dx,dt,m)
 				#LHS = mg.trim_nulled(LHS,obstacle)
 			RHS = mg.FP_convection_explicit_interpol(k*dt,x,y,a1,a2,dx,dt,south,north,west,east,nulled)
@@ -379,20 +399,23 @@ for N in range(REFINEMENTS):
 			#plt.show()
 			t1 += time.time() - t1_tmp
 			t2_tmp = time.time()
+			m_last = np.copy(m_arr[k-1])
 			if NONLINEAR:
 				m_old = np.ravel(np.copy(m_last))
+				m = np.copy(m_last)
 				while True:
-					m_tmp = np.ravel(np.copy(m_last))
+					#m_tmp = np.ravel(np.copy(m_last))
+					m_tmp = np.ravel(np.copy(m))
 					LHS = mg.FP_diffusion_Nonlinear(k*dt,x,y,a1,a2,dx,dt,m,south,north,west,east,nulled)
 					m = sparse.linalg.spsolve(LHS,RHS*np.ravel(m_old))
 					if sum(abs(m-m_tmp))*dx < 1e-6:
-						print "Picard successful", k,"/",Nt
+					#	print "Picard successful", k,"/",Nt
 						break
-					else:
-						print sum(abs(m-m_tmp))*dx
+					#else:
+					#	print sum(abs(m-m_tmp))*dx
 			else:
 				if NICE_DIFFUSION==0:
-					LHS = mg.FP_diffusion_flux_Diamond(time,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled)
+					LHS = mg.FP_diffusion_flux_Diamond(k*dt,x,y,a1,a2,dx,dy,dt,south,north,west,east,nulled)
 				m_last = np.ravel(m_last)
 				#if nulled!=None:
 				#	m_last[nulled] = 0

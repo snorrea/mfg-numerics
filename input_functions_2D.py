@@ -121,10 +121,6 @@ def Hamiltonian_vectorised(ax,ay,x,y,m,dx,dy,timez,I,J,Obstacles,U_south,U_north
 	d11 = Sigma_D11_test(timez,x,y,ax,ay) #all these bitches return matrices now
 	d12 = Sigma_D12_test(timez,x,y,ax,ay) #all these bitches
 	d22 = Sigma_D22_test(timez,x,y,ax,ay)
-	#t0 = time.time()
-	#print ax.shape,ay.shape
-	#print ay
-	#print ss
 	if THREE_DEE:
 		if Obstacles!=0:# or Obstacles is not None or Obstacles is not []:
 			Obstacles = app.map_2d_to_3d(Obstacles,ax)
@@ -134,16 +130,8 @@ def Hamiltonian_vectorised(ax,ay,x,y,m,dx,dy,timez,I,J,Obstacles,U_south,U_north
 		U_east = app.map_2d_to_3d(U_east,ax)
 		U_crossup = app.map_2d_to_3d(U_crossup,ax)
 		U_crossdown = app.map_2d_to_3d(U_crossdown,ax)
-	#	d11 = app.map_2d_to_3d(d11,ax)
-	#	d12 = app.map_2d_to_3d(d12,ax)
-	#	d22 = app.map_2d_to_3d(d22,ax)
-	#print "Time to map to 4D:", time.time()-t0
-	#and do function calls
 	f1,f2 = f_global(timez,x,y,ax,ay) #and these also
 	L = L_global(timez,x,y,ax,ay,m,Obstacles)
-	#print L.shape,f1.shape,U_west.shape
-	#print L
-	#print ss
 	return L + np.maximum(f1,zero)*U_west + np.minimum(f1,zero)*U_east + np.maximum(f2,zero)*U_south + np.minimum(f2,zero)*U_north + .5*d11*(U_east-U_west)/dx + .5*d22*(U_north-U_south)/dy + .5*np.maximum(d12,zero)*U_crossup + .5*np.minimum(d12,zero)*U_crossdown
 
 def Hamiltonian_vectorisedij(ax,ay,x,y,m,dx,dy,timez,I,J,Obstacles,U_south,U_north,U_west,U_east,U_crossup,U_crossdown,THREE_DEE): #spits out a 2D array of Hamiltonian values given arrays of inputs ax_array \times ay_array
@@ -254,7 +242,7 @@ def L_global(time,x,y,a1,a2,m_array,G): #general cost
 #	print G.shape
 	#return 0.5*(a1**2 + a2**2)*(1+x1) + G*(5 +x2) # + F_global(x,y,x,time)
 	#G_big = app.map_2d_to_3d(G,a1)
-	eps = 5000
+	eps = 20
 #	return 0.5*(a1**2+a2**2) + G
 	#return 0.5*(a1**2+a2**2) + 10/eps*m_array*(1+G)
 	#return 0.5*(a1**2+a2**2) + G + 1/eps*m_array #cmfg evacuation
@@ -264,8 +252,8 @@ def L_global(time,x,y,a1,a2,m_array,G): #general cost
 	#print F[:,0,:]==F[:,1,:]
 	#print F.shape
 	#print ss
-	return 0.5*(np.power(a1,2)+np.power(a2,2)) + F# + 1/eps*m_array #justin bieber test
-	#return 0.5*(a1**2+a2**2)*(1+1/eps*m_array) + 2*F #justin bieber test
+	#return 0.5*(np.power(a1,2)+np.power(a2,2)) + F + 1/eps*m_array #justin bieber test
+	return 0.5*(a1**2+a2**2)*(1+1/eps*m_array) + 2*F #justin bieber test
 #return 0.5*(a1**2+a2**2)*(1 + 1/eps*m_array) + 1/eps*m_array + 10*G #mfg evacuation
 #	return 0.5*(a1**2+a2**2)*(1 + 1/eps*m_array) + G #mfg evacuation
 	#return 0.5*(a1**2+a2**2) + G*(1 + 1/eps * m_array)
@@ -280,7 +268,7 @@ def f_global(time,x_array,y_array,ax_array,ay_array):
 	return ax_array, ay_array #standard MFG
 	#return [ax_array*np.exp(-c*time), ay_array*np.exp(-c*time)] #standard MFG
 
-def Sigma_D11_test(time,x,y,ax_array,ay_array):
+def Sigma_D11_test(timez,x,y,ax_array,ay_array):
 	#I = x.size
 	#J = y.size
 	#x,y = np.meshgrid(x,y)
@@ -291,14 +279,22 @@ def Sigma_D11_test(time,x,y,ax_array,ay_array):
 	#	print x.shape==ax_array.shape
 	#	x = app.map_2d_to_3d(x,ax_array)
 	#out = .005*np.ones(ax_array.shape) #+ .1*ax_array**2
-	out = .025*np.ones(x.shape) #+ .1*ax_array**2
+	pi_half = np.pi/2
+	timez = timez*pi_half
+	pos_x = np.cos(timez)
+	pos_y = 1-np.sin(timez)
+	x_dev = abs(x-pos_x)
+	y_dev = abs(y-pos_y)
+	distance = np.sqrt(x_dev**2 + y_dev**2)
+	#print np.amax(distance)
+	out = 1.25*.025*np.ones(x.shape)*(1+0.1*np.log(1+distance))# + .1*ax_array**2
 #	for i in range(0,I):
 #		for j in range(0,J):
 #			if x[i,j] >= .5:
 #				out[i,j] = 2*out[i,j]
 #	#return abs(ax_array)*(.01 + h1(x))
 	return out
-def Sigma_D22_test(time,x,y,ax_array,ay_array):
+def Sigma_D22_test(timez,x,y,ax_array,ay_array):
 	#I = x.size
 	#J = y.size
 	#x,y = np.meshgrid(x,y)
@@ -306,7 +302,15 @@ def Sigma_D22_test(time,x,y,ax_array,ay_array):
 	#if ax_array.shape != x.shape:
 	#	x = app.map_2d_to_3d(x,ax_array)
 	#out = .5*np.ones(ay_array.shape) #+ .1*ay_array**2
-	out = .025*np.ones(x.shape) #+ .1*ay_array**2
+#	out = .025*np.ones(x.shape)# + .1*ay_array**2
+	pi_half = np.pi/2
+	timez = timez*pi_half
+	pos_x = np.cos(timez)
+	pos_y = 1-np.sin(timez)
+	x_dev = abs(x-pos_x)
+	y_dev = abs(y-pos_y)
+	distance = np.sqrt(x_dev**2 + y_dev**2)
+	out = 1.25*.025*np.ones(x.shape)*(1+.01*np.log(1+distance))
 #	for i in range(0,I):
 #		for j in range(0,J):
 #			if y[i,j] >= .5:
@@ -321,7 +325,7 @@ def Sigma_D12_test(time,x,y,ax_array,ay_array):
 	#return .00125*np.ones(x.shape)*(2+x+y)#.01*abs(ax_array*ay_array)
 	#return 0*np.ones(ax_array.shape)
 	#out = 0.00125*(2+x+y)#+1e-3 #FP test mean
-	out = 0.000*np.ones(x.shape)
+	out = 0.0125*np.ones(x.shape)
 #	for i in range(0,I):
 #		for j in range(0,J):
 #			if y[i,j] >= .5 and x[i,j] >= .5:
